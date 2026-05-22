@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useStore } from "./store";
 import type { Command, Event } from "./types";
 import { soundManager } from "./sound/SoundManager";
+import { bridgeLink } from "./bridgeLink";
 
 export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
   const ws = useRef<WebSocket | null>(null);
@@ -20,6 +21,7 @@ export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
           const event = JSON.parse(m.data) as Event;
           apply(event);
           soundManager.handleEvent(event);
+          bridgeLink.emit(event);
         } catch { /* ignore malformed */ }
       };
       sock.onclose = () => {
@@ -34,6 +36,12 @@ export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
   const send = useCallback((cmd: Command) => {
     if (ws.current && ws.current.readyState === 1) ws.current.send(JSON.stringify(cmd));
   }, []);
+
+  // Expose the sender to non-prop-path consumers (Multiplayer view / RemoteMatch).
+  useEffect(() => {
+    bridgeLink.setSender(send);
+    return () => bridgeLink.setSender(null);
+  }, [send]);
 
   return { send };
 }
