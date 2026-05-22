@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Overlay</title>
+  <style>
+    html, body { margin: 0; background: transparent; font-family: system-ui, sans-serif; color: #fff; }
+    #wrap { position: fixed; bottom: 32px; left: 32px; }
+    #bed { font-size: 96px; font-weight: 800; text-shadow: 0 4px 16px rgba(0,0,0,.7); }
+    #total { font-size: 32px; opacity: .85; }
+    #status { position: fixed; top: 8px; right: 12px; font-size: 14px; opacity: .6; }
+  </style>
+</head>
+<body>
+  <div id="status">connecting…</div>
+  <div id="wrap">
+    <div id="bed">—</div>
+    <div id="total">total: 0</div>
+  </div>
+  <script>
+    const PORT = 8787;
+    let total = 0;
+    const bedEl = document.getElementById("bed");
+    const totalEl = document.getElementById("total");
+    const statusEl = document.getElementById("status");
+
+    function connect() {
+      const ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
+      ws.onopen = () => (statusEl.textContent = "connected");
+      ws.onclose = () => { statusEl.textContent = "reconnecting…"; setTimeout(connect, 1000); };
+      ws.onmessage = (msg) => {
+        const ev = JSON.parse(msg.data);
+        if (ev.type === "dart_hit") {
+          bedEl.textContent = ev.bed;
+          total += ev.score;
+          totalEl.textContent = `total: ${total}`;
+        }
+        if (ev.type === "connection_state") {
+          statusEl.textContent = ev.state;
+        }
+      };
+    }
+    connect();
+  </script>
+</body>
+</html>
