@@ -31,3 +31,16 @@ describe("Setup Count-Up", () => {
     );
   });
 });
+
+describe("Setup Medley", () => {
+  it("offers Medley and submits start_game with the medley mode", () => {
+    const send = vi.fn();
+    render(<Setup send={send} />);
+    fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "medley" } });
+    fireEvent.change(screen.getByLabelText("players"), { target: { value: "Ann, Bo" } });
+    fireEvent.click(screen.getByRole("button", { name: /start game/i }));
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "start_game", mode: "medley" }),
+    );
+  });
+});

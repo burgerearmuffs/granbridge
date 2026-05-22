@@ -61,6 +61,7 @@ export function Setup({ send }: Props) {
             <option value="around_the_clock">Around the Clock</option>
             <option value="free_play">Free Play</option>
             <option value="count_up">Count-Up</option>
+            <option value="medley">Medley</option>
           </select>
         </div>
 
@@ -156,6 +157,17 @@ export function Setup({ send }: Props) {
                 className={`${input} w-24`}
               />
             </div>
+          </div>
+        )}
+
+        {mode === "medley" && (
+          <div className="space-y-2 border border-neutral-700 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-widest">
+              Medley
+            </h3>
+            <p className="text-sm text-neutral-400">
+              A best-of-3 match: X01 (501), then Cricket, then Count-Up. First to win 2 games takes the match.
+            </p>
           </div>
         )}
 
