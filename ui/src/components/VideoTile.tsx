@@ -5,6 +5,7 @@
  * Local tile is muted; remote tiles are unmuted.
  */
 import { useEffect, useRef } from "react";
+import { Avatar } from "./Avatar";
 
 interface VideoTileProps {
   stream: MediaStream | null;
@@ -12,9 +13,11 @@ interface VideoTileProps {
   muted?: boolean;
   micActive?: boolean;
   camActive?: boolean;
+  avatarName?: string;
+  avatarColor?: string;
 }
 
-export function VideoTile({ stream, label, muted = false, micActive = true, camActive = true }: VideoTileProps) {
+export function VideoTile({ stream, label, muted = false, micActive = true, camActive = true, avatarName, avatarColor }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -34,6 +37,11 @@ export function VideoTile({ stream, label, muted = false, micActive = true, camA
         className="w-full h-full object-cover"
         aria-label={`Video stream for ${label}`}
       />
+      {!stream && avatarName && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Avatar name={avatarName} color={avatarColor ?? "#3f3f46"} size={64} />
+        </div>
+      )}
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
         <span className="bg-black/60 text-white text-xs px-2 py-0.5 rounded-full truncate max-w-[70%]">
           {label}
