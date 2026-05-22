@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>GRANBRIDGE Game</title>
+<style>
+ html,body{margin:0;background:transparent;font-family:system-ui,sans-serif;color:#fff}
+ #board{position:fixed;bottom:24px;left:24px;display:flex;gap:24px}
+ .player{padding:12px 20px;border-radius:12px;background:rgba(0,0,0,.55);min-width:140px}
+ .player.active{outline:3px solid #ffd54a}
+ .name{font-size:20px;opacity:.85}.score{font-size:64px;font-weight:800}
+ #checkout{position:fixed;bottom:24px;right:24px;font-size:28px;background:rgba(0,0,0,.55);padding:10px 16px;border-radius:12px}
+ #status{position:fixed;top:8px;right:12px;font-size:13px;opacity:.6}
+</style></head><body>
+<div id="status">connecting…</div><div id="board"></div><div id="checkout"></div>
+<script>
+const PORT=8787;
+const boardEl=document.getElementById("board");
+const coEl=document.getElementById("checkout");
+const stEl=document.getElementById("status");
+function makePlayer(p,active,score){
+  const d=document.createElement("div");
+  d.className="player"+(active?" active":"");
+  const name=document.createElement("div");name.className="name";name.textContent=p.name;
+  const sc=document.createElement("div");sc.className="score";
+  sc.textContent=(score===undefined||score===null)?"":String(score);
+  d.append(name,sc);return d;
+}
+function render(state){
+  const scores=(state.mode_view&&state.mode_view.scores)||{};
+  const nodes=state.players.map((p,i)=>makePlayer(p,i===state.active_index,scores[p.id]));
+  boardEl.replaceChildren(...nodes);
+  const co=state.mode_view&&state.mode_view.checkout;
+  coEl.textContent=co?("OUT: "+co.join("  ")):"";
+}
+function connect(){
+  const ws=new WebSocket(`ws://127.0.0.1:${PORT}`);
+  ws.onopen=()=>stEl.textContent="connected";
+  ws.onclose=()=>{stEl.textContent="reconnecting…";setTimeout(connect,1000);};
+  ws.onmessage=(m)=>{const ev=JSON.parse(m.data);
+    if(ev.type==="game_state")render(ev.state);
+    if(ev.type==="game_won")coEl.textContent="🏆 "+ev.player+" wins";};
+}
+connect();
+</script></body></html>

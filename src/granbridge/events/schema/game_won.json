@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "game_won",
+      "default": "game_won",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "player": {
+      "title": "Player",
+      "type": "string"
+    }
+  },
+  "required": [
+    "player"
+  ],
+  "title": "GameWon",
+  "type": "object"
+}

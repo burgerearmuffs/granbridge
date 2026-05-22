@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "leg_won",
+      "default": "leg_won",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "player": {
+      "title": "Player",
+      "type": "string"
+    },
+    "legs": {
+      "title": "Legs",
+      "type": "integer"
+    },
+    "sets": {
+      "title": "Sets",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "player",
+    "legs",
+    "sets"
+  ],
+  "title": "LegWon",
+  "type": "object"
+}

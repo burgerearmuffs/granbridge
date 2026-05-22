@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "bust",
+      "default": "bust",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "player": {
+      "title": "Player",
+      "type": "string"
+    },
+    "score_attempted": {
+      "title": "Score Attempted",
+      "type": "integer"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "player",
+    "score_attempted",
+    "reason"
+  ],
+  "title": "Bust",
+  "type": "object"
+}

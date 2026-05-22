@@ -61,6 +61,6 @@ class Heartbeat(BaseEvent):
 
 class ErrorEvent(BaseEvent):
     type: Literal["error"] = "error"
-    category: Literal["ble", "decode", "transport"]
+    category: Literal["ble", "decode", "transport", "command"]
     message: str
     recoverable: bool = True

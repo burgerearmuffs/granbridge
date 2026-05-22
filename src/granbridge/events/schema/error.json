@@ -19,7 +19,8 @@
       "enum": [
         "ble",
         "decode",
-        "transport"
+        "transport",
+        "command"
       ],
       "title": "Category",
       "type": "string"

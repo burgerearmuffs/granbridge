@@ -11,6 +11,7 @@ from granbridge.ble.connection import ConnectionManager
 from granbridge.ble.transport import ReplayTransport
 from granbridge.config import Settings
 from granbridge.core.bus import EventBus
+from granbridge.game.engine import GameEngine
 from granbridge.logging_setup import configure_logging
 from granbridge.protocol.segment_map import SegmentMap
 
@@ -42,20 +43,26 @@ def serve() -> None:
     async def _run() -> None:
         bus = EventBus()
         segment_map = SegmentMap.load(settings.overrides_path)
+        engine = GameEngine(bus)
+
+        def command_handler(payload: dict) -> None:
+            from granbridge.game.commands import parse_command
+            try:
+                engine.handle_command(parse_command(payload))
+            except Exception:
+                pass
+            asyncio.create_task(engine._flush())
+
         mgr = ConnectionManager(
-            transport=BleakTransport(),
-            bus=bus,
-            name_prefix=settings.board_name_prefix,
-            service_uuid=settings.vendor_service_uuid,
-            backoff_base=settings.backoff_base,
-            backoff_cap=settings.backoff_cap,
-            heartbeat_timeout=settings.heartbeat_timeout,
-            segment_map=segment_map,
+            transport=BleakTransport(), bus=bus,
+            name_prefix=settings.board_name_prefix, service_uuid=settings.vendor_service_uuid,
+            backoff_base=settings.backoff_base, backoff_cap=settings.backoff_cap,
+            heartbeat_timeout=settings.heartbeat_timeout, segment_map=segment_map,
         )
-        server = WebSocketServer(bus, settings.ws_host, settings.ws_port)
+        server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler)
         await server.start()
-        typer.echo(f"Serving events on ws://{settings.ws_host}:{settings.ws_port}")
-        await mgr.run()
+        typer.echo(f"Serving on ws://{settings.ws_host}:{settings.ws_port}")
+        await asyncio.gather(mgr.run(), engine.attach())
 
     asyncio.run(_run())
 

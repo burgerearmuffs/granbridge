@@ -10,6 +10,7 @@ from granbridge.events.models import (
     ErrorEvent,
     Heartbeat,
 )
+from granbridge.game.events import Bust, GameStarted, GameStateEvent, GameWon, LegWon
 
 _EVENT_TYPES = {
     "dart_hit": DartHit,
@@ -17,6 +18,11 @@ _EVENT_TYPES = {
     "button": ButtonEvent,
     "heartbeat": Heartbeat,
     "error": ErrorEvent,
+    "game_started": GameStarted,
+    "game_state": GameStateEvent,
+    "bust": Bust,
+    "leg_won": LegWon,
+    "game_won": GameWon,
 }
 
 
