@@ -30,4 +30,47 @@ compile here), MQTT broker. External-dependent features are built to the seam + 
 - F: built parallel (relay, commentary, vision seam) + serial integration. 129 tests. `granbridge relay` runs a local room relay; commentary plugin emits `commentary` events (template now, LLM seam flagged); camera CV is architecture-only (docs/camera-validation-architecture.md). Merged to master.
 
 ## ALL SUB-PROJECTS COMPLETE (2026-05-21 overnight run)
-Master green: 129 Python tests + 36 UI tests. See the wake-up summary at the bottom of this file.
+Master green: 129 Python tests + 36 UI tests. See the wake-up summary below.
+
+---
+
+## Wake-up summary
+
+Overnight I took GRANBRIDGE from "Milestone 1 just merged" through **all six sub-projects**, each
+via the full brainstorm→spec→plan→build→review→merge cycle (I self-approved gates per your
+pre-approval) on its own branch, fast-forward-merged to `master`. Specs in
+`docs/superpowers/specs/`, plans in `docs/superpowers/plans/`.
+
+**Built & merged (all on `master`):**
+1. **The Bridge** — BLE → decode → JSON → WebSocket → overlay (44 tests).
+2. **Game Engine** — X01 / Cricket / Around-the-Clock / Free-play, 3-dart visits, auto+manual
+   advance, snapshot undo + correct-misread, bust-revert, best-of-legs, X01 checkout suggestions;
+   the WebSocket is now bidirectional (start_game/next/undo/correct/end commands). Reviewed; 2 real
+   bugs fixed.
+3. **Desktop UI** — React+TS+Vite+Tailwind+Zustand web app in `ui/`: setup screen, per-mode live
+   boards, controls, banners, kiosk mode; `npm run build` green; Tauri scaffold present.
+4. **Integrations** — plugin API + manager (error-isolated) + MQTT / Discord / WLED / logging
+   plugins, config-driven.
+5. **OBS overlay suite** — scoreboard / checkout / throw / stats / lower-third + launcher, sharing
+   one WS helper; all safe-DOM.
+6. **Future foundations** — local multiplayer relay (`granbridge relay`) + relay plugin; AI
+   commentary (offline template commentator + `commentary` events + LLM seam); camera CV validation
+   **architecture + interface seam only**.
+
+**Totals:** 165 tests (129 Python + 36 UI), all green and hardware-free. Clean commit history,
+one squash-commit per sub-project (+ doc/review commits).
+
+**What still needs YOU (flagged, by design — I kept everything local):**
+- **Run against your board:** `granbridge scan` → `calibrate` → `serve` (only bull/dbull/miss are
+  pre-seeded; calibrate maps the rest live). This is the one thing I couldn't do (no hardware here).
+- **Rust toolchain** to compile the native Tauri desktop app (`cargo tauri build`); the web UI works now.
+- **Endpoints/keys** to activate integrations: an MQTT broker, a Discord webhook URL, a WLED host;
+  an LLM API key + a TTS voice for richer commentary; relay hosting+auth+TLS to go beyond LAN.
+- **Cameras + OpenCV** if you ever want CV autoscoring (deliberately architecture-only — you chose
+  player-cams, which already ship in `overlay/broadcast.html`).
+
+**Open follow-ups:** see `docs/FOLLOWUPS.md` (e.g. wire §8 headless log sinks, bound bus queues,
+origin-guard before any non-loopback bind, AppData config path for packaging, X01 "sets").
+
+**Suggested next session:** validate live on the board + calibrate; then either install Rust to
+ship the portable Tauri app, or harden the follow-ups for a public/streamed setup.
