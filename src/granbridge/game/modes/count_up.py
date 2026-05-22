@@ -32,9 +32,11 @@ class CountUpMode(GameMode):
         hits = view["hits"][pid]
         hits[dart.bed] = hits.get(dart.bed, 0) + 1
 
-        is_last_dart = len(state.visit) == 2                       # this dart is the 3rd of the turn
+        # The engine appends this dart to state.visit AFTER apply_dart returns, so
+        # state.visit holds the 2 earlier darts exactly when this is the 3rd (final) dart of the turn.
+        is_third_dart = len(state.visit) == 2
         is_last_player = state.active_index == len(state.players) - 1
-        if is_last_dart and is_last_player:
+        if is_third_dart and is_last_player:
             if view["current_round"] >= view["rounds"]:
                 return DartResult(points=dart.score, leg_won=True, winner=self._leader(state))
             view["current_round"] += 1

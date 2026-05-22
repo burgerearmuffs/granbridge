@@ -70,3 +70,20 @@ def test_tie_goes_to_earlier_player():
     _throw(eng, "S5", "S5", "S5")          # p2: 15 (tie)
     assert eng.state.status.value == "finished"
     assert eng.state.winner == "p1"
+
+
+def test_two_player_multi_round_interleaving():
+    eng = _engine(); _start(eng, ["A", "B"], rounds=2)
+    # Round 1: p1 then p2. current_round must only advance after the LAST player's 3rd dart.
+    _throw(eng, "S20", "S20", "S20")   # p1: 60
+    assert eng.state.mode_view["current_round"] == 1   # not advanced until p2 finishes round 1
+    _throw(eng, "S10", "S10", "S10")   # p2: 30 -> round 1 complete
+    assert eng.state.mode_view["current_round"] == 2
+    assert eng.state.status.value == "in_progress"
+    # Round 2
+    _throw(eng, "S20", "S20", "S20")   # p1: 120 total
+    _throw(eng, "S10", "S10", "S10")   # p2: 60 total -> game ends
+    assert eng.state.status.value == "finished"
+    assert eng.state.winner == "p1"
+    assert eng.state.mode_view["total"]["p1"] == 120
+    assert eng.state.mode_view["total"]["p2"] == 60
