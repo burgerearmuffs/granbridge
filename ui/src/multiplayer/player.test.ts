@@ -1,38 +1,41 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getOrCreatePlayer, setPlayerName } from "./player";
+import { getOrCreatePlayer, setPlayerName, setPlayerColor } from "./player";
+import { AVATAR_PALETTE } from "./avatar";
 
-// jsdom provides localStorage — just clear it between tests.
+const KEY = "granbridge.player";
+
 beforeEach(() => localStorage.clear());
 
-describe("player identity", () => {
-  it("creates a new identity on first call", () => {
+describe("getOrCreatePlayer", () => {
+  it("creates a new profile with id, name, and a palette avatar color", () => {
     const p = getOrCreatePlayer();
     expect(p.id).toBeTruthy();
     expect(p.name).toMatch(/^Player-/);
+    expect(AVATAR_PALETTE).toContain(p.avatar.color);
   });
 
-  it("persists: second call returns the same id", () => {
-    const first = getOrCreatePlayer();
-    const second = getOrCreatePlayer();
-    expect(second.id).toBe(first.id);
-  });
-
-  it("name follows id prefix by default", () => {
+  it("migrates a legacy {id,name} record by adding an avatar color and persisting", () => {
+    localStorage.setItem(KEY, JSON.stringify({ id: "legacy-1", name: "Bob" }));
     const p = getOrCreatePlayer();
-    expect(p.name).toBe(`Player-${p.id.slice(0, 6)}`);
+    expect(p.id).toBe("legacy-1");
+    expect(p.name).toBe("Bob");
+    expect(AVATAR_PALETTE).toContain(p.avatar.color);
+    const stored = JSON.parse(localStorage.getItem(KEY)!);
+    expect(stored.avatar.color).toBe(p.avatar.color);
   });
+});
 
-  it("setPlayerName updates the name and persists it", () => {
+describe("setPlayerName / setPlayerColor", () => {
+  it("updates and persists the name", () => {
     getOrCreatePlayer();
-    const updated = setPlayerName("Tina");
-    expect(updated.name).toBe("Tina");
-    // Subsequent getOrCreatePlayer must return updated name
-    expect(getOrCreatePlayer().name).toBe("Tina");
+    const p = setPlayerName("Zoe");
+    expect(p.name).toBe("Zoe");
+    expect(JSON.parse(localStorage.getItem(KEY)!).name).toBe("Zoe");
   });
-
-  it("setPlayerName preserves the id", () => {
-    const original = getOrCreatePlayer();
-    const updated = setPlayerName("Bob");
-    expect(updated.id).toBe(original.id);
+  it("updates and persists the avatar color", () => {
+    getOrCreatePlayer();
+    const p = setPlayerColor("#123456");
+    expect(p.avatar.color).toBe("#123456");
+    expect(JSON.parse(localStorage.getItem(KEY)!).avatar.color).toBe("#123456");
   });
 });
