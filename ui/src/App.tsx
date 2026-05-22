@@ -13,8 +13,9 @@ import { CheckoutOverlay } from "./components/CheckoutOverlay";
 import { VideoToggle } from "./components/VideoToggle";
 import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
+import { Multiplayer } from "./views/Multiplayer";
 
-type NavTab = "live" | "history";
+type NavTab = "live" | "history" | "multiplayer";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -82,6 +83,19 @@ export default function App() {
               >
                 History
               </button>
+              {/* Multiplayer tab — hidden in kiosk mode */}
+              <button
+                onClick={() => setActiveTab("multiplayer")}
+                aria-pressed={activeTab === "multiplayer"}
+                className={[
+                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  activeTab === "multiplayer"
+                    ? "bg-amber-400 text-neutral-900"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                Multiplayer
+              </button>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -92,7 +106,9 @@ export default function App() {
         </header>
       )}
       <Banners banners={banners} />
-      {activeTab === "history" ? (
+      {activeTab === "multiplayer" ? (
+        <Multiplayer />
+      ) : activeTab === "history" ? (
         <History />
       ) : playing ? (
         <>

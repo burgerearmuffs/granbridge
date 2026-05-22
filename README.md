@@ -203,3 +203,68 @@ Then re-run `npx tauri build` from `ui/`.
 **First run after installing:** Run `granbridge calibrate` once from the CLI exe
 (`dist\granbridge\granbridge.exe calibrate`) to map your board. Calibration data is stored
 in your user profile and survives app reinstalls.
+
+## Multiplayer (beta)
+
+Two players join a shared room over WebRTC (camera + mic) via the Granbridge WebSocket broker.
+The broker handles signaling; all A/V travels peer-to-peer. Game-sync (dart events over the data channel) is MP-3.
+
+### How to use
+
+1. **Run the broker** — on the local machine or on TOWER:
+
+   ```
+   # Local (dev)
+   .venv\Scripts\python -m granbridge_broker
+
+   # Or on TOWER (accessible on your LAN):
+   .venv\Scripts\granbridge_broker --host 0.0.0.0 --port 8788
+   ```
+
+2. **Open the UI** → click the **Multiplayer** tab.
+
+3. Both players enter:
+   - A display name
+   - The same **Room ID** (e.g. `friday-night`)
+   - The same **Password**
+   - The **Broker URL** (`ws://127.0.0.1:8788` for local; `wss://tower.local:8788` over TLS for LAN/WAN)
+
+4. Click **Join**. The browser requests camera+mic permission (once). Two-way A/V begins.
+
+### Broker URL
+
+| Scenario | Broker URL |
+|----------|------------|
+| Both players on same machine | `ws://127.0.0.1:8788` |
+| LAN play (TOWER as broker) | `ws://<TOWER-ip>:8788` |
+| Internet / through NAT (TLS) | `wss://<TOWER-domain>:8788` |
+
+Set the URL in the Multiplayer join form — it persists to localStorage.
+
+### Through-NAT A/V (TURN server)
+
+If both players are behind different NATs, pure STUN may not establish a direct
+peer-to-peer connection. Add a TURN server to `DEFAULT_ICE_SERVERS` in
+`ui/src/multiplayer/peerManager.ts`:
+
+```ts
+{ urls: "turn:<TOWER-ip>:3478", username: "<user>", credential: "<secret>" }
+```
+
+TOWER runs coturn; credentials are stored in `turnserver.conf` (not committed).
+
+### Controls
+
+| Button | Action |
+|--------|--------|
+| Mic on/off | Mutes your microphone; preference persists |
+| Cam on/off | Disables your video; preference persists |
+| Leave room | Closes the WebRTC connection and returns to the join form |
+
+### Architecture note
+
+- **Identity:** each browser generates a UUID on first use (`granbridge.player` in localStorage).
+- **Signaling:** SDP offers/answers and ICE candidates are relayed through the broker over the existing WebSocket.
+- **Perfect-negotiation:** polite/impolite by comparing peer IDs (lexicographic); handles offer collisions cleanly.
+- **Data channel** (`granbridge`): open on every connection — ready for game-sync events in MP-3.
+- **Game-sync (MP-3):** dart events will be broadcast over the data channel in a future milestone. Multiplayer A/V is self-contained in MP-2.
