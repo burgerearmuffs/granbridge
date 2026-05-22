@@ -4,6 +4,7 @@ import { X01Board } from "../components/boards/X01Board";
 import { CricketBoard } from "../components/boards/CricketBoard";
 import { AtcBoard } from "../components/boards/AtcBoard";
 import { FreePlayBoard } from "../components/boards/FreePlayBoard";
+import { CountUpBoard } from "../components/boards/CountUpBoard";
 import { Dartboard } from "../components/Dartboard";
 
 interface Props {
@@ -24,6 +25,8 @@ export function LiveGame({ state }: Props) {
         return <AtcBoard state={state} />;
       case "free_play":
         return <FreePlayBoard state={state} />;
+      case "count_up":
+        return <CountUpBoard state={state} />;
       default:
         return (
           <div className="text-center text-neutral-400 py-8">
