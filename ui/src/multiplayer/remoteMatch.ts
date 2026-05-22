@@ -53,10 +53,21 @@ export interface RemoteMatchOptions {
  * Deterministic host election with NO extra signaling: the peer with the
  * lexicographically smaller id is the host. Both clients compute the same
  * answer from their own id + the peer list. Alone -> "host".
+ *
+ * NOTE: 2-player MVP — compares against peers[0]. For >2 players, compare
+ * selfId against the minimum of all peer ids instead.
  */
 export function hostRole(selfId: string, peers: PeerInfo[]): RemoteRole {
   if (peers.length === 0) return "host";
   return selfId < peers[0].peer_id ? "host" : "guest";
+}
+
+function isSyncMsg(o: unknown): o is SyncMsg {
+  if (typeof o !== "object" || o === null) return false;
+  const t = (o as { t?: unknown }).t;
+  if (t === "state") return typeof (o as { state?: unknown }).state === "object";
+  if (t === "dart") return typeof (o as { bed?: unknown }).bed === "string";
+  return false;
 }
 
 export class RemoteMatch {
@@ -75,7 +86,7 @@ export class RemoteMatch {
     this._started = true;
     const { role, peer, bridge } = this._opts;
 
-    peer.onDataMessage = (_peerId, obj) => this._onPeerMessage(obj as SyncMsg);
+    peer.onDataMessage = (_peerId, obj) => this._onPeerMessage(obj);
 
     if (role === "host") {
       // Re-send the latest snapshot whenever a (re)connecting guest channel opens.
@@ -109,19 +120,24 @@ export class RemoteMatch {
     this._unsub?.();
     this._unsub = null;
     this._started = false;
+    // Detach peer handlers so a stopped orchestrator processes nothing.
+    this._opts.peer.onDataMessage = () => {};
+    this._opts.peer.onChannelOpen = () => {};
     // Clear the gate so a later local game on the host bridge isn't filtered.
     if (this._opts.role === "host") {
       this._opts.bridge.send({ command: "set_remote_role", player: null });
     }
   }
 
-  private _onPeerMessage(msg: SyncMsg): void {
+  private _onPeerMessage(obj: unknown): void {
+    if (!isSyncMsg(obj)) return;
+    const msg = obj;
     const { role, bridge, guestSlot, applyState } = this._opts;
     if (role === "host") {
-      if (msg && msg.t === "dart") {
+      if (msg.t === "dart") {
         bridge.send({ command: "remote_dart", bed: msg.bed, player: guestSlot });
       }
-    } else if (msg && msg.t === "state") {
+    } else if (msg.t === "state") {
       applyState(msg.state);
     }
   }
