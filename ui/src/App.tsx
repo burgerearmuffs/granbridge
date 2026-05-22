@@ -14,8 +14,9 @@ import { VideoToggle } from "./components/VideoToggle";
 import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 import { Multiplayer } from "./views/Multiplayer";
+import { Profile } from "./views/Profile";
 
-type NavTab = "live" | "history" | "multiplayer";
+type NavTab = "live" | "history" | "multiplayer" | "profile";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -96,6 +97,18 @@ export default function App() {
               >
                 Multiplayer
               </button>
+              <button
+                onClick={() => setActiveTab("profile")}
+                aria-pressed={activeTab === "profile"}
+                className={[
+                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  activeTab === "profile"
+                    ? "bg-amber-400 text-neutral-900"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                Profile
+              </button>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -106,7 +119,9 @@ export default function App() {
         </header>
       )}
       <Banners banners={banners} />
-      {activeTab === "multiplayer" ? (
+      {activeTab === "profile" ? (
+        <Profile />
+      ) : activeTab === "multiplayer" ? (
         <Multiplayer />
       ) : activeTab === "history" ? (
         <History />
