@@ -14,7 +14,11 @@ node_modules/
 ui/node_modules/
 ui/dist/
 ui/src-tauri/target/
+ui/src-tauri/binaries/
+dist/sidecar/
+build/pyi-sidecar/
 ui/vite.config.js
 ui/vite.config.d.ts
 ui/*.tsbuildinfo
 ui/tsconfig*.tsbuildinfo
+ui/src-tauri/gen/

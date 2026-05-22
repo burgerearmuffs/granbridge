@@ -87,6 +87,13 @@ ship the portable Tauri app, or harden the follow-ups for a public/streamed setu
   `--help` ✓, `scan` ✓ (Bleak/WinRT bundle cleanly, 1 build iteration). 132 tests.
   **To test now:** double-click `dist\granbridge\granbridge.exe` (with the board awake) — it serves
   the UI, opens the browser, and connects over BLE. Or `granbridge.exe scan` / `... calibrate` first.
-- **Step 2b — native Tauri app (PENDING your toolchain):** waiting on Rust (rustup) + MSVC C++ Build
-  Tools install. Once ready, the Tauri app bundles this same exe as a sidecar → a true windowed
-  portable app + `.msi`. Then Step 1 (hardware test), Step 3 (depth/polish), Step 4 (future).
+- **Step 2b — native Tauri app (DONE):** Rust 1.95 (msvc) + MSVC Build Tools verified. Built a
+  PyInstaller **onefile** sidecar (`packaging/granbridge-sidecar.spec`, 21.7 MB), registered it as a
+  Tauri v2 `externalBin`, and the Rust `setup()` spawns `granbridge serve` via tauri-plugin-shell so
+  launching the app boots the bridge + shows the UI in a native window. `npx tauri build` →
+  **installers**: `ui/src-tauri/target/release/bundle/msi/GRANBRIDGE_0.1.0_x64_en-US.msi` (25 MB) and
+  `.../nsis/GRANBRIDGE_0.1.0_x64-setup.exe` (24 MB). 132 tests still green. Placeholder icons (cosmetic
+  follow-up). **STEP 2 COMPLETE.**
+
+**Next:** Step 1 (validate on the board — install the .msi or run the exe, calibrate), then Step 3
+(depth/polish: stats/history, real icons, FOLLOWUPS hardening), then Step 4 (future features).

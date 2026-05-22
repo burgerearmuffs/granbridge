@@ -169,9 +169,37 @@ npm --prefix ui run build
 ```
 Output lands in `ui/dist/`.
 
-**Native app (Tauri):** Once Rust is installed (`rustup`), build the native desktop app:
+## Native app (Tauri)
+
+A polished portable Windows desktop app that launches the GRANBRIDGE bridge automatically
+and shows the React UI in a native window. Built with Tauri v2 + a PyInstaller onefile sidecar.
+
+**Prerequisites:**
+- Rust (msvc target): `winget install Rustlang.Rustup` then `rustup target add x86_64-pc-windows-msvc`
+- WebView2 Runtime (pre-installed on Windows 11)
+- Node 18+ + npm
+
+**Build the installer:**
 ```
 cd ui
-cargo tauri build
+npm install
+npx tauri build
 ```
-The Tauri scaffold lives in `ui/src-tauri/`. The `tauri.conf.json` points `frontendDist` to `../dist` and dev to `http://localhost:5173`, window 1280×800 resizable, identifier `com.granbridge.app`.
+Output installers under `ui/src-tauri/target/release/bundle/`:
+- `msi/GRANBRIDGE_0.1.0_x64_en-US.msi`
+- `nsis/GRANBRIDGE_0.1.0_x64-setup.exe`
+
+**How it works:** The native app bundles `granbridge.exe` (a PyInstaller onefile sidecar) and
+spawns it as `granbridge serve` on startup via `tauri-plugin-shell`. Tauri shows the React UI
+in its own window; the UI connects to `ws://127.0.0.1:8787` as usual.
+
+**Rebuild the sidecar exe** (needed when Python code changes):
+```
+.venv\Scripts\python -m PyInstaller packaging/granbridge-sidecar.spec --noconfirm --distpath dist/sidecar --workpath build/pyi-sidecar
+copy dist\sidecar\granbridge.exe ui\src-tauri\binaries\granbridge-x86_64-pc-windows-msvc.exe
+```
+Then re-run `npx tauri build` from `ui/`.
+
+**First run after installing:** Run `granbridge calibrate` once from the CLI exe
+(`dist\granbridge\granbridge.exe calibrate`) to map your board. Calibration data is stored
+in your user profile and survives app reinstalls.
