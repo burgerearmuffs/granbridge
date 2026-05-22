@@ -1,0 +1,33 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "commentary",
+      "default": "commentary",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "tone": {
+      "default": "play-by-play",
+      "title": "Tone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "Commentary",
+  "type": "object"
+}

@@ -72,6 +72,46 @@ GRANBRIDGE_PLUGINS__WLED__WIN_FX=80
 Plugins that require a network endpoint (mqtt, discord, wled) are silent no-ops if the
 endpoint is not configured — no errors, no broken serve.
 
+## Future foundations
+
+These features are implemented as testable foundations but are not yet production-ready. Each has a clear flag on what is needed before going live.
+
+### Multiplayer relay (`granbridge relay`)
+
+Run a local room-based rebroadcast server so multiple clients can share a live game session:
+
+```
+.venv\Scripts\granbridge relay --host 127.0.0.1 --port 8788
+```
+
+Clients connect via WebSocket with a `?room=<id>` query param. Every message from one client in a room is forwarded to all other clients in the same room.
+
+**Flag:** The relay has no authentication, TLS, or access control. It is safe for localhost/LAN use. Hosting it publicly requires adding auth, TLS termination, and rate limiting.
+
+Enable the relay plugin (forwards local bus events to a remote relay room):
+
+```
+GRANBRIDGE_PLUGINS_ENABLED=["relay"]
+GRANBRIDGE_PLUGINS__RELAY__URL=ws://127.0.0.1:8788
+GRANBRIDGE_PLUGINS__RELAY__ROOM=mygame
+```
+
+### AI commentary plugin
+
+The `commentary` plugin listens to bus events and publishes `commentary` events with human-readable call-outs (e.g. "Treble twenty!", "One hundred and eighty!", "Game shot!"). A `TemplateCommentator` covers key moments offline. An `LLMCommentator` seam is ready for injection of any LLM provider callable.
+
+```
+GRANBRIDGE_PLUGINS_ENABLED=["commentary"]
+```
+
+**Flag:** For richer LLM-generated commentary an API key and a `generate` callable backed by an LLM provider must be injected into `LLMCommentator`. Text-to-speech output requires an additional TTS integration (not included).
+
+### Camera CV validation (architecture only)
+
+A `Validator` / `NoOpValidator` seam lives in `src/granbridge/vision/validator.py`. The current default (`NoOpValidator`) trusts the board's BLE sensor entirely. A future camera-based implementation would cross-check each `dart_hit` against multi-view video analysis and emit a `validation` event on disagreement.
+
+See `docs/camera-validation-architecture.md` for the full rig, calibration, and detection pipeline design. No CV code is implemented — the seam is the integration point.
+
 ## Tests
 `.venv\Scripts\python -m pytest` — all tests are hardware-free (fake/replay transport).
 

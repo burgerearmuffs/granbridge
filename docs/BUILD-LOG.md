@@ -14,7 +14,7 @@ compile here), MQTT broker. External-dependent features are built to the seam + 
 | 3 | Desktop UI (React+TS+Tailwind+Zustand web app; Tauri config scaffolded) | ✅ complete, 36 UI tests, `npm run build` green |
 | 4 | Integrations (plugin API + MQTT + example plugins) | ✅ complete, 111 tests, isolation-tested |
 | 5 | OBS streaming overlay suite | ✅ complete, 118 tests, 5 overlays + launcher |
-| F | Future: multiplayer relay stub, AI-commentary interface, CV-camera notes | ▶ next |
+| F | Future: multiplayer relay, AI-commentary, CV-camera seam | ✅ complete, 129 tests (relay+commentary built, CV architecture-only) |
 
 ## Notes for the user (waking up)
 - Anything needing YOU is collected in `docs/FOLLOWUPS.md` and flagged inline below as I go.
@@ -27,4 +27,7 @@ compile here), MQTT broker. External-dependent features are built to the seam + 
 - SP3: built subagent-driven (scaffold+foundation seq; 4 boards + components parallel; shell seq). 36 UI tests, web build green. Tauri scaffold under ui/src-tauri/ (needs Rust to compile). Merged to master.
 - SP4: built subagent-driven (base+config seq; manager+4 plugins parallel; registry+cli+docs seq). 111 tests. Plugins consume-only + exception-isolated; aiomqtt/httpx lazy + fakes in tests; broker/webhook/WLED-host flagged. Merged to master.
 - SP5: built (one subagent: common.js + 5 overlays + launcher + asset tests). 118 tests. Merged to master.
-- F (future, architecture-only): next — local multiplayer relay stub, AI-commentary interface + local stub, CV-camera architecture notes. Build local seams/stubs; flag anything needing servers/keys/hardware.
+- F: built parallel (relay, commentary, vision seam) + serial integration. 129 tests. `granbridge relay` runs a local room relay; commentary plugin emits `commentary` events (template now, LLM seam flagged); camera CV is architecture-only (docs/camera-validation-architecture.md). Merged to master.
+
+## ALL SUB-PROJECTS COMPLETE (2026-05-21 overnight run)
+Master green: 129 Python tests + 36 UI tests. See the wake-up summary at the bottom of this file.

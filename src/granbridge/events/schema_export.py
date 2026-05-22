@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from granbridge.commentary.events import Commentary
 from granbridge.events.models import (
     ButtonEvent,
     ConnectionState,
@@ -23,6 +24,7 @@ _EVENT_TYPES = {
     "bust": Bust,
     "leg_won": LegWon,
     "game_won": GameWon,
+    "commentary": Commentary,
 }
 
 

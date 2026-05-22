@@ -62,9 +62,13 @@ def serve() -> None:
         server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler)
         await server.start()
         typer.echo(f"Serving on ws://{settings.ws_host}:{settings.ws_port}")
+        from granbridge.commentary.plugin import CommentaryPlugin
         from granbridge.integrations.manager import PluginManager
         from granbridge.integrations.registry import build_enabled
         plugins = build_enabled(settings)
+        for _p in plugins:
+            if isinstance(_p, CommentaryPlugin):
+                _p.set_publish(bus.publish)
         plugin_mgr = PluginManager(bus, plugins)
         await asyncio.gather(mgr.run(), engine.attach(), plugin_mgr.run())
 
@@ -109,3 +113,18 @@ def calibrate() -> None:
     from granbridge.protocol.calibrate_flow import run_calibration
 
     run_calibration(Settings())
+
+
+@app.command()
+def relay(host: str = "127.0.0.1", port: int = 8788) -> None:
+    """Run a local multiplayer relay server (room-based rebroadcast)."""
+    import asyncio
+    from granbridge.net.relay_server import RelayServer
+
+    async def _run():
+        server = RelayServer(host, port)
+        await server.start()
+        typer.echo(f"Relay on ws://{host}:{port} (join with ?room=<id>)")
+        await asyncio.Event().wait()
+
+    asyncio.run(_run())
