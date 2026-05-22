@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel
 
@@ -33,11 +33,23 @@ class EndGame(BaseModel):
     command: Literal["end_game"]
 
 
-Command = Union[StartGame, NextPlayer, RecordMiss, Undo, CorrectLast, EndGame]
+class RemoteDart(BaseModel):
+    command: Literal["remote_dart"]
+    bed: str
+    player: str
+
+
+class SetRemoteRole(BaseModel):
+    command: Literal["set_remote_role"]
+    player: Optional[str] = None
+
+
+Command = Union[StartGame, NextPlayer, RecordMiss, Undo, CorrectLast, EndGame, RemoteDart, SetRemoteRole]
 
 _BY_NAME = {
     "start_game": StartGame, "next_player": NextPlayer, "record_miss": RecordMiss,
     "undo": Undo, "correct_last": CorrectLast, "end_game": EndGame,
+    "remote_dart": RemoteDart, "set_remote_role": SetRemoteRole,
 }
 
 
