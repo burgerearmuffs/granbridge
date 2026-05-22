@@ -25,3 +25,16 @@ def test_dedup_identical_within_window():
 
 def test_empty_frames_ignored():
     assert FrameAssembler().feed(b"@@2.5@@") == ["2.5"]
+
+def test_reset_drops_stale_partial():
+    fa = FrameAssembler()
+    assert fa.feed(b"99.") == []          # partial fragment buffered (no terminator yet)
+    fa.reset()                            # simulate a reconnect
+    assert fa.feed(b"1.1@") == ["1.1"]    # buffer cleared -> not "99.1.1"
+
+def test_reset_clears_dedup_state():
+    fa = FrameAssembler(dedup_window_s=10.0)
+    assert fa.feed(b"2.5@") == ["2.5"]
+    assert fa.feed(b"2.5@") == []         # deduped within the 10s window
+    fa.reset()                            # simulate a reconnect
+    assert fa.feed(b"2.5@") == ["2.5"]    # dedup state cleared -> first throw emitted

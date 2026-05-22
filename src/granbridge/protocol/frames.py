@@ -26,6 +26,17 @@ class FrameAssembler:
         self._last_body: Optional[str] = None
         self._last_time = float("-inf")
 
+    def reset(self) -> None:
+        """Clear buffered partial frames and dedup state.
+
+        Call on every (re)connect so a fragment left over from a dropped session
+        is not prepended to the next session's first bytes, and so the dedup
+        window does not suppress the first throw after reconnecting.
+        """
+        self._buf = ""
+        self._last_body = None
+        self._last_time = float("-inf")
+
     def feed(self, data: bytes) -> list[str]:
         self._buf += data.decode("ascii", errors="ignore")
         out: list[str] = []

@@ -109,6 +109,7 @@ class ConnectionManager:
             raise RuntimeError("no notify characteristic on vendor service")
         loop = asyncio.get_running_loop()
         self._stop_serving = asyncio.Event()
+        self._assembler.reset()  # drop any partial frame / dedup state from a prior session
         await self._t.subscribe(
             chars[0],
             lambda data: loop.call_soon_threadsafe(self._loop_queue.put_nowait, data),
