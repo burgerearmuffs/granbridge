@@ -62,7 +62,11 @@ def serve() -> None:
         server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler)
         await server.start()
         typer.echo(f"Serving on ws://{settings.ws_host}:{settings.ws_port}")
-        await asyncio.gather(mgr.run(), engine.attach())
+        from granbridge.integrations.manager import PluginManager
+        from granbridge.integrations.registry import build_enabled
+        plugins = build_enabled(settings)
+        plugin_mgr = PluginManager(bus, plugins)
+        await asyncio.gather(mgr.run(), engine.attach(), plugin_mgr.run())
 
     asyncio.run(_run())
 

@@ -18,3 +18,5 @@ class Settings(BaseSettings):
     dedup_window_s: float = 0.05
     log_dir: Path = Path("logs")
     overrides_path: Path = Path("src/granbridge/protocol/segment_map.overrides.json")
+    plugins_enabled: list[str] = []
+    plugins: dict[str, dict] = {}

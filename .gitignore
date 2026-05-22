@@ -14,3 +14,7 @@ node_modules/
 ui/node_modules/
 ui/dist/
 ui/src-tauri/target/
+ui/vite.config.js
+ui/vite.config.d.ts
+ui/*.tsbuildinfo
+ui/tsconfig*.tsbuildinfo

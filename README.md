@@ -34,6 +34,44 @@ BLE → FrameAssembler → Decoder(SegmentMap) → EventBus → {JSON log, WebSo
 The BLE bridge is independently usable without any frontend. See
 `docs/superpowers/specs/2026-05-21-granbridge-ble-bridge-design.md`.
 
+## Integrations / plugins
+
+GRANBRIDGE has an optional plugin system that routes every bus event to one or more
+external services. Plugins are error-isolated (one crashing plugin does not affect others)
+and no-op when their endpoint is not configured.
+
+### Install optional deps
+
+```
+.venv\Scripts\python -m pip install -e ".[dev,integrations]"
+```
+
+### Enable plugins
+
+Set `GRANBRIDGE_PLUGINS_ENABLED` (comma-separated, via env or a `.env` file) and supply
+per-plugin config under `GRANBRIDGE_PLUGINS__<NAME>__<KEY>`:
+
+```
+GRANBRIDGE_PLUGINS_ENABLED=["logging","mqtt","discord","wled"]
+GRANBRIDGE_PLUGINS__MQTT__HOST=192.168.1.50
+GRANBRIDGE_PLUGINS__MQTT__PREFIX=granboard
+GRANBRIDGE_PLUGINS__DISCORD__WEBHOOK_URL=https://discord.com/api/webhooks/...
+GRANBRIDGE_PLUGINS__WLED__HOST=192.168.1.60
+GRANBRIDGE_PLUGINS__WLED__WIN_FX=80
+```
+
+### Available plugins
+
+| Name | What it does | Requirements |
+|------|-------------|--------------|
+| `logging` | Logs every event via structlog | none |
+| `mqtt` | Publishes dart hits to `<prefix>/throw`, other events to `<prefix>/event` | MQTT broker (`aiomqtt`) |
+| `discord` | Posts game-won / leg-won messages to a Discord webhook | Discord webhook URL (`httpx`) |
+| `wled` | Triggers LED effects on a WLED controller on game-won / bust | WLED host reachable on LAN (`httpx`) |
+
+Plugins that require a network endpoint (mqtt, discord, wled) are silent no-ops if the
+endpoint is not configured — no errors, no broken serve.
+
 ## Tests
 `.venv\Scripts\python -m pytest` — all tests are hardware-free (fake/replay transport).
 
