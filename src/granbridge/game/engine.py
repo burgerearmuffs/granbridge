@@ -16,6 +16,7 @@ from granbridge.game.modes.base import GameMode
 from granbridge.game.modes.count_up import CountUpMode
 from granbridge.game.modes.cricket import CricketMode
 from granbridge.game.modes.free_play import FreePlayMode
+from granbridge.game.modes.medley import MedleyMode
 from granbridge.game.modes.x01 import X01Mode
 
 log = structlog.get_logger(__name__)
@@ -23,7 +24,7 @@ log = structlog.get_logger(__name__)
 _REGISTRY: dict[str, type[GameMode]] = {
     "x01": X01Mode, "cricket": CricketMode,
     "around_the_clock": AroundTheClockMode, "free_play": FreePlayMode,
-    "count_up": CountUpMode,
+    "count_up": CountUpMode, "medley": MedleyMode,
 }
 _UNDO_LIMIT = 60
 
