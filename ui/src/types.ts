@@ -21,4 +21,6 @@ export type Event =
 export type Command =
   | { command: "start_game"; mode: string; players: string[]; options: Record<string, unknown> }
   | { command: "next_player" } | { command: "record_miss" } | { command: "undo" }
-  | { command: "correct_last"; bed: string } | { command: "end_game" };
+  | { command: "correct_last"; bed: string } | { command: "end_game" }
+  | { command: "remote_dart"; bed: string; player: string }
+  | { command: "set_remote_role"; player: string | null };
