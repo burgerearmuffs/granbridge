@@ -97,3 +97,43 @@ ship the portable Tauri app, or harden the follow-ups for a public/streamed setu
 
 **Next:** Step 1 (validate on the board — install the .msi or run the exe, calibrate), then Step 3
 (depth/polish: stats/history, real icons, FOLLOWUPS hardening), then Step 4 (future features).
+
+---
+
+## Step 3 — Depth & Polish (2026-05-22, autonomous run 2, while user tests on hardware)
+
+Roadmap in `docs/superpowers/specs/2026-05-22-step3-polish-roadmap.md`. Run guardrails honored:
+**no BLE/protocol/decoder/segment-map edits** (user was live-calibrating) and **no exe/installer
+rebuild**. Each sub-project: branch → build (subagent-driven) → test → merge to `main` → push to GitHub.
+
+- **SP-A · Rich graphics (named priority) ✅** — SVG `Dartboard` (classic colors, last-hit highlight),
+  confetti `Celebration`, arcade theme + `score-pop`/`dartboard-hit`/`bust-shake` animations, store
+  tracks `lastHit`. (`f6587f3`)
+- **SP-B · Sound effects (named priority) ✅** — procedural Web Audio SFX (hit/treble/bull/bust/leg/
+  game/**180**/checkout-chime); pure `SoundDecider` (tested) + `SynthPack` + `SoundManager`
+  (mute/volume persisted); `manifest.ts` slots for real audio files. (`2f256ba`)
+- **SP-C · Checkout videos (named priority) ✅** — `CheckoutOverlay` "GAME SHOT!" full-screen moment:
+  plays `/videos/<event>.mp4` if present, else procedural celebration; reduced-motion + toggle;
+  `public/{videos,sounds}/README.md` document drop-in asset slots. (`ca49831`)
+- **SP-D · Stats & history ✅** — SQLite `HistoryStore` + always-on `HistoryPlugin` recorder; JSON API
+  `/api/history/{recent,stats,heatmap}`; UI History view (3-dart avgs, wins, recent games) + dartboard
+  **heatmap** + Live/History nav. DB under `%LOCALAPPDATA%\granbridge`. (`5b276d6`)
+- **SP-E · Hardening ✅** — bounded bus queues (drop-oldest), always-on decoded-event log sink
+  (`logs/decoded_packets/events.jsonl`, spec §8), X01 **sets** match structure (backward-compatible).
+  (`da44a38`)
+
+**Totals after run 2:** 160 Python + 127 UI tests, all green; UI builds clean. All on `main`, pushed.
+
+**Asset reality (for the user):** graphics are vector/procedural (real, working now). Sound is
+synthesized by default — working now — drop files in `ui/public/sounds/` to override. Checkout
+**videos** ship with a procedural fallback; drop real clips in `ui/public/videos/` (filenames in the
+READMEs) to use them. All three named priorities are functional today and upgradeable with real assets.
+
+**Step 3 remaining (not done this run):** real app icons (needs image tooling + a Tauri rebuild —
+deferred since I didn't rebuild the installer); WS origin-guard for non-loopback binds; raw-frame log
+sink (BLE-adjacent, skipped to respect the calibration guardrail); `overrides_path`→AppData (skipped —
+it's where live calibration writes). These are queued for a session when you're not mid-calibration.
+
+**To see Step 3 in action:** `cd ui && npm install && npm run dev` → open the served UI (run
+`granbridge.exe serve` for live data), or rebuild the packaged app (`PyInstaller` + `npx tauri build`)
+to fold these features into a new installer.

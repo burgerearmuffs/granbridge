@@ -51,3 +51,16 @@ Open follow-ups:
 - [ ] **L3** — `checkout._search` runs a ~33k-combo 3-dart loop and rebuilds tables on every `mode_view`; memoize or widen the preferred table for live finishes.
 - [ ] **L4** — (same as the bus-queue bound above) a stalled WS client's subscription queue is unbounded.
 - [ ] **Sets** — X01/Cricket match structure tracks legs (`best_of_legs`); `sets` is carried in state but not yet won/advanced. Wire sets when needed.
+
+## Resolved in Step 3 (2026-05-22 run 2)
+- [x] **L4 / bounded bus queues** — `Subscription` now caps at maxsize (1000) with drop-oldest.
+- [x] **X01 sets** — `best_of_sets` match structure implemented in the engine (backward-compatible).
+- [x] **§8 decoded log sink** — `EventLogPlugin` writes `logs/decoded_packets/events.jsonl` (always-on in `serve`).
+- [x] **AppData path (history)** — match-history DB defaults under `%LOCALAPPDATA%\granbridge`.
+
+## Still open after Step 3 (deferred, with reasons)
+- [ ] **Real app icons** — replace placeholder green squares; needs image tooling (sharp/png-to-ico) + a Tauri rebuild. Not done because run 2 didn't rebuild the installer.
+- [ ] **WS origin-guard** — only matters before binding off `127.0.0.1` (still localhost-only).
+- [ ] **raw-frame log sink** (`logs/raw_packets/`) — BLE-adjacent; skipped to respect the "don't touch BLE during calibration" guardrail. Wire after hardware validation.
+- [ ] **`overrides_path`→AppData** — skipped during run 2 because it's where live `calibrate` writes; move it after calibration is settled.
+- [ ] **L2/L3** — `cli` private `_flush`/import hygiene; `checkout._search` memoization.
