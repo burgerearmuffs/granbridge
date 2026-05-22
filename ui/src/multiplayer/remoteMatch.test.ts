@@ -90,6 +90,24 @@ describe("RemoteMatch host", () => {
     peer.fireData({ t: "state", state: STATE });
     expect(applyState).not.toHaveBeenCalled();
   });
+
+  it("stop() clears the engine role on the bridge (explicit leave)", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} });
+    rm.start();
+    bridge.sent.length = 0;
+    rm.stop();
+    expect(bridge.sent).toEqual([{ command: "set_remote_role", player: null }]);
+  });
+
+  it("stop(false) preserves the engine role (transient unmount / tab switch)", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} });
+    rm.start();
+    bridge.sent.length = 0;
+    rm.stop(false);
+    expect(bridge.sent).toEqual([]);
+  });
 });
 
 describe("RemoteMatch guest", () => {

@@ -83,8 +83,10 @@ export function Multiplayer() {
   // tab switch) so the module-level bridgeLink subscription doesn't leak (and a
   // remount can't stack a second forwarder). Empty deps → fires ONLY on unmount,
   // never on presence/state churn (which must not clear the engine gate).
+  // stop(false) keeps the engine gate armed so scoring stays correct while the
+  // host is away — only an explicit leave (handleLeave) should clear the role.
   useEffect(() => () => {
-    rmRef.current?.stop();
+    rmRef.current?.stop(false);
     rmRef.current = null;
   }, []);
 

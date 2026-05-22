@@ -187,6 +187,6 @@ Spec `docs/superpowers/specs/2026-05-22-mp3-remote-sync-design.md`; plan
   1, Multiplayer 3) → 189 UI. Full suites green; `npm --prefix ui run build` clean.
 - **Manual E2E:** `docs/MANUAL-E2E-mp3.md` (two bridges + two UIs — WebRTC needs real browsers).
 - **Known MVP gaps:** guest-miss not auto-detected; only host has controls; 2-player;
-  avoid tab-switching mid-match (gate not re-armed on remount).
+  host tab-switch mid-match pauses guest state-forwarding (gate stays armed).
 
 **Next:** MP-4 profiles/avatars; quick parity modes (Count-Up, Medley); real app icons.

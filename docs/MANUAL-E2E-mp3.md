@@ -35,6 +35,6 @@ logic with fakes; this exercises the full cross-process / cross-machine path.
 - Host election is by peer-id ordering (fine for 2 players); >2 players / explicit
   host choice is future work.
 - The remote match lives in the Multiplayer tab. Switching the host away mid-match
-  tears down its RemoteMatch (so the bridgeLink subscription can't leak); on return
-  the gate is not re-armed until the host starts a new match. Avoid tab-switching
-  mid-match for now (tracked for MP-4).
+  keeps the engine gate armed (scoring stays correct), but the host UI stops
+  forwarding `game_state` while unmounted, so the guest's board pauses until the
+  host returns and the next state is produced. Reconnect/snapshot covers larger gaps.

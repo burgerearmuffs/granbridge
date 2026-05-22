@@ -116,15 +116,20 @@ export class RemoteMatch {
     this._opts.bridge.send({ command: "start_game", mode, players, options });
   }
 
-  stop(): void {
+  /**
+   * Tear down the orchestrator. `clearRole` (default true) also clears the host
+   * engine's remote role so a later LOCAL game on that bridge isn't gate-filtered
+   * — pass `false` on a transient unmount (e.g. tab switch) to KEEP the gate armed
+   * for the still-running match while still unsubscribing (no leak).
+   */
+  stop(clearRole = true): void {
     this._unsub?.();
     this._unsub = null;
     this._started = false;
     // Detach peer handlers so a stopped orchestrator processes nothing.
     this._opts.peer.onDataMessage = () => {};
     this._opts.peer.onChannelOpen = () => {};
-    // Clear the gate so a later local game on the host bridge isn't filtered.
-    if (this._opts.role === "host") {
+    if (clearRole && this._opts.role === "host") {
       this._opts.bridge.send({ command: "set_remote_role", player: null });
     }
   }
