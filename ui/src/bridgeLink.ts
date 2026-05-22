@@ -18,7 +18,13 @@ let sender: ((cmd: Command) => void) | null = null;
 
 export const bridgeLink = {
   emit(e: Event): void {
-    for (const l of listeners) l(e);
+    for (const l of listeners) {
+      try {
+        l(e);
+      } catch (err) {
+        console.error("[bridgeLink] subscriber threw", err);
+      }
+    }
   },
   onEvent(cb: Listener): () => void {
     listeners.add(cb);

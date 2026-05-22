@@ -36,4 +36,16 @@ describe("bridgeLink", () => {
     bridgeLink.setSender(null);
     expect(() => bridgeLink.send({ command: "undo" })).not.toThrow();
   });
+
+  it("isolates a throwing subscriber from the others", () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const seen: Event[] = [];
+    const offBad = bridgeLink.onEvent(() => { throw new Error("boom"); });
+    const offGood = bridgeLink.onEvent((e) => seen.push(e));
+    bridgeLink.emit(DART);
+    expect(seen).toEqual([DART]);   // good subscriber still received the event
+    offBad();
+    offGood();
+    errSpy.mockRestore();
+  });
 });
