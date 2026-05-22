@@ -137,3 +137,31 @@ it's where live calibration writes). These are queued for a session when you're 
 **To see Step 3 in action:** `cd ui && npm install && npm run dev` → open the served UI (run
 `granbridge.exe serve` for live data), or rebuild the packaged app (`PyInstaller` + `npx tauri build`)
 to fold these features into a new installer.
+
+---
+
+## Internet multiplayer — the reframe (2026-05-22)
+
+User reframed the project: **internet multiplayer is now the primary purpose** (premium remote dart
+experience). Target features in `docs/TARGET-FEATURES.md`; competitive analysis of the official app in
+`docs/RESEARCH-official-app.md` (key finding: in-match **video is parity, not polish**; their worst
+weakness is **BLE reliability** = our differentiator). Architecture in
+`docs/superpowers/specs/2026-05-22-multiplayer-architecture.md`. Self-hosted on the user's Proxmox box
+"TOWER" (public IP); decisions locked: host-authoritative sync, anonymous IDs, WebRTC P2P A/V, separate
+Dockerized broker + coturn.
+
+- **MP-1 · Broker (Dockerized) ✅** — `server/` standalone WebSocket broker: rooms + password + presence +
+  WebRTC signaling relay; Dockerfile + compose (broker + coturn) + TOWER deploy README; 4 tests. (`41fc7ad`)
+- **MP-2 · WebRTC A/V client ✅** — anonymous identity, BrokerClient, PeerManager (perfect-negotiation +
+  data channel), guarded media, Multiplayer view (join by room+password) + video tiles + mic/cam/leave;
+  +41 tests. WebRTC/getUserMedia guarded → real A/V is **manual-verify** (jsdom can't). (`da3e19e`)
+
+**Repo totals:** ~287 tests (160 Python + 127 UI; broker tests run separately). All on `main`, pushed to GitHub.
+
+### Next: MP-3 (host-authoritative remote game sync) — the delicate keystone
+This is cross-process + cross-language: the **GameEngine lives in the Python bridge**, so remote play means
+a non-host player's `dart_hit` must travel bridge→UI→(WebRTC data channel)→host UI→host bridge engine,
+which applies it (respecting turn ownership) and broadcasts `game_state` back. Touches the engine (turn
+ownership / multi-source darts), the bridge WS (a "remote input" command), and the UI (data-channel relay)
++ reconnect/snapshot. **Best done with fresh context** — flagged for a focused next session.
+Then: MP-4 profiles+avatars; quick parity wins (Count-Up, Medley); real app icons.
