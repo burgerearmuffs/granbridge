@@ -43,7 +43,7 @@ class GameEngine:
             while True:
                 event = await sub.get()
                 if isinstance(event, DartHit) and self.state.status == GameStatus.IN_PROGRESS:
-                    self.on_dart(Dart(bed=event.bed, ring=str(event.ring), segment=event.segment,
+                    self.on_dart(Dart(bed=event.bed, ring=event.ring.value, segment=event.segment,
                                       multiplier=event.multiplier, score=event.score))
                     await self._flush()
 
@@ -94,7 +94,14 @@ class GameEngine:
         self.state.legs = {p.id: 0 for p in players}
         self.state.sets = {p.id: 0 for p in players}
         self.state.stats = {p.id: PlayerStats() for p in players}
-        self._mode.on_start(self.state, cmd.options)
+        self.state.leg_starter_index = 0
+        try:
+            self._mode.on_start(self.state, cmd.options)
+        except Exception as exc:  # bad option values (e.g. non-numeric start_score)
+            self.state = GameState(mode="none")
+            self._mode = None
+            self._emit(ErrorEvent(category="command", message=f"invalid game options: {exc}"))
+            return
         self._undo.clear()
         self._snapshot_visit_start()
         self._emit(GameStarted(mode=cmd.mode, players=players, options=dict(cmd.options)))
@@ -137,8 +144,10 @@ class GameEngine:
             self._emit(GameWon(player=pid))
             self._emit_state()
             return
-        idx = next(i for i, p in enumerate(self.state.players) if p.id == pid)
-        self.state.active_index = (idx + 1) % len(self.state.players)
+        # Alternate the leg STARTER (not the winner) for correct multi-leg throw order.
+        next_starter = (self.state.leg_starter_index + 1) % len(self.state.players)
+        self.state.leg_starter_index = next_starter
+        self.state.active_index = next_starter
         self.state.visit = []
         self._mode.on_start(self.state, self.state.options)
         self._snapshot_visit_start()

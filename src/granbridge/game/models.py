@@ -54,6 +54,7 @@ class GameState(BaseModel):
     status: GameStatus = GameStatus.WAITING
     players: list[Player] = []
     active_index: int = 0
+    leg_starter_index: int = 0
     visit: list[Dart] = []
     legs: dict[str, int] = {}
     sets: dict[str, int] = {}

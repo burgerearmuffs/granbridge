@@ -63,6 +63,11 @@
           "title": "Active Index",
           "type": "integer"
         },
+        "leg_starter_index": {
+          "default": 0,
+          "title": "Leg Starter Index",
+          "type": "integer"
+        },
         "visit": {
           "default": [],
           "items": {

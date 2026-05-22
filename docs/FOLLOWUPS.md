@@ -38,3 +38,16 @@ with all five success criteria met and 44 tests passing. Listed roughly by value
   the flow currently lives at `protocol/calibrate_flow.py`, wired via the CLI.
 - [ ] **Stream large replay sessions** instead of reading the whole file
   (`cli.py replay`). Negligible for sample sizes.
+
+## Sub-project 2 (game engine) review
+
+Fixed in SP2:
+- [x] **M1** — live `attach()` path serialized `ring` as `"Ring.TRIPLE"`; now `event.ring.value`. Regression test added (`tests/game/test_attach_and_legs.py`).
+- [x] **M2** — multi-leg starter now alternates by *starter* (tracked in `GameState.leg_starter_index`, snapshot-safe under undo), not by winner.
+- [x] **L1** — bad `start_game` option values now emit `error{category:"command"}` instead of raising.
+
+Open follow-ups:
+- [ ] **L2** — `cli.py serve` reaches into engine private `_flush()` + per-payload local import; expose a public `flush()` and hoist the import.
+- [ ] **L3** — `checkout._search` runs a ~33k-combo 3-dart loop and rebuilds tables on every `mode_view`; memoize or widen the preferred table for live finishes.
+- [ ] **L4** — (same as the bus-queue bound above) a stalled WS client's subscription queue is unbounded.
+- [ ] **Sets** — X01/Cricket match structure tracks legs (`best_of_legs`); `sets` is carried in state but not yet won/advanced. Wire sets when needed.
