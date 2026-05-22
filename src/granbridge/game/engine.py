@@ -7,7 +7,7 @@ import structlog
 from granbridge.core.bus import EventBus
 from granbridge.events.models import DartHit, ErrorEvent
 from granbridge.game.commands import (
-    Command, CorrectLast, EndGame, NextPlayer, RecordMiss, StartGame, Undo,
+    Command, CorrectLast, EndGame, NextPlayer, RecordMiss, RemoteDart, SetRemoteRole, StartGame, Undo,
 )
 from granbridge.game.events import Bust, GameStarted, GameStateEvent, GameWon, LegWon
 from granbridge.game.models import Dart, GameState, GameStatus, Player, PlayerStats
@@ -36,6 +36,7 @@ class GameEngine:
         self._undo: list[tuple[GameState, Optional[GameState]]] = []
         self._visit_start: Optional[GameState] = None
         self._pending: list = []
+        self._local_player_id: Optional[str] = None
 
     # ---- bus integration ----
     async def attach(self) -> None:
@@ -43,8 +44,11 @@ class GameEngine:
             while True:
                 event = await sub.get()
                 if isinstance(event, DartHit) and self.state.status == GameStatus.IN_PROGRESS:
-                    self.on_dart(Dart(bed=event.bed, ring=event.ring.value, segment=event.segment,
-                                      multiplier=event.multiplier, score=event.score))
+                    self.on_dart(
+                        Dart(bed=event.bed, ring=event.ring.value, segment=event.segment,
+                             multiplier=event.multiplier, score=event.score),
+                        source_player_id=self._local_player_id,
+                    )
                     await self._flush()
 
     async def _flush(self) -> None:
@@ -75,12 +79,21 @@ class GameEngine:
         elif isinstance(cmd, EndGame):
             self.state.status = GameStatus.WAITING
             self._emit_state()
+        elif isinstance(cmd, RemoteDart):
+            self._guard(lambda: self.on_dart(Dart.from_bed(cmd.bed), source_player_id=cmd.player))
+        elif isinstance(cmd, SetRemoteRole):
+            self.set_remote_role(cmd.player)
 
     def _guard(self, fn) -> None:
         if self.state.status != GameStatus.IN_PROGRESS:
             self._emit(ErrorEvent(category="command", message="no game in progress"))
             return
         fn()
+
+    def set_remote_role(self, local_player_id: Optional[str]) -> None:
+        """Set which engine slot the LOCAL board feeds for host-authoritative
+        remote play. None disables turn-source gating (normal local play)."""
+        self._local_player_id = local_player_id
 
     def _start(self, cmd: StartGame) -> None:
         mode_cls = _REGISTRY.get(cmd.mode)
@@ -108,10 +121,12 @@ class GameEngine:
         self._emit_state()
 
     # ---- dart handling ----
-    def on_dart(self, dart: Dart) -> None:
+    def on_dart(self, dart: Dart, source_player_id: Optional[str] = None) -> None:
         if self.state.status != GameStatus.IN_PROGRESS or self._mode is None:
             self._emit(ErrorEvent(category="command", message="dart with no game in progress"))
             return
+        if self._local_player_id is not None and source_player_id is not None and source_player_id != self.state.active_player_id:
+            return  # out-of-turn / stray board hit — the host engine is the single arbiter
         self._push_undo()
         pid = self.state.active_player_id
         result = self._mode.apply_dart(self.state, dart)
