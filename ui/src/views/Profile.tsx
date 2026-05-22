@@ -56,6 +56,7 @@ export function Profile() {
             />
           ))}
           <button
+            aria-label="Reset avatar color to default"
             onClick={() => setProfile(setPlayerColor(defaultAvatarColor(profile.id)))}
             className="text-xs text-neutral-400 underline ml-2"
           >

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { Profile } from "./Profile";
 
 beforeEach(() => localStorage.clear());
@@ -10,16 +10,16 @@ function mockStats(rows: unknown) {
 }
 
 describe("Profile view", () => {
-  it("renders the display-name input and the avatar preview", () => {
+  it("renders the display-name input and the avatar preview", async () => {
     mockStats([]);
-    render(<Profile />);
+    await act(async () => { render(<Profile />); });
     expect(screen.getByRole("textbox", { name: /display name/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /avatar/i })).toBeInTheDocument();
   });
 
-  it("renders the palette color swatches", () => {
+  it("renders the palette color swatches", async () => {
     mockStats([]);
-    render(<Profile />);
+    await act(async () => { render(<Profile />); });
     expect(screen.getAllByRole("button", { name: /^color #/i })).toHaveLength(8);
   });
 
@@ -32,11 +32,11 @@ describe("Profile view", () => {
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
-  it("updates the display name on input", () => {
+  it("updates the display name on input", async () => {
     mockStats([]);
-    render(<Profile />);
+    await act(async () => { render(<Profile />); });
     const input = screen.getByRole("textbox", { name: /display name/i });
-    fireEvent.change(input, { target: { value: "Zoe" } });
+    await act(async () => { fireEvent.change(input, { target: { value: "Zoe" } }); });
     expect((input as HTMLInputElement).value).toBe("Zoe");
     expect(JSON.parse(localStorage.getItem("granbridge.player")!).name).toBe("Zoe");
   });
