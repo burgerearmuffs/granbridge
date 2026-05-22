@@ -36,3 +36,35 @@ The BLE bridge is independently usable without any frontend. See
 
 ## Tests
 `.venv\Scripts\python -m pytest` — all tests are hardware-free (fake/replay transport).
+
+## Desktop UI
+
+A React+TypeScript+Tailwind+Zustand web app that connects to the GRANBRIDGE WebSocket and drives live games via the bidirectional command channel. Tauri-ready for a native Windows app.
+
+**Dev server (browser):**
+```
+cd ui
+npm install
+npm run dev
+```
+Opens at `http://localhost:5173`. The app connects to `ws://127.0.0.1:8787` — run `granbridge serve` first.
+
+**Kiosk / OBS mode:** append `?kiosk=1` to hide the header/badge — ideal for fullscreen overlays.
+
+**Run tests:**
+```
+npm --prefix ui test
+```
+
+**Web build:**
+```
+npm --prefix ui run build
+```
+Output lands in `ui/dist/`.
+
+**Native app (Tauri):** Once Rust is installed (`rustup`), build the native desktop app:
+```
+cd ui
+cargo tauri build
+```
+The Tauri scaffold lives in `ui/src-tauri/`. The `tauri.conf.json` points `frontendDist` to `../dist` and dev to `http://localhost:5173`, window 1280×800 resizable, identifier `com.granbridge.app`.

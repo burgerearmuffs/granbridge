@@ -9,3 +9,8 @@ logs/**/*.jsonl
 logs/**/*.log
 !logs/**/.gitkeep
 src/granbridge/protocol/segment_map.overrides.json
+
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/src-tauri/target/

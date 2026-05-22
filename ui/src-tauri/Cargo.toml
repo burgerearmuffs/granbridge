@@ -1,0 +1,19 @@
+[package]
+name = "granbridge-app"
+version = "0.1.0"
+edition = "2021"
+
+# NOTE: Building requires Rust (cargo/rustup) which is not installed in the current
+# environment. Run `npm run build` (web) then `cargo tauri build` once Rust is installed.
+
+[lib]
+name = "granbridge_app_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
