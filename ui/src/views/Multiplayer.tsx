@@ -21,6 +21,10 @@ import { PeerManager } from "../multiplayer/peerManager";
 import { getLocalStream } from "../multiplayer/media";
 import { VideoTile } from "../components/VideoTile";
 import { MpControls } from "../components/MpControls";
+import { useStore } from "../store";
+import { LiveGame } from "./LiveGame";
+import { bridgeLink } from "../bridgeLink";
+import { RemoteMatch, hostRole } from "../multiplayer/remoteMatch";
 
 // keyed by broker peer_id
 type StreamMap = Map<string, MediaStream>;
@@ -33,6 +37,9 @@ export function Multiplayer() {
   const mic = useMpStore((s) => s.mic);
   const cam = useMpStore((s) => s.cam);
   const brokerUrl = useMpStore((s) => s.brokerUrl);
+  const selfId = useMpStore((s) => s.selfId);
+  const peersForRole = useMpStore((s) => s.peers);
+  const gameState = useStore((s) => s.gameState);
   const { setMpStatus, setRoom, setSelfId, setPeers, setError, setBrokerUrl, resetMp } = useMpStore.getState();
 
   const identity = getOrCreatePlayer();
@@ -40,6 +47,7 @@ export function Multiplayer() {
   const [roomInput, setRoomInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [brokerInput, setBrokerInput] = useState(brokerUrl);
+  const [mpMode, setMpMode] = useState("x01");
 
   // Local stream + remote streams
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -48,6 +56,7 @@ export function Multiplayer() {
   // Refs — stable across renders
   const brokerRef = useRef<BrokerClient | null>(null);
   const pmRef = useRef<PeerManager | null>(null);
+  const rmRef = useRef<RemoteMatch | null>(null);
 
   // Update local tracks when mic/cam toggles change
   useEffect(() => {
@@ -55,6 +64,21 @@ export function Multiplayer() {
     for (const track of localStream.getAudioTracks()) track.enabled = mic;
     for (const track of localStream.getVideoTracks()) track.enabled = cam;
   }, [mic, cam, localStream]);
+
+  // Establish the host-authoritative remote match once we're in a room with a
+  // peer and a live PeerManager. Role is derived deterministically from peer ids.
+  useEffect(() => {
+    if (mpStatus !== "in_room" || !pmRef.current || peersForRole.length === 0 || !selfId) return;
+    if (rmRef.current) return;
+    const rm = new RemoteMatch({
+      role: hostRole(selfId, peersForRole),
+      peer: pmRef.current,
+      bridge: bridgeLink,
+      applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
+    });
+    rm.start();
+    rmRef.current = rm;
+  }, [mpStatus, selfId, peersForRole]);
 
   const handleJoin = useCallback(async () => {
     if (!roomInput.trim() || !passwordInput.trim()) return;
@@ -126,11 +150,23 @@ export function Multiplayer() {
     pmRef.current?.closeAll();
     pmRef.current = null;
 
+    rmRef.current?.stop();
+    rmRef.current = null;
+
     localStream?.getTracks().forEach((t) => t.stop());
     setLocalStream(null);
     setRemoteStreams(new Map());
     resetMp();
   }, [localStream, resetMp]);
+
+  const handleStartMatch = useCallback(() => {
+    const me = getOrCreatePlayer();
+    const opponent = peersForRole[0]?.player.name ?? "Guest";
+    const options = mpMode === "x01" ? { start_score: 501, double_out: true } : {};
+    rmRef.current?.startGame(mpMode, [me.name, opponent], options);
+  }, [mpMode, peersForRole]);
+
+  const role = selfId && peersForRole.length ? hostRole(selfId, peersForRole) : null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -253,6 +289,39 @@ export function Multiplayer() {
       {peers.length === 0 && (
         <p className="text-neutral-500 text-sm">Waiting for opponent to join…</p>
       )}
+
+      {/* Shared match */}
+      <div className="border-t border-neutral-800 pt-4">
+        {gameState && gameState.status === "in_progress" ? (
+          <LiveGame state={gameState} />
+        ) : role === "host" ? (
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-neutral-300">
+              Mode
+              <select
+                value={mpMode}
+                onChange={(e) => setMpMode(e.target.value)}
+                aria-label="Match mode"
+                className="ml-2 bg-neutral-800 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="x01">X01 (501)</option>
+                <option value="cricket">Cricket</option>
+                <option value="around_the_clock">Around the Clock</option>
+              </select>
+            </label>
+            <button
+              onClick={handleStartMatch}
+              disabled={peersForRole.length === 0}
+              className="px-4 py-2 rounded-lg bg-amber-400 text-neutral-900 font-bold text-sm hover:bg-amber-300 disabled:opacity-40"
+              aria-label="Start match"
+            >
+              Start match
+            </button>
+          </div>
+        ) : (
+          <p className="text-neutral-500 text-sm">Waiting for the host to start the match…</p>
+        )}
+      </div>
 
       <MpControls onLeave={handleLeave} />
     </div>

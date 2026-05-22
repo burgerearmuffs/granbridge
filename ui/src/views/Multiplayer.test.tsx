@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { useMpStore } from "../multiplayer/store";
+import { useStore } from "../store";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ beforeEach(() => {
   localStorage.clear();
   useMpStore.getState().resetMp();
   useMpStore.setState({ brokerUrl: "ws://127.0.0.1:8788", mic: true, cam: true, mpStatus: "idle", error: undefined });
+  useStore.setState({ gameState: null });
   vi.clearAllMocks();
   // Reset mock to return itself for chaining
   mockBrokerInstance.onJoined.mockReturnThis();
@@ -142,5 +144,45 @@ describe("Multiplayer join form", () => {
     useMpStore.setState({ error: "wrong_password: Bad password" });
     render(<Multiplayer />);
     expect(screen.getByRole("alert")).toHaveTextContent("wrong_password: Bad password");
+  });
+});
+
+describe("Multiplayer in-room match panel", () => {
+  function enterRoomAs(selfId: string, peerId: string) {
+    useMpStore.setState({
+      mpStatus: "in_room",
+      room: "r1",
+      selfId,
+      peers: [{ peer_id: peerId, player: { id: "px", name: "Opponent" } }],
+    });
+  }
+
+  it("host (smaller peer id) sees the Start match button", () => {
+    enterRoomAs("aaa", "zzz");
+    render(<Multiplayer />);
+    expect(screen.getByRole("button", { name: /start match/i })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /match mode/i })).toBeInTheDocument();
+  });
+
+  it("guest (larger peer id) sees a waiting message, no Start button", () => {
+    enterRoomAs("zzz", "aaa");
+    render(<Multiplayer />);
+    expect(screen.getByText(/waiting for the host/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
+  });
+
+  it("renders the synced board when a game is in progress", () => {
+    enterRoomAs("aaa", "zzz");
+    useStore.setState({
+      gameState: {
+        mode: "x01", status: "in_progress",
+        players: [{ id: "p1", name: "Alice" }, { id: "p2", name: "Bob" }],
+        active_index: 0, visit: [], legs: {}, sets: {}, winner: null,
+        options: {}, mode_view: {}, stats: {},
+      },
+    });
+    render(<Multiplayer />);
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);  // LiveGame header + scoreboard
+    expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
   });
 });
