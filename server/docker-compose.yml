@@ -1,0 +1,50 @@
+version: "3.9"
+
+# TOWER deployment: both services run on the same host.
+# Expose port 8788 on the public IP for the broker.
+# Expose TURN ports (3478 TCP/UDP + relay range) for coturn.
+# Set TURN_SECRET in your environment or a .env file before running.
+
+services:
+
+  broker:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8788:8788"
+    environment:
+      BROKER_HOST: "0.0.0.0"
+      BROKER_PORT: "8788"
+
+  coturn:
+    image: coturn/coturn:latest
+    # Use host networking so coturn can discover the public IP automatically
+    # and relay UDP/TCP across a port range without complex port-mapping.
+    # On TOWER: make sure firewall allows UDP 3478 and UDP 49152-65535.
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      # Replace with your actual public IP or domain.
+      DETECT_EXTERNAL_IP: "yes"
+      # coturn reads these from the command line via the entrypoint;
+      # override by mounting a custom turnserver.conf if you need more control.
+    # Minimum coturn flags for WebRTC TURN (time-limited HMAC credentials):
+    command: >
+      -n
+      --log-file=stdout
+      --lt-cred-mech
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET}
+      --realm=${TURN_REALM:-granbridge.local}
+      --no-tls
+      --no-dtls
+      --min-port=49152
+      --max-port=65535
+      --listening-port=3478
+    # NOTE: --no-tls/--no-dtls is fine behind a TURN-aware reverse proxy.
+    # For direct production use, add --tls-listening-port=5349 and mount certs.
+
+# Port summary (open on TOWER firewall):
+#   TCP  8788   — WebSocket broker  (or 443 if behind reverse proxy for wss://)
+#   UDP/TCP 3478  — STUN/TURN
+#   UDP  49152-65535 — TURN relay range
