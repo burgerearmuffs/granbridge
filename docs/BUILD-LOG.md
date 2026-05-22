@@ -215,3 +215,21 @@ Spec `docs/superpowers/specs/2026-05-22-mp4-profiles-design.md`; plan
   (uploaded images deferred).
 
 **Next:** quick parity modes (Count-Up, Medley); real app icons; (later) server-side profiles/accounts.
+
+### Count-Up mode ✅ (quick parity)
+Spec `docs/superpowers/specs/2026-05-22-count-up-mode-design.md`; plan
+`docs/superpowers/plans/2026-05-22-count-up-mode.md`. Built subagent-driven on `count-up-mode`.
+
+- **Engine:** new `CountUpMode` — N rounds (default 8) of 3 darts, every dart accumulates (bull 25 /
+  dbull 50, no bust/checkout), highest total wins (ties → earlier player). One backward-compatible
+  engine tweak: `_on_leg_won(result.winner or pid)` so the winner can be the highest scorer rather
+  than whoever threw the final dart (inert for X01/Cricket/ATC, which set `winner == pid`).
+- **UI:** `CountUpBoard` (per-player totals + "Round x / y" + leader crown); Count-Up in the local
+  Setup form (with a rounds input) and the Multiplayer start-match select (default rounds remotely).
+- **Tests:** +9 Python (scoring/rounds/end/highest-total-wins-incl-non-last-thrower/tie/default/option/
+  multi-round-interleaving) → 182 Python; +4 UI (CountUpBoard ×2, Setup option/submit ×2) → 221 UI.
+  Full suites + `npm --prefix ui run build` green.
+- **Limitation:** assumes full 3-dart turns (round counter keys off the 3rd dart); early `next_player`
+  isn't a supported Count-Up action.
+
+**Next:** Medley (a match of sequenced games — its own sub-project); real app icons.
