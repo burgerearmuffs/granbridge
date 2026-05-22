@@ -56,11 +56,38 @@ const BAND_COLORS = ["#1a7a3a", "#c0262a"]; // green, red
 const HIGHLIGHT_COLOR = "#ffd54a";
 const HIGHLIGHT_CLASS = "dartboard-hit";
 
-interface Props {
-  highlight?: string;
+/**
+ * Interpolate a heat fill color for a normalised intensity in [0, 1].
+ * 0 → transparent (no hits), 0.5 → amber, 1 → red.
+ */
+function heatFill(intensity: number): { fill: string; opacity: number } {
+  if (intensity <= 0) return { fill: "transparent", opacity: 0 };
+  // Ramp: low intensity amber (#f59e0b), high intensity red (#ef4444)
+  const r = Math.round(245 + (239 - 245) * intensity); // 245→239
+  const g = Math.round(158 + (68 - 158) * intensity);  // 158→68
+  const b = Math.round(11 + (68 - 11) * intensity);    // 11→68
+  const opacity = 0.3 + 0.7 * intensity;               // 0.3 → 1.0
+  return { fill: `rgb(${r},${g},${b})`, opacity };
 }
 
-export function Dartboard({ highlight }: Props) {
+interface Props {
+  highlight?: string;
+  heatmap?: Record<string, number>;
+}
+
+export function Dartboard({ highlight, heatmap }: Props) {
+  // Pre-compute normalised intensity for each bed when heatmap is provided.
+  const heatNorm = React.useMemo<Record<string, number>>(() => {
+    if (!heatmap) return {};
+    const values = Object.values(heatmap);
+    const max = values.length > 0 ? Math.max(...values) : 0;
+    if (max === 0) return {};
+    const result: Record<string, number> = {};
+    for (const [bed, count] of Object.entries(heatmap)) {
+      result[bed] = count / max;
+    }
+    return result;
+  }, [heatmap]);
   return (
     <svg
       viewBox="0 0 200 200"
@@ -93,12 +120,26 @@ export function Dartboard({ highlight }: Props) {
               // Both single-outer and single-inner share the S{n} bed key;
               // all regions matching the highlight string are lit up.
               const highlighted = highlight === bed;
+
+              // Determine fill: highlight wins over heat.
+              let fillColor = baseColor;
+              let fillOpacity: number | undefined = undefined;
+              if (highlighted) {
+                fillColor = HIGHLIGHT_COLOR;
+              } else if (heatmap) {
+                const intensity = heatNorm[bed] ?? 0;
+                const heat = heatFill(intensity);
+                fillColor = heat.opacity > 0 ? heat.fill : baseColor;
+                fillOpacity = heat.opacity > 0 ? heat.opacity : undefined;
+              }
+
               return (
                 <path
                   key={`${bed}-${ri}`}
                   data-bed={bed}
                   d={wedgePath(r1, r2, startA, endA)}
-                  fill={highlighted ? HIGHLIGHT_COLOR : baseColor}
+                  fill={fillColor}
+                  fillOpacity={fillOpacity}
                   className={highlighted ? HIGHLIGHT_CLASS : undefined}
                   stroke="#111"
                   strokeWidth="0.5"
@@ -132,28 +173,56 @@ export function Dartboard({ highlight }: Props) {
       })}
 
       {/* Outer bull (SBULL / BULL) */}
-      <circle
-        cx={CX}
-        cy={CY}
-        r={R_SBULL}
-        data-bed="BULL"
-        fill={highlight === "BULL" ? HIGHLIGHT_COLOR : "#1a7a3a"}
-        className={highlight === "BULL" ? HIGHLIGHT_CLASS : undefined}
-        stroke="#111"
-        strokeWidth="0.5"
-      />
+      {(() => {
+        const bullHighlighted = highlight === "BULL";
+        let bullFill = "#1a7a3a";
+        let bullOpacity: number | undefined = undefined;
+        if (bullHighlighted) {
+          bullFill = HIGHLIGHT_COLOR;
+        } else if (heatmap) {
+          const heat = heatFill(heatNorm["BULL"] ?? 0);
+          if (heat.opacity > 0) { bullFill = heat.fill; bullOpacity = heat.opacity; }
+        }
+        return (
+          <circle
+            cx={CX}
+            cy={CY}
+            r={R_SBULL}
+            data-bed="BULL"
+            fill={bullFill}
+            fillOpacity={bullOpacity}
+            className={bullHighlighted ? HIGHLIGHT_CLASS : undefined}
+            stroke="#111"
+            strokeWidth="0.5"
+          />
+        );
+      })()}
 
       {/* Inner bull (DBULL) */}
-      <circle
-        cx={CX}
-        cy={CY}
-        r={R_DBULL}
-        data-bed="DBULL"
-        fill={highlight === "DBULL" ? HIGHLIGHT_COLOR : "#c0262a"}
-        className={highlight === "DBULL" ? HIGHLIGHT_CLASS : undefined}
-        stroke="#111"
-        strokeWidth="0.5"
-      />
+      {(() => {
+        const dbullHighlighted = highlight === "DBULL";
+        let dbullFill = "#c0262a";
+        let dbullOpacity: number | undefined = undefined;
+        if (dbullHighlighted) {
+          dbullFill = HIGHLIGHT_COLOR;
+        } else if (heatmap) {
+          const heat = heatFill(heatNorm["DBULL"] ?? 0);
+          if (heat.opacity > 0) { dbullFill = heat.fill; dbullOpacity = heat.opacity; }
+        }
+        return (
+          <circle
+            cx={CX}
+            cy={CY}
+            r={R_DBULL}
+            data-bed="DBULL"
+            fill={dbullFill}
+            fillOpacity={dbullOpacity}
+            className={dbullHighlighted ? HIGHLIGHT_CLASS : undefined}
+            stroke="#111"
+            strokeWidth="0.5"
+          />
+        );
+      })()}
     </svg>
   );
 }

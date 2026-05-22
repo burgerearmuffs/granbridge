@@ -1,8 +1,9 @@
 from __future__ import annotations
 import http.server
+import json
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import structlog
 
@@ -12,6 +13,33 @@ log = structlog.get_logger(__name__)
 class _Handler(http.server.SimpleHTTPRequestHandler):
     ui_dir: Path
     overlay_dir: Path
+    routes: Optional[dict[str, Callable[[], object]]] = None
+
+    def do_GET(self) -> None:  # type: ignore[override]
+        # Check custom API routes first
+        if self.routes is not None:
+            # Strip query string and fragment for route matching
+            path_only = self.path.split("?", 1)[0].split("#", 1)[0]
+            if path_only in self.routes:
+                try:
+                    data = self.routes[path_only]()
+                    body = json.dumps(data).encode("utf-8")
+                except Exception as exc:
+                    body = json.dumps({"error": str(exc)}).encode("utf-8")
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+        # Fall through to default static file serving
+        super().do_GET()
 
     def translate_path(self, path: str) -> str:
         # Strip query string and fragment
@@ -50,11 +78,12 @@ class StaticServer:
         overlay_dir: Path,
         host: str = "127.0.0.1",
         port: int = 8080,
+        routes: Optional[dict[str, Callable[[], object]]] = None,
     ) -> None:
         handler = type(
             "Bound_Handler",
             (_Handler,),
-            {"ui_dir": ui_dir, "overlay_dir": overlay_dir},
+            {"ui_dir": ui_dir, "overlay_dir": overlay_dir, "routes": routes},
         )
         self._httpd = http.server.ThreadingHTTPServer((host, port), handler)
         self._thread: Optional[threading.Thread] = None

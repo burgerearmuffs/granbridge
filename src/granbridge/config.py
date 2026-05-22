@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,3 +22,4 @@ class Settings(BaseSettings):
     http_port: int = 8080
     plugins_enabled: list[str] = []
     plugins: dict[str, dict] = {}
+    history_db: Path = Path(os.environ.get("LOCALAPPDATA", ".")) / "granbridge" / "history.db"

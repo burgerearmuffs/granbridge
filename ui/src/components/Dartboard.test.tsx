@@ -77,4 +77,49 @@ describe("Dartboard", () => {
     const highlighted = container.querySelectorAll(".dartboard-hit");
     expect(highlighted.length).toBe(0);
   });
+
+  describe("heatmap prop", () => {
+    it("T20 (count=10) has a stronger heat fill than S1 (count=1)", () => {
+      const { container } = render(
+        <Dartboard heatmap={{ T20: 10, S1: 1 }} />
+      );
+
+      // There may be multiple elements with data-bed='T20' (outer+inner single share the key,
+      // but T20 is the treble, so there is exactly one treble path).
+      // We look at the first matching element for each bed.
+      const t20Els = container.querySelectorAll("[data-bed='T20']");
+      const s1Els = container.querySelectorAll("[data-bed='S1']");
+
+      expect(t20Els.length).toBeGreaterThan(0);
+      expect(s1Els.length).toBeGreaterThan(0);
+
+      // T20 is the maximum (count=10, intensity=1.0) → fill-opacity should be 1.0
+      // S1 has intensity=0.1 → fill-opacity should be lower.
+      // We check the first element for each bed.
+      const t20Opacity = parseFloat(t20Els[0].getAttribute("fill-opacity") ?? "1");
+      const s1Opacity = parseFloat(s1Els[0].getAttribute("fill-opacity") ?? "1");
+
+      // T20 should be brighter (higher opacity) than S1
+      expect(t20Opacity).toBeGreaterThan(s1Opacity);
+    });
+
+    it("highlight wins over heatmap: highlighted bed has highlight fill, not heat", () => {
+      const { container } = render(
+        <Dartboard highlight="T20" heatmap={{ T20: 10 }} />
+      );
+      const el = container.querySelector("[data-bed='T20']");
+      expect(el!.getAttribute("fill")).toBe("#ffd54a");
+      expect(el!.classList.contains("dartboard-hit")).toBe(true);
+    });
+
+    it("beds with no heatmap hits keep a defined non-transparent fill", () => {
+      const { container } = render(
+        <Dartboard heatmap={{ T20: 5 }} />
+      );
+      // S1 is not in the heatmap, so it should have no fill-opacity attribute
+      const s1 = container.querySelector("[data-bed='S1']");
+      expect(s1).not.toBeNull();
+      expect(s1!.getAttribute("fill-opacity")).toBeNull();
+    });
+  });
 });

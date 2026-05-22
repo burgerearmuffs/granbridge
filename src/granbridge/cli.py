@@ -66,8 +66,22 @@ def serve(
         server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler)
         await server.start()
 
+        from granbridge.history import HistoryPlugin, HistoryStore
+
+        store = HistoryStore(settings.history_db)
+
         ui_dir, overlay_dir = static_dirs()
-        static = StaticServer(ui_dir, overlay_dir, settings.ws_host, settings.http_port)
+        static = StaticServer(
+            ui_dir,
+            overlay_dir,
+            settings.ws_host,
+            settings.http_port,
+            routes={
+                "/api/history/recent": store.recent_games,
+                "/api/history/stats": store.player_stats,
+                "/api/history/heatmap": store.hit_counts,
+            },
+        )
         static.start()
         typer.echo(f"UI at http://{settings.ws_host}:{settings.http_port}  |  WS ws://{settings.ws_host}:{settings.ws_port}")
         if open_browser:
@@ -81,6 +95,7 @@ def serve(
         for _p in plugins:
             if isinstance(_p, CommentaryPlugin):
                 _p.set_publish(bus.publish)
+        plugins.append(HistoryPlugin({}, store))
         plugin_mgr = PluginManager(bus, plugins)
         await asyncio.gather(mgr.run(), engine.attach(), plugin_mgr.run())
 

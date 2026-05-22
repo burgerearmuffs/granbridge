@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGranbridgeSocket } from "./useGranbridgeSocket";
 import { useStore } from "./store";
 import { Setup } from "./views/Setup";
 import { LiveGame } from "./views/LiveGame";
+import { History } from "./views/History";
 import { Controls } from "./components/Controls";
 import { Banners } from "./components/Banners";
 import { ConnectionBadge } from "./components/ConnectionBadge";
@@ -13,6 +14,8 @@ import { VideoToggle } from "./components/VideoToggle";
 import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 
+type NavTab = "live" | "history";
+
 export default function App() {
   const { send } = useGranbridgeSocket();
   const connection = useStore((s) => s.connection);
@@ -20,6 +23,7 @@ export default function App() {
   const banners = useStore((s) => s.banners);
   const playing = gameState && gameState.status === "in_progress";
   const kiosk = new URLSearchParams(location.search).has("kiosk");
+  const [activeTab, setActiveTab] = useState<NavTab>("live");
 
   // CheckoutOverlay owns the game_won "GAME SHOT" moment.
   // Confetti Celebration is kept for leg_won only to avoid double-celebration.
@@ -51,7 +55,35 @@ export default function App() {
     <div className="min-h-full bg-neutral-950 text-white p-6">
       {!kiosk && (
         <header className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-black tracking-tight">GRANBRIDGE</h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-3xl font-black tracking-tight">GRANBRIDGE</h1>
+            <nav className="flex gap-1" aria-label="main navigation">
+              <button
+                onClick={() => setActiveTab("live")}
+                aria-pressed={activeTab === "live"}
+                className={[
+                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  activeTab === "live"
+                    ? "bg-amber-400 text-neutral-900"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                Live
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                aria-pressed={activeTab === "history"}
+                className={[
+                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  activeTab === "history"
+                    ? "bg-amber-400 text-neutral-900"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                History
+              </button>
+            </nav>
+          </div>
           <div className="flex items-center gap-4">
             <VideoToggle />
             <SoundToggle />
@@ -60,7 +92,9 @@ export default function App() {
         </header>
       )}
       <Banners banners={banners} />
-      {playing ? (
+      {activeTab === "history" ? (
+        <History />
+      ) : playing ? (
         <>
           <LiveGame state={gameState!} />
           <div className="mt-10">
