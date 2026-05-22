@@ -53,10 +53,15 @@ def test_unknown_sub_mode_aborts_start():
 
 def test_undo_across_leg_boundary():
     eng = _engine(); _start(eng, ["A"], sequence=["count_up", "x01"], rounds=1)
-    _throw(eng, "S5", "S5", "S5")            # win leg 1 -> advanced to x01
+    eng.on_dart(Dart.from_bed("S5"))         # count_up dart 1 (total 5)
+    eng.on_dart(Dart.from_bed("S5"))         # count_up dart 2 (total 10)
+    eng.on_dart(Dart.from_bed("S5"))         # count_up dart 3 -> wins leg 1, advance to x01
     assert eng.state.mode_view["medley"]["current"] == "x01"
-    eng.handle_command(Undo(command="undo"))
+    eng.handle_command(Undo(command="undo"))  # undo the leg-winning dart -> back to count_up leg 1
     assert eng.state.mode_view["medley"]["current"] == "count_up"
-    before = eng.state.mode_view["total"]["p1"]
-    eng.on_dart(Dart.from_bed("S20"))
-    assert eng.state.mode_view["total"]["p1"] == before + 20
+    assert eng.state.mode_view["total"]["p1"] == 10              # count_up state restored
+    # the restored count_up mode still functions: undo once more, then a non-final dart scores
+    eng.handle_command(Undo(command="undo"))  # back to after dart 1 (total 5, 1 dart in the turn)
+    eng.on_dart(Dart.from_bed("S20"))         # 2nd dart of the turn -> scores, does NOT end the leg
+    assert eng.state.mode_view["total"]["p1"] == 25
+    assert eng.state.mode_view["medley"]["current"] == "count_up"

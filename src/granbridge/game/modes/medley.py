@@ -41,25 +41,13 @@ class MedleyMode(GameMode):
             state.options = {**state.options, **options}
             state.options["best_of_legs"] = len(sequence)
             state.options["best_of_sets"] = 1
-            leg_history: list[dict] = []
         else:
             sequence = prior["sequence"]
             index = prior["index"] + 1
-            # Snapshot the outgoing sub-mode's view before it is overwritten.
-            outgoing = prior["current"]
-            outgoing_view = _SUB_MODES[outgoing]().mode_view(state)
-            outgoing_view.pop("medley", None)
-            leg_history = list(prior.get("leg_history", []))
-            leg_history.append({"mode": outgoing, "view": outgoing_view})
 
         current = sequence[index]
         _SUB_MODES[current]().on_start(state, options)            # sets the sub-mode's mode_view keys
-        state.mode_view["medley"] = {
-            "sequence": sequence,
-            "index": index,
-            "current": current,
-            "leg_history": leg_history,
-        }
+        state.mode_view["medley"] = {"sequence": sequence, "index": index, "current": current}
 
     def apply_dart(self, state: GameState, dart: Dart) -> DartResult:
         current = state.mode_view["medley"]["current"]
@@ -67,11 +55,6 @@ class MedleyMode(GameMode):
 
     def mode_view(self, state: GameState) -> dict[str, Any]:
         medley = state.mode_view["medley"]
-        # Start with historical leg data so prior-leg keys (e.g. "total" from count_up) remain accessible.
-        view: dict[str, Any] = {}
-        for leg in medley.get("leg_history", []):
-            view.update(leg["view"])
-        # Overlay the live sub-mode view (current leg's keys overwrite history).
-        view.update(_SUB_MODES[medley["current"]]().mode_view(state))
+        view = _SUB_MODES[medley["current"]]().mode_view(state)   # sub-mode view (incl. e.g. x01 checkout)
         view["medley"] = medley
         return view
