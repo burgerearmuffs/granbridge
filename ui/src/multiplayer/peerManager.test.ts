@@ -12,6 +12,7 @@ class FakeDataChannel {
   readyState: "open" | "closed" = "open";
   sent: string[] = [];
   onmessage: ((ev: { data: string }) => void) | null = null;
+  onopen: (() => void) | null = null;
   send(data: string) { this.sent.push(data); }
 }
 
@@ -123,5 +124,18 @@ describe("PeerManager (light, fake RTCPeerConnection)", () => {
     const pm = new PeerManager(broker, "aaa", null);
     expect(() => pm.sendData({ x: 1 })).not.toThrow();
     expect(() => pm.closeAll()).not.toThrow();
+  });
+
+  it("fires onChannelOpen when the created data channel opens", () => {
+    const broker = makeMockBroker() as unknown as BrokerClient;
+    const pm = new PeerManager(broker, "zzz", null); // impolite → creates the channel
+    const opened: string[] = [];
+    pm.onChannelOpen = (peerId) => opened.push(peerId);
+
+    (broker as any)._emitPeers([{ peer_id: "aaa", player: { id: "p1", name: "Alice" } }]);
+
+    const dc = FakePC.instances[0]._channels[0];
+    dc.onopen?.();
+    expect(opened).toEqual(["aaa"]);
   });
 });

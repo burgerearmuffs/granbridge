@@ -49,6 +49,7 @@ export class PeerManager {
   onRemoteStream: (peerId: string, stream: MediaStream) => void = () => {};
   onDataMessage: (peerId: string, obj: unknown) => void = () => {};
   onPeerState: (peerId: string, state: PeerState) => void = () => {};
+  onChannelOpen: (peerId: string) => void = () => {};
 
   constructor(
     broker: BrokerClient,
@@ -123,6 +124,7 @@ export class PeerManager {
     if (!isPolite) {
       const dc = pc.createDataChannel("granbridge");
       entry.dc = dc;
+      dc.onopen = () => this.onChannelOpen(peerId);
       dc.onmessage = (ev) => {
         try { this.onDataMessage(peerId, JSON.parse(ev.data as string)); } catch { /* ignore */ }
       };
@@ -140,6 +142,7 @@ export class PeerManager {
     // Receive data channel from polite peer
     pc.ondatachannel = (ev) => {
       entry.dc = ev.channel;
+      ev.channel.onopen = () => this.onChannelOpen(peerId);
       ev.channel.onmessage = (me) => {
         try { this.onDataMessage(peerId, JSON.parse(me.data as string)); } catch { /* ignore */ }
       };
