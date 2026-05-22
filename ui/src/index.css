@@ -1,2 +1,72 @@
-@tailwind base; @tailwind components; @tailwind utilities;
-html,body,#root{height:100%} body{margin:0}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { margin: 0; }
+
+/* ── Arcade dark theme CSS variables ── */
+:root {
+  --color-accent: #ffd54a;
+  --color-accent-glow: rgba(255, 213, 74, 0.6);
+  --color-board-green: #1a7a3a;
+  --color-board-red: #c0262a;
+  --color-board-black: #1a1a1a;
+  --color-board-cream: #f5f0dc;
+  --color-bg: #080b0e;
+  --color-surface: #141920;
+  --color-surface-2: #1e2530;
+  --color-text: #f0f0f0;
+  --color-text-muted: #7a8a99;
+  --color-ring-active: rgba(255, 213, 74, 0.85);
+}
+
+/* ── Keyframe animations ── */
+
+/* Dartboard hit: amber pulse glow */
+@keyframes dartboard-hit-pulse {
+  0%   { filter: brightness(1.5) drop-shadow(0 0 6px var(--color-accent)); }
+  40%  { filter: brightness(2.2) drop-shadow(0 0 16px var(--color-accent-glow)); }
+  100% { filter: brightness(1.5) drop-shadow(0 0 6px var(--color-accent)); }
+}
+
+.dartboard-hit {
+  animation: dartboard-hit-pulse 0.55s ease-in-out;
+}
+
+/* Score pop: scale bounce on point change */
+@keyframes score-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.18); }
+  60%  { transform: scale(0.95); }
+  80%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.score-pop {
+  animation: score-pop 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* Bust shake */
+@keyframes bust-shake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-8px) rotate(-2deg); }
+  30%  { transform: translateX(8px) rotate(2deg); }
+  45%  { transform: translateX(-6px) rotate(-1deg); }
+  60%  { transform: translateX(6px) rotate(1deg); }
+  75%  { transform: translateX(-3px); }
+  90%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+.bust-shake {
+  animation: bust-shake 0.5s ease-in-out;
+}
+
+/* ── Subtle board polish ── */
+.granbridge-board-container {
+  background: var(--color-surface);
+  border: 1px solid rgba(255, 213, 74, 0.12);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+}

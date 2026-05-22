@@ -1,8 +1,10 @@
 import type { GameState } from "../types";
+import { useStore } from "../store";
 import { X01Board } from "../components/boards/X01Board";
 import { CricketBoard } from "../components/boards/CricketBoard";
 import { AtcBoard } from "../components/boards/AtcBoard";
 import { FreePlayBoard } from "../components/boards/FreePlayBoard";
+import { Dartboard } from "../components/Dartboard";
 
 interface Props {
   state: GameState;
@@ -10,6 +12,7 @@ interface Props {
 
 export function LiveGame({ state }: Props) {
   const activePlayer = state.players[state.active_index];
+  const lastHit = useStore((s) => s.lastHit);
 
   const board = () => {
     switch (state.mode) {
@@ -40,7 +43,30 @@ export function LiveGame({ state }: Props) {
           <span className="text-neutral-500 text-sm ml-2">throwing</span>
         </div>
       )}
-      {board()}
+
+      <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
+        {/* Mode-specific scoreboard */}
+        <div className="flex-1 min-w-0">
+          {board()}
+        </div>
+
+        {/* Dartboard panel */}
+        <div className="flex flex-col items-center gap-3 lg:w-64 xl:w-72">
+          <Dartboard highlight={lastHit?.bed} />
+          {lastHit && (
+            <div className="text-center">
+              <span className="text-amber-300 font-bold text-lg score-pop">
+                {lastHit.bed}
+              </span>
+              {lastHit.score > 0 && (
+                <span className="text-neutral-400 text-sm ml-2">
+                  +{lastHit.score}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

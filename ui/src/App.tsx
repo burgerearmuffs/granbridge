@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useGranbridgeSocket } from "./useGranbridgeSocket";
 import { useStore } from "./store";
 import { Setup } from "./views/Setup";
@@ -5,6 +6,7 @@ import { LiveGame } from "./views/LiveGame";
 import { Controls } from "./components/Controls";
 import { Banners } from "./components/Banners";
 import { ConnectionBadge } from "./components/ConnectionBadge";
+import { Celebration } from "./components/Celebration";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -13,6 +15,14 @@ export default function App() {
   const banners = useStore((s) => s.banners);
   const playing = gameState && gameState.status === "in_progress";
   const kiosk = new URLSearchParams(location.search).has("kiosk");
+
+  // Derive a celebration trigger: count of game_won banners seen so far.
+  // Each new game_won banner increments the trigger, re-firing confetti.
+  const celebrationTrigger = useMemo(
+    () => banners.filter((b) => b.kind === "game_won").length,
+    [banners],
+  );
+
   return (
     <div className="min-h-full bg-neutral-950 text-white p-6">
       {!kiosk && (
@@ -32,6 +42,7 @@ export default function App() {
       ) : (
         <Setup send={send} />
       )}
+      <Celebration trigger={celebrationTrigger} />
     </div>
   );
 }
