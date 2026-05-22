@@ -186,3 +186,30 @@ describe("Multiplayer in-room match panel", () => {
     expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
   });
 });
+
+import { OpponentCard } from "../components/OpponentCard";
+
+describe("Multiplayer avatars", () => {
+  it("renders an avatar for a peer with no stream", () => {
+    useMpStore.setState({
+      mpStatus: "in_room",
+      room: "r1",
+      selfId: "aaa",
+      peers: [{ peer_id: "zzz", player: { id: "id-z", name: "Zoe", avatar: { color: "#10b981" } } }],
+    });
+    render(<Multiplayer />);
+    expect(screen.getByRole("img", { name: /zoe avatar/i })).toBeInTheDocument();
+  });
+});
+
+describe("OpponentCard wiring smoke", () => {
+  it("OpponentCard renders given a profile + summary", () => {
+    render(
+      <OpponentCard
+        profile={{ id: "x", name: "Eve", avatar: { color: "#ef4444" } }}
+        summary={{ threeDartAvg: 1, wins: 0, gamesPlayed: 0 }}
+      />,
+    );
+    expect(screen.getByText("Eve")).toBeInTheDocument();
+  });
+});

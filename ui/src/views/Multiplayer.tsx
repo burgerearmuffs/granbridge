@@ -25,6 +25,12 @@ import { useStore } from "../store";
 import { LiveGame } from "./LiveGame";
 import { bridgeLink } from "../bridgeLink";
 import { RemoteMatch, hostRole } from "../multiplayer/remoteMatch";
+import { Avatar } from "../components/Avatar";
+import { OpponentCard } from "../components/OpponentCard";
+import { defaultAvatarColor } from "../multiplayer/avatar";
+import { fetchMyCareerSummary } from "../multiplayer/careerSummary";
+import type { Profile } from "../multiplayer/player";
+import type { CareerSummary } from "../multiplayer/careerSummary";
 
 // keyed by broker peer_id
 type StreamMap = Map<string, MediaStream>;
@@ -47,6 +53,7 @@ export function Multiplayer() {
   const [passwordInput, setPasswordInput] = useState("");
   const [brokerInput, setBrokerInput] = useState(brokerUrl);
   const [mpMode, setMpMode] = useState("x01");
+  const [opponentCard, setOpponentCard] = useState<{ profile: Profile; summary: CareerSummary } | null>(null);
 
   // Local stream + remote streams
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -56,6 +63,7 @@ export function Multiplayer() {
   const brokerRef = useRef<BrokerClient | null>(null);
   const pmRef = useRef<PeerManager | null>(null);
   const rmRef = useRef<RemoteMatch | null>(null);
+  const selfCardRef = useRef<{ profile: Profile; summary: CareerSummary } | null>(null);
 
   // Update local tracks when mic/cam toggles change
   useEffect(() => {
@@ -74,6 +82,8 @@ export function Multiplayer() {
       peer: pmRef.current,
       bridge: bridgeLink,
       applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
+      selfCard: selfCardRef.current,
+      onOpponentCard: (profile, summary) => setOpponentCard({ profile, summary }),
     });
     rm.start();
     rmRef.current = rm;
@@ -106,6 +116,10 @@ export function Multiplayer() {
     // Get local media (null in jsdom — guarded)
     const stream = await getLocalStream({ video: cam, audio: mic });
     setLocalStream(stream);
+
+    // Build the card we advertise to the opponent (profile + local career summary).
+    const summary = await fetchMyCareerSummary(player.name);
+    selfCardRef.current = { profile: player, summary };
 
     // Construct broker client
     const bc = new BrokerClient(brokerInput.trim() || "ws://127.0.0.1:8788");
@@ -148,7 +162,7 @@ export function Multiplayer() {
     });
 
     bc.connect();
-    bc.join(roomInput.trim(), passwordInput.trim(), { id: player.id, name: player.name });
+    bc.join(roomInput.trim(), passwordInput.trim(), { id: player.id, name: player.name, avatar: player.avatar });
   }, [roomInput, passwordInput, displayName, brokerInput, cam, mic, identity.name,
       setBrokerUrl, setError, setMpStatus, setPeers, setRoom, setSelfId]);
 
@@ -163,6 +177,7 @@ export function Multiplayer() {
     rmRef.current?.stop();
     rmRef.current = null;
 
+    setOpponentCard(null);
     localStream?.getTracks().forEach((t) => t.stop());
     setLocalStream(null);
     setRemoteStreams(new Map());
@@ -283,6 +298,8 @@ export function Multiplayer() {
           muted
           micActive={mic}
           camActive={cam}
+          avatarName={displayName}
+          avatarColor={identity.avatar.color}
         />
         {/* Remote tiles */}
         {peers.map((p) => (
@@ -291,9 +308,15 @@ export function Multiplayer() {
             stream={remoteStreams.get(p.peer_id) ?? null}
             label={p.player.name}
             muted={false}
+            avatarName={p.player.name}
+            avatarColor={p.player.avatar?.color ?? defaultAvatarColor(p.player.id)}
           />
         ))}
       </div>
+
+      {opponentCard && (
+        <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} />
+      )}
 
       {/* Peer list */}
       {peers.length === 0 && (
