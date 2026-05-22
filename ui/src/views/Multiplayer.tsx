@@ -344,6 +344,7 @@ export function Multiplayer() {
                 <option value="x01">X01 (501)</option>
                 <option value="cricket">Cricket</option>
                 <option value="around_the_clock">Around the Clock</option>
+                <option value="count_up">Count-Up</option>
               </select>
             </label>
             <button

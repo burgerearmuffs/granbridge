@@ -12,6 +12,7 @@ export function Setup({ send }: Props) {
   const [startScore, setStartScore] = useState<301 | 501 | 701>(501);
   const [doubleOut, setDoubleOut] = useState(false);
   const [bestOfLegs, setBestOfLegs] = useState(1);
+  const [rounds, setRounds] = useState(8);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,8 @@ export function Setup({ send }: Props) {
     const options: Record<string, unknown> =
       mode === "x01"
         ? { start_score: startScore, double_out: doubleOut, best_of_legs: bestOfLegs }
+        : mode === "count_up"
+        ? { rounds }
         : {};
 
     send({ command: "start_game", mode, players, options });
@@ -57,6 +60,7 @@ export function Setup({ send }: Props) {
             <option value="cricket">Cricket</option>
             <option value="around_the_clock">Around the Clock</option>
             <option value="free_play">Free Play</option>
+            <option value="count_up">Count-Up</option>
           </select>
         </div>
 
@@ -126,6 +130,29 @@ export function Setup({ send }: Props) {
                 max={99}
                 value={bestOfLegs}
                 onChange={(e) => setBestOfLegs(Number(e.target.value))}
+                className={`${input} w-24`}
+              />
+            </div>
+          </div>
+        )}
+
+        {mode === "count_up" && (
+          <div className="space-y-4 border border-neutral-700 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-widest">
+              Count-Up Options
+            </h3>
+            <div>
+              <label className={label} htmlFor="rounds">
+                Rounds
+              </label>
+              <input
+                id="rounds"
+                aria-label="rounds"
+                type="number"
+                min={1}
+                max={50}
+                value={rounds}
+                onChange={(e) => setRounds(Number(e.target.value))}
                 className={`${input} w-24`}
               />
             </div>
