@@ -80,9 +80,14 @@ function isSyncMsg(o: unknown): o is SyncMsg {
   if (t === "state") return typeof (o as { state?: unknown }).state === "object";
   if (t === "dart") return typeof (o as { bed?: unknown }).bed === "string";
   if (t === "card") {
-    const profile = (o as { profile?: unknown }).profile;
-    const summary = (o as { summary?: unknown }).summary;
-    return typeof profile === "object" && profile !== null && typeof summary === "object" && summary !== null;
+    const profile = (o as { profile?: { id?: unknown; name?: unknown; avatar?: { color?: unknown } } }).profile;
+    const summary = (o as { summary?: { threeDartAvg?: unknown; wins?: unknown; gamesPlayed?: unknown } }).summary;
+    return (
+      !!profile && typeof profile.id === "string" && typeof profile.name === "string" &&
+      !!profile.avatar && typeof profile.avatar.color === "string" &&
+      !!summary && typeof summary.threeDartAvg === "number" &&
+      typeof summary.wins === "number" && typeof summary.gamesPlayed === "number"
+    );
   }
   return false;
 }

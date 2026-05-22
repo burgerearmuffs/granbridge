@@ -2,7 +2,7 @@
  * BrokerClient — WebSocket wrapper for the Granbridge broker protocol.
  *
  * Broker protocol (MP-1, already built):
- *   client → { type:"join", room, password, player:{id,name} }
+ *   client → { type:"join", room, password, player:{id,name,avatar?} }
  *   server → { type:"joined", self, peers:[{peer_id, player}] }
  *   server → { type:"peers",  peers:[{peer_id, player}] }
  *   server → { type:"signal", from, data }

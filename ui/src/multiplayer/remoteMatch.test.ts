@@ -186,4 +186,12 @@ describe("RemoteMatch card exchange", () => {
     peer.fireData({ t: "card", profile: "nope" });
     expect(onOpponentCard).not.toHaveBeenCalled();
   });
+
+  it("ignores a card with empty profile/summary objects", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const onOpponentCard = vi.fn();
+    new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {}, onOpponentCard }).start();
+    peer.fireData({ t: "card", profile: {}, summary: {} });
+    expect(onOpponentCard).not.toHaveBeenCalled();
+  });
 });
