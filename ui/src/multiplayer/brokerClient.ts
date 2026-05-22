@@ -16,9 +16,11 @@
  * useGranbridgeSocket.test.ts does).
  */
 
+import type { AvatarSpec } from "./player";
+
 export interface PeerInfo {
   peer_id: string;
-  player: { id: string; name: string };
+  player: { id: string; name: string; avatar?: AvatarSpec };
 }
 
 export type BrokerCallbacks = {
@@ -44,7 +46,7 @@ export class BrokerClient {
   private _url: string;
   private _ws: WebSocket | null = null;
   private _callbacks: BrokerCallbacks = {};
-  private _pendingJoin: { room: string; password: string; player: { id: string; name: string } } | null = null;
+  private _pendingJoin: { room: string; password: string; player: { id: string; name: string; avatar?: AvatarSpec } } | null = null;
   private _closed = false;
   private _retryCount = 0;
   private _retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -91,7 +93,7 @@ export class BrokerClient {
     };
   }
 
-  join(room: string, password: string, player: { id: string; name: string }): void {
+  join(room: string, password: string, player: { id: string; name: string; avatar?: AvatarSpec }): void {
     this._pendingJoin = { room, password, player };
     if (this._ws && this._ws.readyState === 1 /* OPEN */) {
       this._send({ type: "join", room, password, player });

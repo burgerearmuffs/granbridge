@@ -17,6 +17,8 @@
 
 import type { Command, Event, GameState } from "../types";
 import type { PeerInfo } from "./brokerClient";
+import type { Profile } from "./player";
+import type { CareerSummary } from "./careerSummary";
 
 export type RemoteRole = "host" | "guest";
 
@@ -33,9 +35,15 @@ export interface BridgeLike {
   onEvent(cb: (e: Event) => void): () => void;
 }
 
+export interface PeerCard {
+  profile: Profile;
+  summary: CareerSummary;
+}
+
 export type SyncMsg =
   | { t: "state"; state: GameState }
-  | { t: "dart"; bed: string };
+  | { t: "dart"; bed: string }
+  | { t: "card"; profile: Profile; summary: CareerSummary };
 
 export interface RemoteMatchOptions {
   role: RemoteRole;
@@ -47,6 +55,10 @@ export interface RemoteMatchOptions {
   hostSlot?: string;
   /** Engine slot the guest's darts are scored as. Default "p2". */
   guestSlot?: string;
+  /** This client's advertised card; sent to the peer on channel open. */
+  selfCard?: PeerCard | null;
+  /** Called when the peer's card arrives. */
+  onOpponentCard?: (profile: Profile, summary: CareerSummary) => void;
 }
 
 /**
@@ -67,6 +79,11 @@ function isSyncMsg(o: unknown): o is SyncMsg {
   const t = (o as { t?: unknown }).t;
   if (t === "state") return typeof (o as { state?: unknown }).state === "object";
   if (t === "dart") return typeof (o as { bed?: unknown }).bed === "string";
+  if (t === "card") {
+    const profile = (o as { profile?: unknown }).profile;
+    const summary = (o as { summary?: unknown }).summary;
+    return typeof profile === "object" && profile !== null && typeof summary === "object" && summary !== null;
+  }
   return false;
 }
 
@@ -77,7 +94,7 @@ export class RemoteMatch {
   private _started = false;
 
   constructor(opts: RemoteMatchOptions) {
-    this._opts = { hostSlot: "p1", guestSlot: "p2", ...opts };
+    this._opts = { hostSlot: "p1", guestSlot: "p2", selfCard: null, onOpponentCard: () => {}, ...opts };
   }
 
   /** Wire peer + bridge callbacks. Idempotent. */
@@ -88,10 +105,15 @@ export class RemoteMatch {
 
     peer.onDataMessage = (_peerId, obj) => this._onPeerMessage(obj);
 
+    const sendCard = () => {
+      const card = this._opts.selfCard;
+      if (card) peer.sendData({ t: "card", profile: card.profile, summary: card.summary });
+    };
+
     if (role === "host") {
-      // Re-send the latest snapshot whenever a (re)connecting guest channel opens.
       peer.onChannelOpen = () => {
         if (this._lastState) peer.sendData({ t: "state", state: this._lastState });
+        sendCard();
       };
       this._unsub = bridge.onEvent((e) => {
         if (e.type === "game_state") {
@@ -100,7 +122,7 @@ export class RemoteMatch {
         }
       });
     } else {
-      peer.onChannelOpen = () => {};
+      peer.onChannelOpen = () => { sendCard(); };
       this._unsub = bridge.onEvent((e) => {
         if (e.type === "dart_hit") {
           peer.sendData({ t: "dart", bed: e.bed });
@@ -137,7 +159,11 @@ export class RemoteMatch {
   private _onPeerMessage(obj: unknown): void {
     if (!isSyncMsg(obj)) return;
     const msg = obj;
-    const { role, bridge, guestSlot, applyState } = this._opts;
+    const { role, bridge, guestSlot, applyState, onOpponentCard } = this._opts;
+    if (msg.t === "card") {
+      onOpponentCard(msg.profile, msg.summary);
+      return;
+    }
     if (role === "host") {
       if (msg.t === "dart") {
         bridge.send({ command: "remote_dart", bed: msg.bed, player: guestSlot });

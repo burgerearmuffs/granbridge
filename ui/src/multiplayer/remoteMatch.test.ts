@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { RemoteMatch, hostRole } from "./remoteMatch";
 import type { BridgeLike, PeerLike } from "./remoteMatch";
 import type { Command, Event, GameState } from "../types";
+import type { Profile } from "./player";
+import type { CareerSummary } from "./careerSummary";
 
 function fakePeer() {
   const sent: unknown[] = [];
@@ -140,5 +142,48 @@ describe("RemoteMatch guest", () => {
     rm.stop();
     bridge.fireEvent(DART);
     expect(peer.sent).toEqual([]);
+  });
+});
+
+const PROFILE: Profile = { id: "id-h", name: "Host", avatar: { color: "#f59e0b" } };
+const SUMMARY: CareerSummary = { threeDartAvg: 60, wins: 2, gamesPlayed: 5 };
+
+describe("RemoteMatch card exchange", () => {
+  it("host sends its card on channel open when selfCard is set", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    new RemoteMatch({ role: "host", peer, bridge, applyState: () => {}, selfCard: { profile: PROFILE, summary: SUMMARY } }).start();
+    peer.sent.length = 0;
+    peer.fireOpen();
+    expect(peer.sent).toContainEqual({ t: "card", profile: PROFILE, summary: SUMMARY });
+  });
+
+  it("guest sends its card on channel open when selfCard is set", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {}, selfCard: { profile: PROFILE, summary: SUMMARY } }).start();
+    peer.fireOpen();
+    expect(peer.sent).toEqual([{ t: "card", profile: PROFILE, summary: SUMMARY }]);
+  });
+
+  it("does not send a card when selfCard is absent", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {} }).start();
+    peer.fireOpen();
+    expect(peer.sent).toEqual([]);
+  });
+
+  it("calls onOpponentCard when a card message arrives (either role)", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const onOpponentCard = vi.fn();
+    new RemoteMatch({ role: "host", peer, bridge, applyState: () => {}, onOpponentCard }).start();
+    peer.fireData({ t: "card", profile: PROFILE, summary: SUMMARY });
+    expect(onOpponentCard).toHaveBeenCalledWith(PROFILE, SUMMARY);
+  });
+
+  it("ignores a malformed card message", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const onOpponentCard = vi.fn();
+    new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {}, onOpponentCard }).start();
+    peer.fireData({ t: "card", profile: "nope" });
+    expect(onOpponentCard).not.toHaveBeenCalled();
   });
 });
