@@ -7,6 +7,7 @@ import { Controls } from "./components/Controls";
 import { Banners } from "./components/Banners";
 import { ConnectionBadge } from "./components/ConnectionBadge";
 import { Celebration } from "./components/Celebration";
+import { SoundToggle } from "./components/SoundToggle";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -28,7 +29,10 @@ export default function App() {
       {!kiosk && (
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-black tracking-tight">GRANBRIDGE</h1>
-          <ConnectionBadge connection={connection} />
+          <div className="flex items-center gap-4">
+            <SoundToggle />
+            <ConnectionBadge connection={connection} />
+          </div>
         </header>
       )}
       <Banners banners={banners} />

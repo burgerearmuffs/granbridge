@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useStore } from "./store";
 import type { Command, Event } from "./types";
+import { soundManager } from "./sound/SoundManager";
 
 export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
   const ws = useRef<WebSocket | null>(null);
@@ -15,7 +16,11 @@ export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
       ws.current = sock;
       sock.onopen = () => setConnection("connected");
       sock.onmessage = (m: MessageEvent) => {
-        try { apply(JSON.parse(m.data) as Event); } catch { /* ignore malformed */ }
+        try {
+          const event = JSON.parse(m.data) as Event;
+          apply(event);
+          soundManager.handleEvent(event);
+        } catch { /* ignore malformed */ }
       };
       sock.onclose = () => {
         setConnection("disconnected");
