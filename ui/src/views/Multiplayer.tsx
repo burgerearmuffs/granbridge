@@ -38,7 +38,6 @@ export function Multiplayer() {
   const cam = useMpStore((s) => s.cam);
   const brokerUrl = useMpStore((s) => s.brokerUrl);
   const selfId = useMpStore((s) => s.selfId);
-  const peersForRole = useMpStore((s) => s.peers);
   const gameState = useStore((s) => s.gameState);
   const { setMpStatus, setRoom, setSelfId, setPeers, setError, setBrokerUrl, resetMp } = useMpStore.getState();
 
@@ -68,17 +67,26 @@ export function Multiplayer() {
   // Establish the host-authoritative remote match once we're in a room with a
   // peer and a live PeerManager. Role is derived deterministically from peer ids.
   useEffect(() => {
-    if (mpStatus !== "in_room" || !pmRef.current || peersForRole.length === 0 || !selfId) return;
+    if (mpStatus !== "in_room" || !pmRef.current || peers.length === 0 || !selfId) return;
     if (rmRef.current) return;
     const rm = new RemoteMatch({
-      role: hostRole(selfId, peersForRole),
+      role: hostRole(selfId, peers),
       peer: pmRef.current,
       bridge: bridgeLink,
       applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
     });
     rm.start();
     rmRef.current = rm;
-  }, [mpStatus, selfId, peersForRole]);
+  }, [mpStatus, selfId, peers]);
+
+  // Unmount-only teardown: stop the remote match if the view unmounts (e.g. a
+  // tab switch) so the module-level bridgeLink subscription doesn't leak (and a
+  // remount can't stack a second forwarder). Empty deps → fires ONLY on unmount,
+  // never on presence/state churn (which must not clear the engine gate).
+  useEffect(() => () => {
+    rmRef.current?.stop();
+    rmRef.current = null;
+  }, []);
 
   const handleJoin = useCallback(async () => {
     if (!roomInput.trim() || !passwordInput.trim()) return;
@@ -161,12 +169,12 @@ export function Multiplayer() {
 
   const handleStartMatch = useCallback(() => {
     const me = getOrCreatePlayer();
-    const opponent = peersForRole[0]?.player.name ?? "Guest";
+    const opponent = peers[0]?.player.name ?? "Guest";
     const options = mpMode === "x01" ? { start_score: 501, double_out: true } : {};
     rmRef.current?.startGame(mpMode, [me.name, opponent], options);
-  }, [mpMode, peersForRole]);
+  }, [mpMode, peers]);
 
-  const role = selfId && peersForRole.length ? hostRole(selfId, peersForRole) : null;
+  const role = selfId && peers.length ? hostRole(selfId, peers) : null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -311,7 +319,7 @@ export function Multiplayer() {
             </label>
             <button
               onClick={handleStartMatch}
-              disabled={peersForRole.length === 0}
+              disabled={peers.length === 0}
               className="px-4 py-2 rounded-lg bg-amber-400 text-neutral-900 font-bold text-sm hover:bg-amber-300 disabled:opacity-40"
               aria-label="Start match"
             >
