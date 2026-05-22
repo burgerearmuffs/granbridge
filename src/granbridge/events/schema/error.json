@@ -1,0 +1,43 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "error",
+      "default": "error",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "ble",
+        "decode",
+        "transport"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "recoverable": {
+      "default": true,
+      "title": "Recoverable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "category",
+    "message"
+  ],
+  "title": "ErrorEvent",
+  "type": "object"
+}

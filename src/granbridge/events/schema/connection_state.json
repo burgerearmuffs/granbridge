@@ -1,0 +1,59 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "connection_state",
+      "default": "connection_state",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "scanning",
+        "connecting",
+        "connected",
+        "reconnecting",
+        "disconnected"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "device": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Device"
+    },
+    "rssi": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rssi"
+    }
+  },
+  "required": [
+    "state"
+  ],
+  "title": "ConnectionState",
+  "type": "object"
+}

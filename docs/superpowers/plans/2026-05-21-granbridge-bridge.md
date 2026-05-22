@@ -2037,6 +2037,121 @@ git add -A && git commit -m "docs: README, Windows setup, reverse-engineering gu
 
 ---
 
+## Task 17: Dual player-cam broadcast overlay (post-MVP, first streaming-layer piece)
+
+> Added 2026-05-21. "Dual cameras" = streaming player-cams (two webcam feeds composited for broadcast), NOT CV autoscoring. Pure browser concern (`MediaDevices`/`getUserMedia`), no BLE-core changes. Cameras are selectable by device label via `?cam1=`/`?cam2=` query params; default = first two enumerated devices.
+
+**Files:**
+- Create: `src/granbridge/overlay/broadcast.html`
+- Test: `tests/test_broadcast_overlay_asset.py`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+from pathlib import Path
+
+def test_broadcast_overlay_supports_two_cameras_and_score():
+    html = Path("src/granbridge/overlay/broadcast.html").read_text()
+    # two distinct video elements for two cameras
+    assert html.count("<video") >= 2
+    assert "getUserMedia" in html and "enumerateDevices" in html
+    # still wired to the live score feed
+    assert "8787" in html and "dart_hit" in html
+    # camera selection via query params
+    assert "cam1" in html and "cam2" in html
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `.venv\Scripts\python -m pytest tests/test_broadcast_overlay_asset.py -v`
+Expected: FAIL (file missing).
+
+- [ ] **Step 3: Implement `src/granbridge/overlay/broadcast.html`**
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Broadcast Overlay</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; font-family: system-ui, sans-serif; color: #fff; }
+    #cams { position: fixed; top: 16px; right: 16px; display: flex; gap: 12px; }
+    #cams video { width: 320px; height: 180px; object-fit: cover; border-radius: 12px;
+                  border: 3px solid rgba(255,255,255,.85); background: #000; box-shadow: 0 6px 24px rgba(0,0,0,.6); }
+    #score { position: fixed; bottom: 32px; left: 32px; }
+    #bed { font-size: 96px; font-weight: 800; text-shadow: 0 4px 16px rgba(0,0,0,.7); }
+    #total { font-size: 32px; opacity: .85; }
+    #status { position: fixed; top: 8px; left: 12px; font-size: 14px; opacity: .6; }
+  </style>
+</head>
+<body>
+  <div id="status">starting…</div>
+  <div id="cams"><video id="cam1" autoplay muted playsinline></video><video id="cam2" autoplay muted playsinline></video></div>
+  <div id="score"><div id="bed">—</div><div id="total">total: 0</div></div>
+  <script>
+    const PORT = 8787;
+    const params = new URLSearchParams(location.search);
+    const wantCam1 = params.get("cam1");   // optional device label substring
+    const wantCam2 = params.get("cam2");
+    const statusEl = document.getElementById("status");
+
+    // --- dual player-cams via MediaDevices ---
+    function pick(devices, want, fallbackIndex) {
+      if (want) {
+        const match = devices.find(d => (d.label || "").toLowerCase().includes(want.toLowerCase()));
+        if (match) return match.deviceId;
+      }
+      return devices[fallbackIndex] ? devices[fallbackIndex].deviceId : undefined;
+    }
+    async function startCameras() {
+      try {
+        // prompt for permission so device labels populate
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+        const id1 = pick(cams, wantCam1, 0);
+        const id2 = pick(cams, wantCam2, 1);
+        if (id1) document.getElementById("cam1").srcObject =
+          await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id1 } } });
+        if (id2 && id2 !== id1) document.getElementById("cam2").srcObject =
+          await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id2 } } });
+      } catch (e) {
+        statusEl.textContent = "camera error: " + e.message;
+      }
+    }
+
+    // --- live score feed (same contract as index.html) ---
+    let total = 0;
+    const bedEl = document.getElementById("bed");
+    const totalEl = document.getElementById("total");
+    function connect() {
+      const ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
+      ws.onopen = () => (statusEl.textContent = "connected");
+      ws.onclose = () => { statusEl.textContent = "reconnecting…"; setTimeout(connect, 1000); };
+      ws.onmessage = (msg) => {
+        const ev = JSON.parse(msg.data);
+        if (ev.type === "dart_hit") { bedEl.textContent = ev.bed; total += ev.score; totalEl.textContent = `total: ${total}`; }
+        if (ev.type === "connection_state") statusEl.textContent = ev.state;
+      };
+    }
+    startCameras();
+    connect();
+  </script>
+</body>
+</html>
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `.venv\Scripts\python -m pytest tests/test_broadcast_overlay_asset.py -v`
+Expected: PASS.
+
+- [ ] **Step 5: Document in README** — add a "Dual player-cams" line under streaming: add `broadcast.html` as an OBS Browser Source; grant camera permission once; optionally pass `?cam1=<label>&cam2=<label>` to pin specific webcams.
+
+- [ ] **Step 6: Commit** (controller batches at checkpoint)
+
+---
+
 ## Self-Review (completed against the spec)
 
 - **Spec coverage:** BLE scan/connect/enumerate/notify (T8/T9), reconnect+watchdog (T8), JSON events (T1), event contract incl. all 5 types + miss/bull rules (T1/T5), WebSocket (T11), overlay (T13), logging/replay (T10/T12/T15), tests incl. fake transport + replay regression (T7/T15), HCI tooling (T14), calibration (T12), config (T10), docs (T16). All five Milestone-1 success criteria are covered by T8+T9 (connect/notify), T5 (decode), T11 (stream), T13 (overlay).

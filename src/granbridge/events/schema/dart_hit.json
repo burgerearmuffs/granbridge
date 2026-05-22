@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "Ring": {
+      "enum": [
+        "SO",
+        "SI",
+        "D",
+        "T",
+        "SBULL",
+        "DBULL",
+        "OUT"
+      ],
+      "title": "Ring",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "dart_hit",
+      "default": "dart_hit",
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "raw": {
+      "title": "Raw",
+      "type": "string"
+    },
+    "ring": {
+      "$ref": "#/$defs/Ring"
+    },
+    "segment": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Segment"
+    },
+    "multiplier": {
+      "title": "Multiplier",
+      "type": "integer"
+    },
+    "bed": {
+      "title": "Bed",
+      "type": "string"
+    },
+    "score": {
+      "title": "Score",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "raw",
+    "ring",
+    "segment",
+    "multiplier",
+    "bed",
+    "score"
+  ],
+  "title": "DartHit",
+  "type": "object"
+}
