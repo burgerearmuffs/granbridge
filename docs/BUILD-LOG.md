@@ -165,3 +165,28 @@ which applies it (respecting turn ownership) and broadcasts `game_state` back. T
 ownership / multi-source darts), the bridge WS (a "remote input" command), and the UI (data-channel relay)
 + reconnect/snapshot. **Best done with fresh context** — flagged for a focused next session.
 Then: MP-4 profiles+avatars; quick parity wins (Count-Up, Medley); real app icons.
+
+### MP-3 · Host-authoritative remote game sync ✅
+Spec `docs/superpowers/specs/2026-05-22-mp3-remote-sync-design.md`; plan
+`docs/superpowers/plans/2026-05-22-mp3-remote-sync.md`. Built subagent-driven on
+`mp3-remote-sync` (fresh implementer + spec & code-quality review per task).
+
+- **Engine:** `on_dart(dart, source_player_id=None)` with an opt-in active-player
+  gate (`self._local_player_id is not None and source_player_id is not None and
+  source != active`); `set_remote_role()` + `attach()` tags local darts. The gate is
+  INERT for local play (default role `None`) so single-board multiplayer is unchanged.
+- **Commands:** `remote_dart {bed, player}` + `set_remote_role {player}`.
+- **UI:** pure `RemoteMatch` orchestrator (host forwards `game_state`, routes peer
+  darts to `remote_dart`; guest forwards `dart_hit`, renders pushed state) with a
+  runtime guard on untrusted peer messages; deterministic `hostRole()` election;
+  `bridgeLink` pub/sub wiring the bridge WS to the Multiplayer view (fault-isolated
+  subscribers); `PeerManager.onChannelOpen` reconnect snapshots; and a "Start remote
+  match" panel + synced board in the Multiplayer view (unmount-safe lifecycle).
+- **Tests:** +10 Python (3 command-parse + 7 turn-gate / alternating-sequence /
+  local regression) → 173 Python; +21 UI (remoteMatch 12, bridgeLink 5, peerManager
+  1, Multiplayer 3) → 189 UI. Full suites green; `npm --prefix ui run build` clean.
+- **Manual E2E:** `docs/MANUAL-E2E-mp3.md` (two bridges + two UIs — WebRTC needs real browsers).
+- **Known MVP gaps:** guest-miss not auto-detected; only host has controls; 2-player;
+  avoid tab-switching mid-match (gate not re-armed on remount).
+
+**Next:** MP-4 profiles/avatars; quick parity modes (Count-Up, Medley); real app icons.
