@@ -25,7 +25,6 @@ import { useStore } from "../store";
 import { LiveGame } from "./LiveGame";
 import { bridgeLink } from "../bridgeLink";
 import { RemoteMatch, hostRole } from "../multiplayer/remoteMatch";
-import { Avatar } from "../components/Avatar";
 import { OpponentCard } from "../components/OpponentCard";
 import { defaultAvatarColor } from "../multiplayer/avatar";
 import { fetchMyCareerSummary } from "../multiplayer/careerSummary";
@@ -99,6 +98,11 @@ export function Multiplayer() {
     rmRef.current?.stop(false);
     rmRef.current = null;
   }, []);
+
+  // Clear the opponent card if the room empties (peer left).
+  useEffect(() => {
+    if (peers.length === 0) setOpponentCard(null);
+  }, [peers.length]);
 
   const handleJoin = useCallback(async () => {
     if (!roomInput.trim() || !passwordInput.trim()) return;
