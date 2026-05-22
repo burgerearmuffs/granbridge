@@ -38,15 +38,17 @@ class MedleyMode(GameMode):
                 if m not in _SUB_MODES:
                     raise ValueError(f"unknown medley sub-mode {m!r}")
             index = 0
-            state.options = {**state.options, **options}
-            state.options["best_of_legs"] = len(sequence)
-            state.options["best_of_sets"] = 1
         else:
             sequence = prior["sequence"]
-            index = prior["index"] + 1
+            index = min(prior["index"] + 1, len(sequence) - 1)   # defensive: never past the last leg
 
         current = sequence[index]
         _SUB_MODES[current]().on_start(state, options)            # sets the sub-mode's mode_view keys
+        if prior is None:
+            # Medley owns the match length — set AFTER the sub-mode's on_start so its
+            # option-merge can't clobber best_of_legs (e.g. a user-supplied value).
+            state.options["best_of_legs"] = len(sequence)
+            state.options["best_of_sets"] = 1
         state.mode_view["medley"] = {"sequence": sequence, "index": index, "current": current}
 
     def apply_dart(self, state: GameState, dart: Dart) -> DartResult:

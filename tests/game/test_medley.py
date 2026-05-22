@@ -65,3 +65,12 @@ def test_undo_across_leg_boundary():
     eng.on_dart(Dart.from_bed("S20"))         # 2nd dart of the turn -> scores, does NOT end the leg
     assert eng.state.mode_view["total"]["p1"] == 25
     assert eng.state.mode_view["medley"]["current"] == "count_up"
+
+
+def test_two_player_medley_advances_when_second_player_wins_leg():
+    eng = _engine(); _start(eng, ["A", "B"], sequence=["count_up", "x01"], rounds=1)
+    _throw(eng, "S5", "S5", "S5")    # p1: 15; round not complete until the last player throws
+    assert eng.state.mode_view["medley"]["current"] == "count_up"
+    _throw(eng, "S20", "S20", "S20") # p2: 60 -> round 1 complete -> count_up leg won by p2 (leader)
+    assert eng.state.mode_view["medley"]["current"] == "x01"
+    assert eng.state.mode_view["medley"]["index"] == 1
