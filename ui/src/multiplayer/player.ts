@@ -51,7 +51,8 @@ export function setPlayerName(name: string): Profile {
 
 /** Update the stored avatar color; returns the updated profile. */
 export function setPlayerColor(color: string): Profile {
-  const updated: Profile = { ...getOrCreatePlayer(), avatar: { color } };
+  const current = getOrCreatePlayer();
+  const updated: Profile = { ...current, avatar: { ...current.avatar, color } };
   _persist(updated);
   return updated;
 }

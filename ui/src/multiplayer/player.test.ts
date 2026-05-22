@@ -23,6 +23,12 @@ describe("getOrCreatePlayer", () => {
     const stored = JSON.parse(localStorage.getItem(KEY)!);
     expect(stored.avatar.color).toBe(p.avatar.color);
   });
+
+  it("returns the same id on repeated calls (idempotent identity)", () => {
+    const a = getOrCreatePlayer();
+    const b = getOrCreatePlayer();
+    expect(b.id).toBe(a.id);
+  });
 });
 
 describe("setPlayerName / setPlayerColor", () => {
