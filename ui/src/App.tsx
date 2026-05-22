@@ -8,6 +8,10 @@ import { Banners } from "./components/Banners";
 import { ConnectionBadge } from "./components/ConnectionBadge";
 import { Celebration } from "./components/Celebration";
 import { SoundToggle } from "./components/SoundToggle";
+import { CheckoutOverlay } from "./components/CheckoutOverlay";
+import { VideoToggle } from "./components/VideoToggle";
+import { videoForEvent } from "./video/decide";
+import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -17,12 +21,31 @@ export default function App() {
   const playing = gameState && gameState.status === "in_progress";
   const kiosk = new URLSearchParams(location.search).has("kiosk");
 
-  // Derive a celebration trigger: count of game_won banners seen so far.
-  // Each new game_won banner increments the trigger, re-firing confetti.
-  const celebrationTrigger = useMemo(
-    () => banners.filter((b) => b.kind === "game_won").length,
+  // CheckoutOverlay owns the game_won "GAME SHOT" moment.
+  // Confetti Celebration is kept for leg_won only to avoid double-celebration.
+  const legWonCount = useMemo(
+    () => banners.filter((b) => b.kind === "leg_won").length,
     [banners],
   );
+
+  // Derive overlay trigger from the most recent game_won or leg_won banner.
+  // We count each kind separately so n always increments correctly.
+  const overlayTrigger = useMemo<CheckoutTrigger | null>(() => {
+    // Walk banners newest-first to find the latest relevant event.
+    for (let i = banners.length - 1; i >= 0; i--) {
+      const b = banners[i];
+      const key = videoForEvent(b.kind);
+      if (key !== null) {
+        // Use the index (count of banners up to and including this one) as n
+        // so that repeated events of the same kind still increment.
+        const n = banners
+          .slice(0, i + 1)
+          .filter((x) => x.kind === b.kind).length;
+        return { key, n };
+      }
+    }
+    return null;
+  }, [banners]);
 
   return (
     <div className="min-h-full bg-neutral-950 text-white p-6">
@@ -30,6 +53,7 @@ export default function App() {
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-black tracking-tight">GRANBRIDGE</h1>
           <div className="flex items-center gap-4">
+            <VideoToggle />
             <SoundToggle />
             <ConnectionBadge connection={connection} />
           </div>
@@ -46,7 +70,9 @@ export default function App() {
       ) : (
         <Setup send={send} />
       )}
-      <Celebration trigger={celebrationTrigger} />
+      {/* Confetti fires on leg_won only; CheckoutOverlay owns game_won celebration */}
+      <Celebration trigger={legWonCount} />
+      <CheckoutOverlay trigger={overlayTrigger} />
     </div>
   );
 }
