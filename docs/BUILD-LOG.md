@@ -190,3 +190,28 @@ Spec `docs/superpowers/specs/2026-05-22-mp3-remote-sync-design.md`; plan
   host tab-switch mid-match pauses guest state-forwarding (gate stays armed).
 
 **Next:** MP-4 profiles/avatars; quick parity modes (Count-Up, Medley); real app icons.
+
+### MP-4 · Player profiles + avatars ✅
+Spec `docs/superpowers/specs/2026-05-22-mp4-profiles-design.md`; plan
+`docs/superpowers/plans/2026-05-22-mp4-profiles.md`. Built subagent-driven on `mp4-profiles`
+(fresh implementer + spec & code-quality review per task). **UI-only — no Python/bridge/broker/engine changes.**
+
+- **Profile:** extended the anonymous identity (`player.ts`) to `Profile {id, name, avatar:{color}}`
+  with legacy `{id,name}` migration; `setPlayerColor`. Pure `avatar.ts` (`initials`, deterministic
+  `defaultAvatarColor`, `AVATAR_PALETTE`); `<Avatar>` component.
+- **Profile view:** new nav tab — edit name, pick avatar color, copy persistent ID, and see my
+  career stats (from the existing `/api/history/stats`, matched by display name).
+- **Multiplayer:** avatar travels in the broker `join` (the broker forwards the whole `player`
+  dict); avatars on the local + peer video tiles (shown when a cam is off); opponent **stat card**
+  (avatar, name, 3-dart avg / wins / games) exchanged symmetrically over MP-3's data channel via a
+  new `{t:"card"}` message — `RemoteMatch` stays the single channel owner, with field-level
+  validation of the untrusted card payload.
+- **Tests:** UI-only — `avatar`/`player`/`careerSummary`/`Avatar`/`OpponentCard`/`VideoTile`/`Profile`
+  + RemoteMatch card-exchange + Multiplayer avatar. Full UI suite **217 green**; `npm --prefix ui run
+  build` clean. (Python suite unchanged at 173.)
+- **Known limitations:** stats are keyed by display name and remote-match guest throws aren't
+  recorded — so the opponent card reflects each player's *local* stats only. True per-identity,
+  cross-device stats remain the deferred **server-side** profile feature. Avatars are initials+color
+  (uploaded images deferred).
+
+**Next:** quick parity modes (Count-Up, Medley); real app icons; (later) server-side profiles/accounts.
