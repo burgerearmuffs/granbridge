@@ -90,12 +90,14 @@ def serve(
 
         from granbridge.commentary.plugin import CommentaryPlugin
         from granbridge.integrations.manager import PluginManager
+        from granbridge.integrations.plugins.event_log_plugin import EventLogPlugin
         from granbridge.integrations.registry import build_enabled
         plugins = build_enabled(settings)
         for _p in plugins:
             if isinstance(_p, CommentaryPlugin):
                 _p.set_publish(bus.publish)
         plugins.append(HistoryPlugin({}, store))
+        plugins.append(EventLogPlugin({"dir": settings.log_dir / "decoded_packets"}))
         plugin_mgr = PluginManager(bus, plugins)
         await asyncio.gather(mgr.run(), engine.attach(), plugin_mgr.run())
 

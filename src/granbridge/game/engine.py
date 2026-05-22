@@ -135,15 +135,29 @@ class GameEngine:
 
     def _on_leg_won(self, pid: str) -> None:
         self.state.legs[pid] += 1
-        best_of = int(self.state.options.get("best_of_legs", 1))
-        needed = best_of // 2 + 1
+        best_of_legs = int(self.state.options.get("best_of_legs", 1))
+        legs_needed = best_of_legs // 2 + 1
         self._emit(LegWon(player=pid, legs=self.state.legs[pid], sets=self.state.sets[pid]))
-        if self.state.legs[pid] >= needed:
-            self.state.status = GameStatus.FINISHED
-            self.state.winner = pid
-            self._emit(GameWon(player=pid))
-            self._emit_state()
-            return
+
+        if self.state.legs[pid] >= legs_needed:
+            # Player has won the current set.
+            self.state.sets[pid] += 1
+            # Reset per-set leg counts for all players.
+            for key in self.state.legs:
+                self.state.legs[key] = 0
+
+            best_of_sets = int(self.state.options.get("best_of_sets", 1))
+            sets_needed = best_of_sets // 2 + 1
+
+            if self.state.sets[pid] >= sets_needed:
+                # Player has won the match.
+                self.state.status = GameStatus.FINISHED
+                self.state.winner = pid
+                self._emit(GameWon(player=pid))
+                self._emit_state()
+                return
+            # Start the next set/leg (keep alternating the leg starter).
+
         # Alternate the leg STARTER (not the winner) for correct multi-leg throw order.
         next_starter = (self.state.leg_starter_index + 1) % len(self.state.players)
         self.state.leg_starter_index = next_starter

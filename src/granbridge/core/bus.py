@@ -4,15 +4,26 @@ import asyncio
 
 from granbridge.events.models import BaseEvent
 
+_DEFAULT_MAXSIZE = 1000
+
 
 class Subscription:
-    """A bus subscription backed by an unbounded queue. Use as a context manager."""
+    """A bus subscription backed by a bounded queue. Use as a context manager.
 
-    def __init__(self, bus: "EventBus") -> None:
+    When the queue is full the OLDEST item is dropped so that a stalled consumer
+    cannot grow memory unbounded and always receives the freshest events.
+    """
+
+    def __init__(self, bus: "EventBus", maxsize: int = _DEFAULT_MAXSIZE) -> None:
         self._bus = bus
-        self._queue: asyncio.Queue[BaseEvent] = asyncio.Queue()
+        self._queue: asyncio.Queue[BaseEvent] = asyncio.Queue(maxsize=maxsize)
 
     def _put(self, event: BaseEvent) -> None:
+        if self._queue.full():
+            try:
+                self._queue.get_nowait()  # drop oldest
+            except asyncio.QueueEmpty:
+                pass
         self._queue.put_nowait(event)
 
     async def get(self) -> BaseEvent:
@@ -42,8 +53,8 @@ class EventBus:
     def _remove(self, sub: Subscription) -> None:
         self._subs.discard(sub)
 
-    def subscribe(self) -> Subscription:
-        return Subscription(self)
+    def subscribe(self, maxsize: int = _DEFAULT_MAXSIZE) -> Subscription:
+        return Subscription(self, maxsize=maxsize)
 
     async def publish(self, event: BaseEvent) -> None:
         self._last[event.type] = event
