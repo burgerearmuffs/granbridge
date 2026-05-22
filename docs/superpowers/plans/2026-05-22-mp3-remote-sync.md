@@ -12,7 +12,7 @@
 
 **Baseline (already confirmed green at plan time):** 163 Python tests (`.venv/Scripts/python.exe -m pytest -q`) + 168 UI tests (`npm --prefix ui test`). Each task must keep both suites green.
 
-**Key design decision — the turn gate must NOT break local play:** In a *local* 2-player game both players throw on the **same** board, so every `dart_hit` enters identically with no per-dart source. Therefore `_local_player_id` defaults to **`None`** (gate disabled) and `on_dart` only gates when `source_player_id is not None`. Remote mode opts in via `set_remote_role("p1")`. This keeps local play byte-for-byte unchanged.
+**Key design decision — the turn gate must NOT break local play:** In a *local* 2-player game both players throw on the **same** board, so every `dart_hit` enters identically with no per-dart source. Therefore `_local_player_id` defaults to **`None`** (gate disabled) and `on_dart` gates only when a remote role is set **and** the dart carries a source (`self._local_player_id is not None and source_player_id is not None and source_player_id != active`). Remote mode opts in via `set_remote_role("p1")`. This keeps local play byte-for-byte unchanged.
 
 ---
 
@@ -322,7 +322,8 @@ from granbridge.game.commands import (
         if self.state.status != GameStatus.IN_PROGRESS or self._mode is None:
             self._emit(ErrorEvent(category="command", message="dart with no game in progress"))
             return
-        if source_player_id is not None and source_player_id != self.state.active_player_id:
+        if (self._local_player_id is not None and source_player_id is not None
+                and source_player_id != self.state.active_player_id):
             return  # out-of-turn / stray board hit — the host engine is the single arbiter
         self._push_undo()
         pid = self.state.active_player_id
