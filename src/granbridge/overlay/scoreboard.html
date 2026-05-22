@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Scoreboard</title>
+  <style>
+    html, body { margin: 0; background: transparent; font-family: system-ui, sans-serif; color: #fff; }
+    #board { position: fixed; bottom: 24px; left: 24px; display: flex; gap: 20px; }
+    .player { padding: 12px 20px; border-radius: 12px; background: rgba(0,0,0,.55); min-width: 140px; }
+    .player.active { outline: 3px solid #ffd54a; }
+    .name { font-size: 20px; opacity: .85; }
+    .score { font-size: 64px; font-weight: 800; }
+    #status { position: fixed; top: 8px; right: 12px; font-size: 13px; opacity: .6; }
+  </style>
+</head>
+<body>
+  <div id="status">connecting…</div>
+  <div id="board"></div>
+  <script src="common.js"></script>
+  <script>
+    const boardEl = document.getElementById("board");
+    const statusEl = document.getElementById("status");
+
+    function makePlayer(p, active, score) {
+      const d = document.createElement("div");
+      d.className = "player" + (active ? " active" : "");
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = p.name;
+      const sc = document.createElement("div");
+      sc.className = "score";
+      sc.textContent = (score === undefined || score === null) ? "" : String(score);
+      d.append(name, sc);
+      return d;
+    }
+
+    function render(state) {
+      const mv = state.mode_view || {};
+      const scores = mv.scores || {};
+      const points = mv.points || {};
+      const nodes = state.players.map((p, i) => {
+        let score;
+        if (scores[p.id] !== undefined) {
+          score = scores[p.id];
+        } else if (points[p.id] !== undefined) {
+          score = points[p.id];
+        }
+        return makePlayer(p, i === state.active_index, score);
+      });
+      boardEl.replaceChildren(...nodes);
+    }
+
+    connectGranbridge(function onEvent(ev) {
+      if (ev.type === "_open") { statusEl.textContent = "connected"; }
+      if (ev.type === "game_state") { render(ev.state); }
+    });
+  </script>
+</body>
+</html>

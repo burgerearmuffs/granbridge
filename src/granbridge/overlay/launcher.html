@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Overlay Launcher</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #1a1a2e; font-family: system-ui, sans-serif; color: #e0e0e0; min-height: 100vh; }
+    .container { max-width: 680px; margin: 0 auto; padding: 40px 24px; }
+    h1 { font-size: 28px; font-weight: 800; color: #ffd54a; margin: 0 0 6px; letter-spacing: .04em; }
+    .subtitle { font-size: 14px; opacity: .6; margin-bottom: 32px; }
+    .note {
+      background: rgba(255,213,74,.12);
+      border: 1px solid rgba(255,213,74,.3);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    .note strong { color: #ffd54a; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .overlay-card {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: background .15s, border-color .15s;
+    }
+    .overlay-card:hover { background: rgba(255,255,255,.12); border-color: rgba(255,213,74,.5); }
+    .card-name { font-size: 17px; font-weight: 700; color: #ffd54a; margin-bottom: 4px; }
+    .card-file { font-size: 12px; opacity: .55; font-family: monospace; }
+    .card-desc { font-size: 13px; opacity: .75; margin-top: 6px; }
+    h2 { font-size: 16px; font-weight: 600; opacity: .55; margin: 0 0 16px; text-transform: uppercase; letter-spacing: .1em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GRANBRIDGE Overlays</h1>
+    <p class="subtitle">OBS Browser Source overlay suite</p>
+
+    <div class="note">
+      <strong>How to add to OBS:</strong> In OBS Studio, add a <strong>Browser Source</strong>,
+      check <em>Local file</em>, and point it at the overlay file.
+      Size each source to fit your scene (e.g. 1920x1080 for full-canvas overlays).
+      Enable <strong>transparent background</strong> in the Browser Source properties
+      so only the overlay elements appear over your scene.
+    </div>
+
+    <h2>All Overlays</h2>
+    <div class="grid">
+      <a class="overlay-card" href="scoreboard.html">
+        <div class="card-name">Scoreboard</div>
+        <div class="card-file">scoreboard.html</div>
+        <div class="card-desc">Live player scores for X01 and Cricket modes.</div>
+      </a>
+      <a class="overlay-card" href="checkout.html">
+        <div class="card-name">Checkout Guide</div>
+        <div class="card-file">checkout.html</div>
+        <div class="card-desc">Displays the suggested checkout route when available.</div>
+      </a>
+      <a class="overlay-card" href="throw.html">
+        <div class="card-name">Throw Display</div>
+        <div class="card-file">throw.html</div>
+        <div class="card-desc">Pops up the dart bed and score on each throw.</div>
+      </a>
+      <a class="overlay-card" href="stats.html">
+        <div class="card-name">Player Stats</div>
+        <div class="card-file">stats.html</div>
+        <div class="card-desc">Three-dart average and dart count per player.</div>
+      </a>
+      <a class="overlay-card" href="lower-third.html">
+        <div class="card-name">Lower Third</div>
+        <div class="card-file">lower-third.html</div>
+        <div class="card-desc">Broadcast-style lower third with game mode and player names.</div>
+      </a>
+      <a class="overlay-card" href="game.html">
+        <div class="card-name">Game (Classic)</div>
+        <div class="card-file">game.html</div>
+        <div class="card-desc">Original combined scoreboard and checkout overlay.</div>
+      </a>
+      <a class="overlay-card" href="broadcast.html">
+        <div class="card-name">Broadcast</div>
+        <div class="card-file">broadcast.html</div>
+        <div class="card-desc">Dual player-cam feeds with live throw display.</div>
+      </a>
+      <a class="overlay-card" href="index.html">
+        <div class="card-name">Index (Basic)</div>
+        <div class="card-file">index.html</div>
+        <div class="card-desc">Simple throw display overlay.</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

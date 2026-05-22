@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Throw</title>
+  <style>
+    html, body { margin: 0; background: transparent; font-family: system-ui, sans-serif; color: #fff; }
+    #throw-display {
+      position: fixed;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    #bed {
+      font-size: 96px;
+      font-weight: 800;
+      text-shadow: 0 4px 24px rgba(0,0,0,.8);
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    #throw-score {
+      font-size: 40px;
+      font-weight: 700;
+      opacity: .85;
+      text-shadow: 0 2px 12px rgba(0,0,0,.7);
+    }
+    @keyframes pop-fade {
+      0%   { opacity: 1; transform: scale(1.18); }
+      15%  { opacity: 1; transform: scale(1); }
+      70%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.95); }
+    }
+    #throw-display.show #bed,
+    #throw-display.show #throw-score {
+      animation: pop-fade 2.2s ease-out forwards;
+    }
+    #status { position: fixed; top: 8px; right: 12px; font-size: 13px; opacity: .6; }
+  </style>
+</head>
+<body>
+  <div id="status">connecting…</div>
+  <div id="throw-display">
+    <div id="bed">—</div>
+    <div id="throw-score"></div>
+  </div>
+  <script src="common.js"></script>
+  <script>
+    const displayEl = document.getElementById("throw-display");
+    const bedEl = document.getElementById("bed");
+    const throwScoreEl = document.getElementById("throw-score");
+    const statusEl = document.getElementById("status");
+    let animTimer = null;
+
+    function showDartHit(ev) {
+      bedEl.textContent = ev.bed || "—";
+      throwScoreEl.textContent = (ev.score !== undefined && ev.score !== null) ? String(ev.score) : "";
+      // Re-trigger animation by removing and re-adding the class
+      displayEl.classList.remove("show");
+      if (animTimer) { clearTimeout(animTimer); }
+      // Force reflow so the browser re-runs the animation
+      void displayEl.offsetWidth;
+      displayEl.classList.add("show");
+      animTimer = setTimeout(function() { displayEl.classList.remove("show"); }, 2300);
+    }
+
+    connectGranbridge(function onEvent(ev) {
+      if (ev.type === "_open") { statusEl.textContent = "connected"; }
+      if (ev.type === "dart_hit") { showDartHit(ev); }
+    });
+  </script>
+</body>
+</html>

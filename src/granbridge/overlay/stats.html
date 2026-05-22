@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Stats</title>
+  <style>
+    html, body { margin: 0; background: transparent; font-family: system-ui, sans-serif; color: #fff; }
+    #stats-panel {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .stat-card {
+      background: rgba(0,0,0,.55);
+      border-radius: 12px;
+      padding: 10px 16px;
+      min-width: 180px;
+    }
+    .stat-name { font-size: 16px; opacity: .8; }
+    .stat-avg { font-size: 32px; font-weight: 800; }
+    .stat-darts { font-size: 13px; opacity: .65; margin-top: 2px; }
+    #status { position: fixed; top: 8px; left: 12px; font-size: 13px; opacity: .6; }
+  </style>
+</head>
+<body>
+  <div id="status">connecting…</div>
+  <div id="stats-panel"></div>
+  <script src="common.js"></script>
+  <script>
+    const panelEl = document.getElementById("stats-panel");
+    const statusEl = document.getElementById("status");
+
+    function makeStatCard(p, playerStats) {
+      const card = document.createElement("div");
+      card.className = "stat-card";
+
+      const nameEl = document.createElement("div");
+      nameEl.className = "stat-name";
+      nameEl.textContent = p.name;
+
+      const avgEl = document.createElement("div");
+      avgEl.className = "stat-avg";
+      const three_dart_avg = playerStats && playerStats.three_dart_avg;
+      avgEl.textContent = (three_dart_avg !== undefined && three_dart_avg !== null)
+        ? Number(three_dart_avg).toFixed(1)
+        : "—";
+
+      const dartsEl = document.createElement("div");
+      dartsEl.className = "stat-darts";
+      const darts = playerStats && playerStats.darts;
+      dartsEl.textContent = (darts !== undefined && darts !== null)
+        ? darts + " darts"
+        : "0 darts";
+
+      card.append(nameEl, avgEl, dartsEl);
+      return card;
+    }
+
+    function render(state) {
+      const statsMap = state.stats || {};
+      const nodes = state.players.map(function(p) {
+        return makeStatCard(p, statsMap[p.id]);
+      });
+      panelEl.replaceChildren(...nodes);
+    }
+
+    connectGranbridge(function onEvent(ev) {
+      if (ev.type === "_open") { statusEl.textContent = "connected"; }
+      if (ev.type === "game_state") { render(ev.state); }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GRANBRIDGE Checkout</title>
+  <style>
+    html, body { margin: 0; background: transparent; font-family: system-ui, sans-serif; color: #fff; }
+    #checkout {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      font-size: 28px;
+      font-weight: 700;
+      background: rgba(0,0,0,.55);
+      padding: 10px 16px;
+      border-radius: 12px;
+      display: none;
+    }
+    #checkout.visible { display: block; }
+    #label { font-size: 14px; opacity: .7; letter-spacing: .08em; text-transform: uppercase; }
+    #darts { font-size: 28px; }
+    #status { position: fixed; top: 8px; right: 12px; font-size: 13px; opacity: .6; }
+  </style>
+</head>
+<body>
+  <div id="status">connecting…</div>
+  <div id="checkout">
+    <div id="label">OUT</div>
+    <div id="darts"></div>
+  </div>
+  <script src="common.js"></script>
+  <script>
+    const checkoutEl = document.getElementById("checkout");
+    const dartsEl = document.getElementById("darts");
+    const statusEl = document.getElementById("status");
+
+    function renderCheckout(state) {
+      const co = state.mode_view && state.mode_view.checkout;
+      if (co && co.length) {
+        dartsEl.textContent = co.join("  ");
+        checkoutEl.classList.add("visible");
+      } else {
+        dartsEl.textContent = "";
+        checkoutEl.classList.remove("visible");
+      }
+    }
+
+    connectGranbridge(function onEvent(ev) {
+      if (ev.type === "_open") { statusEl.textContent = "connected"; }
+      if (ev.type === "game_state") {
+        // game_state carries checkout info in state.mode_view.checkout
+        renderCheckout(ev.state);
+      }
+    });
+  </script>
+</body>
+</html>
