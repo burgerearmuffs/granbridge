@@ -5,6 +5,7 @@ from pathlib import Path
 
 import typer
 
+from granbridge.api.static_server import StaticServer
 from granbridge.api.ws_server import WebSocketServer
 from granbridge.ble.bleak_transport import BleakTransport
 from granbridge.ble.connection import ConnectionManager
@@ -14,6 +15,7 @@ from granbridge.core.bus import EventBus
 from granbridge.game.engine import GameEngine
 from granbridge.logging_setup import configure_logging
 from granbridge.protocol.segment_map import SegmentMap
+from granbridge.resources import static_dirs
 
 app = typer.Typer(help="GRANBRIDGE — GRANBOARD BLE bridge")
 
@@ -35,8 +37,10 @@ def scan(timeout: float = 5.0) -> None:
 
 
 @app.command()
-def serve() -> None:
-    """Connect to the board and stream events over WebSocket."""
+def serve(
+    open_browser: bool = typer.Option(False, "--open/--no-open", help="Open the UI in the default browser after starting."),
+) -> None:
+    """Connect to the board and stream events over WebSocket, serving the UI at /."""
     settings = Settings()
     configure_logging(settings.log_dir)
 
@@ -61,7 +65,15 @@ def serve() -> None:
         )
         server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler)
         await server.start()
-        typer.echo(f"Serving on ws://{settings.ws_host}:{settings.ws_port}")
+
+        ui_dir, overlay_dir = static_dirs()
+        static = StaticServer(ui_dir, overlay_dir, settings.ws_host, settings.http_port)
+        static.start()
+        typer.echo(f"UI at http://{settings.ws_host}:{settings.http_port}  |  WS ws://{settings.ws_host}:{settings.ws_port}")
+        if open_browser:
+            import webbrowser
+            webbrowser.open(f"http://{settings.ws_host}:{settings.http_port}")
+
         from granbridge.commentary.plugin import CommentaryPlugin
         from granbridge.integrations.manager import PluginManager
         from granbridge.integrations.registry import build_enabled

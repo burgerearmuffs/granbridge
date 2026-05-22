@@ -112,6 +112,35 @@ A `Validator` / `NoOpValidator` seam lives in `src/granbridge/vision/validator.p
 
 See `docs/camera-validation-architecture.md` for the full rig, calibration, and detection pipeline design. No CV code is implemented — the seam is the integration point.
 
+## Packaged app (Windows)
+
+GRANBRIDGE ships as a self-serving Windows executable — no Python, no venv, no npm dev
+server required. The exe bundles the bridge, the built UI, and all overlays.
+
+**Build:**
+```
+.venv\Scripts\python -m PyInstaller packaging/granbridge.spec --noconfirm --distpath dist --workpath build/pyi
+```
+Output lands in `dist\granbridge\granbridge.exe`.
+
+**Run (double-click or terminal):**
+```
+dist\granbridge\granbridge.exe
+```
+With no arguments the exe runs `serve --open`: it starts the bridge on
+`ws://127.0.0.1:8787`, serves the UI at `http://127.0.0.1:8080`, and opens the browser
+automatically.
+
+**CLI subcommands still work inside the exe:**
+```
+dist\granbridge\granbridge.exe scan
+dist\granbridge\granbridge.exe calibrate
+dist\granbridge\granbridge.exe serve --no-open
+```
+
+**Tauri sidecar:** The produced exe is the sidecar the native Tauri app (Step 2b) bundles
+— not throwaway. Configure `tauri.conf.json` to embed `granbridge.exe` as an external binary.
+
 ## Tests
 `.venv\Scripts\python -m pytest` — all tests are hardware-free (fake/replay transport).
 

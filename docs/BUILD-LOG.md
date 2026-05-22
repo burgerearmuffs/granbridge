@@ -74,3 +74,19 @@ origin-guard before any non-loopback bind, AppData config path for packaging, X0
 
 **Suggested next session:** validate live on the board + calibrate; then either install Rust to
 ship the portable Tauri app, or harden the follow-ups for a public/streamed setup.
+
+---
+
+## Productionization (2026-05-22)
+
+- **GitHub:** pushed to https://github.com/burgerearmuffs/granbridge (public, `main`, force-replaced the boilerplate init). `gh` CLI installed + authed.
+- **Step 2a — self-serving exe (DONE):** the bridge now serves the built UI at `/` and overlays at
+  `/overlays/` over HTTP (default :8080, path-traversal-hardened) alongside the WS (:8787).
+  `serve --open` opens the browser; the frozen entry runs `serve --open` on no-args.
+  PyInstaller onedir build → `dist/granbridge/granbridge.exe` (gitignored). Smoke-tested:
+  `--help` ✓, `scan` ✓ (Bleak/WinRT bundle cleanly, 1 build iteration). 132 tests.
+  **To test now:** double-click `dist\granbridge\granbridge.exe` (with the board awake) — it serves
+  the UI, opens the browser, and connects over BLE. Or `granbridge.exe scan` / `... calibrate` first.
+- **Step 2b — native Tauri app (PENDING your toolchain):** waiting on Rust (rustup) + MSVC C++ Build
+  Tools install. Once ready, the Tauri app bundles this same exe as a sidecar → a true windowed
+  portable app + `.msi`. Then Step 1 (hardware test), Step 3 (depth/polish), Step 4 (future).
