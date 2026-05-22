@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Callable, Optional
 
 TERMINATOR = "@"
+
+# GRANBOARD sends a one-time connect handshake like "GB7;101" / "GB8;102" with NO '@' terminator,
+# so it buffers and glues onto the first real frame ("GB7;1013.5"). Strip a leading handshake of the
+# form GB<digit>;<3 digits>. (Exactly 3 digits so it doesn't eat into the following "row.col".)
+_HANDSHAKE = re.compile(r"^GB\d;\d{3}")
 
 
 class FrameAssembler:
@@ -53,8 +59,9 @@ class FrameAssembler:
     def _strip_prefixes(self, body: str) -> str:
         for prefix in self._prefixes:
             if body.startswith(prefix):
-                return body[len(prefix):]
-        return body
+                body = body[len(prefix):]
+                break
+        return _HANDSHAKE.sub("", body)
 
     def _is_duplicate(self, body: str) -> bool:
         now = self._clock()

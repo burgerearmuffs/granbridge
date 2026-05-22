@@ -147,8 +147,9 @@ class ConnectionManager:
                 break
 
             if not done:
-                # Timeout - check heartbeat
-                if (loop.time() - self._last_frame_at) > self._heartbeat_timeout:
+                # Timeout - check heartbeat (only if a positive timeout is configured; GRANBOARD
+                # is silent between throws, so the silence-watchdog is disabled by default).
+                if self._heartbeat_timeout > 0 and (loop.time() - self._last_frame_at) > self._heartbeat_timeout:
                     raise RuntimeError("heartbeat timeout: forcing reconnect")
                 continue
 

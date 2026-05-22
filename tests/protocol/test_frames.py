@@ -38,3 +38,13 @@ def test_reset_clears_dedup_state():
     assert fa.feed(b"2.5@") == []         # deduped within the 10s window
     fa.reset()                            # simulate a reconnect
     assert fa.feed(b"2.5@") == ["2.5"]    # dedup state cleared -> first throw emitted
+
+def test_strips_connect_handshake_glued_to_first_frame():
+    # Real GRANBOARD 3s behaviour (captured 2026-05-22): a "GB7;101" handshake notification with
+    # no terminator buffers and glues onto the first real frame; it must be stripped.
+    fa = FrameAssembler()
+    assert fa.feed(b"GB7;101") == []        # handshake, no '@' -> buffered
+    assert fa.feed(b"3.5@") == ["3.5"]      # handshake stripped -> clean S20 frame
+    # also the GB8;102 variant, in one chunk
+    fa2 = FrameAssembler()
+    assert fa2.feed(b"GB8;1027.0@") == ["7.0"]

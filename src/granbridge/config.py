@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     vendor_service_uuid: str = "442f1570-8a00-9a28-cbe1-e1d4212d53eb"
     backoff_base: float = 0.5
     backoff_cap: float = 30.0
-    heartbeat_timeout: float = 20.0
+    heartbeat_timeout: float = 0.0  # 0 = disabled; GRANBOARD is silent between throws, so a
+    #                                 silence-watchdog falsely fires. Drops are caught by the BLE
+    #                                 disconnect callback. Set >0 only as a stale-connection backstop.
     dedup_window_s: float = 0.05
     log_dir: Path = Path("logs")
     overrides_path: Path = Path("src/granbridge/protocol/segment_map.overrides.json")
