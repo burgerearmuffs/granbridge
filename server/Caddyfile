@@ -1,10 +1,19 @@
-# Caddy obtains + auto-renews a Let's Encrypt cert for $DOMAIN and reverse-proxies
-# everything to the broker: WebSocket upgrades (wss:// play) and the plain-HTTP
-# /turn and /healthz endpoints all share one origin.
+# Caddy auto-provisions + renews a Let's Encrypt cert for $DOMAIN and reverse-proxies
+# WebSocket (wss:// play) + the plain-HTTP /turn and /healthz endpoints to the broker.
+# X-Real-IP gives the broker the true client IP (set here, so it can't be spoofed) for
+# rate limiting.
 #
-# Optional: to receive renewal/expiry notices, add a global options block above
-# the site, e.g.:   {  email you@example.com  }
+# ACME email (recommended — receive cert renewal/expiry notices):
+#   Caddy rejects an empty email string, so ACME_EMAIL cannot be wired via an
+#   env-placeholder default.  To enable it, uncomment the global block below and
+#   set ACME_EMAIL to a real address in your .env file before starting Caddy:
+#
+#   {
+#       email {$ACME_EMAIL}
+#   }
 
 {$DOMAIN} {
-	reverse_proxy broker:8788
+	reverse_proxy broker:8788 {
+		header_up X-Real-IP {remote_host}
+	}
 }
