@@ -63,7 +63,8 @@ def serve(
             backoff_base=settings.backoff_base, backoff_cap=settings.backoff_cap,
             heartbeat_timeout=settings.heartbeat_timeout, segment_map=segment_map,
         )
-        server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler)
+        server = WebSocketServer(bus, settings.ws_host, settings.ws_port, command_handler=command_handler,
+                                 http_port=settings.http_port, allowed_origins=settings.allowed_origins)
         await server.start()
 
         from granbridge.history import HistoryPlugin, HistoryStore

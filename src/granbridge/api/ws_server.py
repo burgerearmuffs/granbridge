@@ -12,22 +12,43 @@ from granbridge.core.bus import EventBus
 
 log = structlog.get_logger(__name__)
 
+_LOOPBACK = {"127.0.0.1", "localhost", "::1", ""}
+
+
+def _origin_policy(host: str, http_port: int, extra: list[str]) -> Optional[list[Optional[str]]]:
+    """Allowlist for websockets serve(origins=...). Loopback binds are local-only and
+    safe -> None (allow all). Non-loopback binds enforce a CSWSH guard: served UI origins
+    + extras + None (missing Origin = non-browser client; browsers always send Origin)."""
+    if host in _LOOPBACK:
+        return None
+    return [
+        f"http://{host}:{http_port}",
+        f"http://localhost:{http_port}",
+        f"http://127.0.0.1:{http_port}",
+        *extra,
+        None,
+    ]
+
 
 class WebSocketServer:
     """Broadcasts bus events as JSON (snapshot first), and optionally routes
     inbound JSON commands to `command_handler`."""
 
     def __init__(self, bus: EventBus, host: str, port: int,
-                 command_handler: Optional[Callable[[dict], None]] = None) -> None:
+                 command_handler: Optional[Callable[[dict], None]] = None,
+                 http_port: int = 8080, allowed_origins: Optional[list[str]] = None) -> None:
         self._bus = bus
         self._host = host
         self._port = port
         self._command_handler = command_handler
+        self._http_port = http_port
+        self._allowed_origins = allowed_origins or []
         self._server: Optional[Server] = None
 
     async def start(self) -> None:
-        self._server = await serve(self._handle, self._host, self._port)
-        log.info("ws_server.started", host=self._host, port=self._port)
+        origins = _origin_policy(self._host, self._http_port, self._allowed_origins)
+        self._server = await serve(self._handle, self._host, self._port, origins=origins)
+        log.info("ws_server.started", host=self._host, port=self._port, origins_guarded=origins is not None)
 
     async def stop(self) -> None:
         if self._server is not None:
