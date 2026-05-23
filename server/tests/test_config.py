@@ -22,6 +22,8 @@ def test_from_env_parses_and_defaults():
     assert cfg.port == 8788
     assert cfg.max_rooms == 200
     assert cfg.room_size_cap == 4
+    assert cfg.max_size == 65536
+    assert cfg.turn_ttl == 86400
 
 
 def test_from_env_origins_empty_means_permissive():
