@@ -367,10 +367,37 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"`
 
 - [ ] **Step 1: `docker-compose.yml`** — add env to the relevant services (keep everything else identical):
 
-`caddy.environment` (add alongside `DOMAIN`):
+**`caddy` service** — Caddy can't take an *optional* email via a static Caddyfile (an empty `email` is a parse error), so inject the email global block at startup only when `ACME_EMAIL` is set. Replace the existing `caddy` service block with this (same image/ports/volumes/networks/depends_on; the additions are `environment.ACME_EMAIL`, `entrypoint`, and `command`):
 ```yaml
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
       ACME_EMAIL: "${ACME_EMAIL:-}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -n "$$ACME_EMAIL" ]; then
+          { printf '{\n\temail %s\n}\n\n' "$$ACME_EMAIL"; cat /etc/caddy/Caddyfile; } > /tmp/Caddyfile
+          exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend]
 ```
+(`$$ACME_EMAIL` is compose-escaped to `$ACME_EMAIL` for the shell; `exec` makes `caddy` PID 1 for clean signals.)
+
+Then tidy `server/Caddyfile`: replace the multi-line "ACME email … uncomment the global block" comment with a single line — `# ACME email: set ACME_EMAIL in .env; the caddy service injects the email global block at startup.` Leave the `X-Real-IP` comment and the site block unchanged.
 
 `broker.environment` (add alongside the existing keys):
 ```yaml
@@ -385,7 +412,12 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"`
       TURN_MAX_BPS: "${TURN_MAX_BPS:-0}"
 ```
 
-- [ ] **Step 2: Validate** — from `server/`: `$env:DOMAIN="test.example.com"; docker compose config` renders cleanly (exit 0), no `version` warning.
+- [ ] **Step 2: Validate** — from `server/`: `$env:DOMAIN="test.example.com"; docker compose config` renders cleanly (exit 0), no `version` warning. Also verify the **email-injected** config validates: generate it and run `caddy validate` against the real image:
+  ```sh
+  { printf '{\n\temail me@test.example.com\n}\n\n'; cat server/Caddyfile; } > /tmp/cf
+  docker run --rm -e DOMAIN=test.example.com -v "/tmp/cf:/etc/caddy/Caddyfile:ro" caddy:2.8 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  ```
+  Expect "Valid configuration" (confirms the injected `email` block parses). The unset case is the plain `server/Caddyfile`, already validated in Task 3.
 
 - [ ] **Step 3: `.env.example`** — append (after the existing optional block):
 
