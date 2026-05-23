@@ -51,4 +51,10 @@ describe("fetchIceServers", () => {
     const servers = await fetchIceServers("wss://d");
     expect(servers).toEqual([{ urls: STUN }]);
   });
+
+  it("falls back to STUN-only when uris contains a non-string element", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x", credential: "y", uris: ["turn:d:3478", 42] }) })) as unknown as typeof fetch);
+    const servers = await fetchIceServers("wss://d");
+    expect(servers).toEqual([{ urls: STUN }]);
+  });
 });
