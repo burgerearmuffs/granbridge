@@ -6,11 +6,13 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY granbridge_broker/ ./granbridge_broker/
-
-# Non-root runtime user; /secrets is a read mount (written by the init one-shot)
+# Create the non-root user BEFORE copying source so the package dir is app-owned
+# (lets Python write __pycache__) and app owns the /secrets mount point.
 RUN adduser --disabled-password --gecos "" --no-create-home app \
-    && mkdir -p /secrets && chown app:app /app
+    && mkdir -p /secrets && chown app:app /app /secrets
+
+COPY --chown=app:app granbridge_broker/ ./granbridge_broker/
+
 USER app
 
 EXPOSE 8788
