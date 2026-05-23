@@ -29,12 +29,6 @@ async def _main() -> None:
         turn_domain=cfg.turn_domain,
         turn_ttl=cfg.turn_ttl,
     )
-    await server.start()
-    log.info(
-        "broker listening host=%s port=%s domain=%s max_rooms=%s origins=%s",
-        cfg.host, cfg.port, cfg.turn_domain, cfg.max_rooms, cfg.allowed_origins,
-    )
-
     loop = asyncio.get_running_loop()
     stop = loop.create_future()
 
@@ -49,6 +43,12 @@ async def _main() -> None:
             # Windows dev: rely on KeyboardInterrupt below
             pass
 
+    await server.start()
+    log.info(
+        "broker listening host=%s port=%s domain=%s max_rooms=%s origins=%s",
+        cfg.host, cfg.port, cfg.turn_domain, cfg.max_rooms, cfg.allowed_origins,
+    )
+
     try:
         await stop
     finally:
@@ -60,4 +60,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(_main())
     except KeyboardInterrupt:
-        pass
+        pass  # graceful stop already ran in _main's finally; just silence the traceback
