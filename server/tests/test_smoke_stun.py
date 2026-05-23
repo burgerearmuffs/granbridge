@@ -34,3 +34,18 @@ def test_check_stun_fails_on_unreachable_port():
     ok, detail = smoke.check_stun("127.0.0.1", 9, timeout=0.5)
     assert ok is False
     assert "stun" in detail.lower()
+
+
+def test_parse_skips_padded_leading_attribute():
+    # A leading unknown attr with a non-4-multiple length (5 bytes -> 3 pad bytes),
+    # then XOR-MAPPED-ADDRESS for 1.2.3.4:1234. Confirms the padding-advance is correct.
+    ip_int, port = 0x01020304, 1234
+    xport = port ^ (MAGIC >> 16)
+    xaddr = ip_int ^ MAGIC
+    lead_val = b"hello"  # 5 bytes -> 3 padding bytes
+    lead = struct.pack(">HH", 0x8022, len(lead_val)) + lead_val + b"\x00\x00\x00"
+    xma_val = struct.pack(">BBHI", 0x00, 0x01, xport, xaddr)
+    xma = struct.pack(">HH", 0x0020, len(xma_val)) + xma_val
+    body = lead + xma
+    resp = struct.pack(">HHI", 0x0101, len(body), MAGIC) + b"\x00" * 12 + body
+    assert smoke.parse_xor_mapped_address(resp) == ("1.2.3.4", 1234)
