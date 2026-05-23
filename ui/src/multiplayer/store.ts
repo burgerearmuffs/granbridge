@@ -27,11 +27,8 @@ const LS_CAM = "granbridge.mp.cam";
 export function readBrokerUrl(): string {
   // In a Vite browser build import.meta.env is statically injected; in vitest
   // vi.stubEnv sets process.env (accessed via globalThis to avoid @types/node).
-  // The cast avoids strict-mode errors because vite/client types are not in this tsconfig.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const metaEnv: Record<string, string | undefined> = (import.meta as any).env ?? {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeEnv: Record<string, string | undefined> = (globalThis as any).process?.env ?? {};
+  const metaEnv = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+  const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
   const fallback = metaEnv["VITE_BROKER_URL"] ?? nodeEnv["VITE_BROKER_URL"] ?? "ws://127.0.0.1:8788";
   try {
     return localStorage.getItem(LS_BROKER_URL) ?? fallback;
