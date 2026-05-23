@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { useMpStore } from "./store";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { useMpStore, readBrokerUrl } from "./store";
 
 beforeEach(() => {
   localStorage.clear();
@@ -77,5 +77,20 @@ describe("multiplayer store — actions", () => {
     expect(s.error).toBeUndefined();
     // brokerUrl survives reset
     expect(s.brokerUrl).toBe("wss://example.com");
+  });
+});
+
+describe("readBrokerUrl default", () => {
+  it("uses VITE_BROKER_URL when set and no localStorage override", () => {
+    localStorage.removeItem("granbridge.mp.brokerUrl");
+    vi.stubEnv("VITE_BROKER_URL", "wss://play.example.com");
+    expect(readBrokerUrl()).toBe("wss://play.example.com");
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to localhost when neither is set", () => {
+    localStorage.removeItem("granbridge.mp.brokerUrl");
+    vi.unstubAllEnvs();
+    expect(readBrokerUrl()).toBe("ws://127.0.0.1:8788");
   });
 });

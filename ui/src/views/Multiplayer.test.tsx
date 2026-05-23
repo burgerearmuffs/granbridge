@@ -53,6 +53,11 @@ vi.mock("../multiplayer/peerManager", () => ({
   DEFAULT_ICE_SERVERS: [],
 }));
 
+// Mock fetchIceServers — resolves immediately so handleJoin doesn't block on network
+vi.mock("../multiplayer/turn", () => ({
+  fetchIceServers: vi.fn().mockResolvedValue([]),
+}));
+
 // ── Import component AFTER mocks are in place ─────────────────────────────────
 
 import { Multiplayer } from "./Multiplayer";

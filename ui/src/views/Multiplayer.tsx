@@ -19,6 +19,7 @@ import { BrokerClient } from "../multiplayer/brokerClient";
 import type { PeerInfo } from "../multiplayer/brokerClient";
 import { PeerManager } from "../multiplayer/peerManager";
 import { getLocalStream } from "../multiplayer/media";
+import { fetchIceServers } from "../multiplayer/turn";
 import { VideoTile } from "../components/VideoTile";
 import { MpControls } from "../components/MpControls";
 import { useStore } from "../store";
@@ -125,8 +126,12 @@ export function Multiplayer() {
     const summary = await fetchMyCareerSummary(player.name);
     selfCardRef.current = { profile: player, summary };
 
+    // Resolve broker URL once; fetch TURN creds (STUN-only fallback inside).
+    const url = brokerInput.trim() || useMpStore.getState().brokerUrl;
+    const iceServers = await fetchIceServers(url);
+
     // Construct broker client
-    const bc = new BrokerClient(brokerInput.trim() || "ws://127.0.0.1:8788");
+    const bc = new BrokerClient(url);
     brokerRef.current = bc;
 
     bc.onJoined((self: PeerInfo, initialPeers: PeerInfo[]) => {
@@ -134,8 +139,8 @@ export function Multiplayer() {
       setPeers(initialPeers);
       setMpStatus("in_room");
 
-      // Start peer manager
-      const pm = new PeerManager(bc, self.peer_id, stream);
+      // Start peer manager (with TURN if /turn was reachable)
+      const pm = new PeerManager(bc, self.peer_id, stream, iceServers);
       pmRef.current = pm;
 
       pm.onRemoteStream = (peerId, rs) => {
