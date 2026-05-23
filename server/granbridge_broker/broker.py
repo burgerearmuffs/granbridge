@@ -130,14 +130,14 @@ class BrokerServer:
     # HTTP (same port as the WebSocket) — health + TURN credentials
     # ------------------------------------------------------------------
 
-    def _http_route(self, path: str, client_ip: str = "-"):
+    def _http_route(self, path: str, ip: str = "-"):
         if path == "/healthz":
             return json_response(
                 200,
                 {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)},
             )
         if path == "/turn":
-            if not self._turn_limiter.allow(client_ip, self._clock()):
+            if not self._turn_limiter.allow(ip, self._clock()):
                 return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
             return json_response(
                 200,
