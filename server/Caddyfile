@@ -2,15 +2,7 @@
 # WebSocket (wss:// play) + the plain-HTTP /turn and /healthz endpoints to the broker.
 # X-Real-IP gives the broker the true client IP (set here, so it can't be spoofed) for
 # rate limiting.
-#
-# ACME email (recommended — receive cert renewal/expiry notices):
-#   Caddy rejects an empty email string, so ACME_EMAIL cannot be wired via an
-#   env-placeholder default.  To enable it, uncomment the global block below and
-#   set ACME_EMAIL to a real address in your .env file before starting Caddy:
-#
-#   {
-#       email {$ACME_EMAIL}
-#   }
+# ACME email: set ACME_EMAIL in .env; the caddy service injects the email global block at startup.
 
 {$DOMAIN} {
 	reverse_proxy broker:8788 {

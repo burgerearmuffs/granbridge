@@ -29,6 +29,15 @@ services:
       - "443:443"
     environment:
       DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
+      ACME_EMAIL: "${ACME_EMAIL:-}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -n "$$ACME_EMAIL" ]; then
+          { printf '{\n\temail %s\n}\n\n' "$$ACME_EMAIL"; cat /etc/caddy/Caddyfile; } > /tmp/Caddyfile
+          exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -49,6 +58,9 @@ services:
       TURN_TTL: "${TURN_TTL:-86400}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
       SECRET_PATH: "/secrets/turn_secret"
+      TURN_RATE_PER_MIN: "${TURN_RATE_PER_MIN:-30}"
+      CONN_RATE_PER_MIN: "${CONN_RATE_PER_MIN:-60}"
+      MSG_RATE_PER_SEC: "${MSG_RATE_PER_SEC:-20}"
     volumes:
       - secrets:/secrets:ro
     networks: [backend]
@@ -66,6 +78,8 @@ services:
       TURN_REALM: "${TURN_REALM:-${DOMAIN}}"
       TURN_SECRET: "${TURN_SECRET:-}"
       TURN_EXTERNAL_IP: "${TURN_EXTERNAL_IP:-}"
+      TURN_TOTAL_QUOTA: "${TURN_TOTAL_QUOTA:-200}"
+      TURN_MAX_BPS: "${TURN_MAX_BPS:-0}"
     volumes:
       - caddy_data:/caddy-data:ro      # read Caddy's Let's Encrypt cert
       - secrets:/secrets:ro
