@@ -55,15 +55,16 @@ fi
 # Background watcher: on renewal reload in place (SIGHUP); if TLS was off and the
 # cert later appears, exit so Docker restarts us with turns:// enabled.
 HAD_TLS=$([ -n "$TLS" ] && echo 1 || echo 0)
+TURNSERVER_PID=$$
 ( while true; do
     sleep 3600
     before="$( [ -f "$CERT_DIR/turn.crt" ] && md5sum "$CERT_DIR/turn.crt" | cut -d' ' -f1 || echo none )"
     if copy_cert; then
       after="$(md5sum "$CERT_DIR/turn.crt" | cut -d' ' -f1)"
       if [ "$HAD_TLS" = "1" ] && [ "$before" != "$after" ]; then
-        echo "coturn: cert changed — reloading (SIGHUP)"; pkill -HUP turnserver || true
+        echo "coturn: cert changed — reloading (SIGHUP)"; kill -HUP "$TURNSERVER_PID" 2>/dev/null || true
       elif [ "$HAD_TLS" = "0" ]; then
-        echo "coturn: cert now present — restarting to enable turns://"; pkill turnserver || true
+        echo "coturn: cert now present — restarting to enable turns://"; kill "$TURNSERVER_PID" 2>/dev/null || true
       fi
     fi
   done ) &
