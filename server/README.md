@@ -1,104 +1,51 @@
-# granbridge-broker — Multiplayer Broker Server
+# granbridge-broker — Multiplayer Backend (TOWER)
 
-A thin WebSocket broker for GRANBRIDGE multiplayer: rooms, password protection, presence broadcasts, and WebRTC signaling relay. Pairs with a coturn TURN server for peer-to-peer media when NAT traversal is needed.
+A contained `docker compose` stack for GRANBRIDGE internet multiplayer:
 
-The broker is **stateless** (in-memory only, no database). It can be restarted at any time; clients rejoin automatically.
+- **caddy** — automatic Let's Encrypt TLS; reverse-proxies `wss://` + `/turn` + `/healthz` to the broker.
+- **broker** — stateless WebSocket rooms (password + presence + WebRTC signaling) and a single-port HTTP
+  `/turn` (short-lived TURN credentials) + `/healthz`.
+- **coturn** — `turn://` (3478) and `turns://` (5349, reusing Caddy's cert) for NAT/firewall traversal.
+- **init** — one-shot; generates the shared TURN secret on first boot.
 
----
+The broker is stateless (in-memory). Restart any time; clients rejoin automatically.
 
-## Quick Deploy on TOWER
+## Deploy (one-time)
 
-### Prerequisites
+1. **DNS:** point `DOMAIN` (e.g. `play.example.com`) at TOWER's public IP.
+2. **Config:** `cp .env.example .env` and set `DOMAIN`. Set `TURN_EXTERNAL_IP` only if TOWER is behind a
+   router. Leave `TURN_SECRET` unset to auto-generate.
+3. **Firewall (open on TOWER):**
+   - TCP **80, 443** (Caddy / `wss://` / `/turn`)
+   - UDP+TCP **3478**, TCP **5349** (STUN/TURN / `turns://`)
+   - UDP **49152–65535** (TURN relay range)
+4. **Run:** `docker compose up -d --build`
 
-- Docker + Docker Compose installed on TOWER
-- A public IP (or DNS name) reachable from clients
-- Firewall open on: **TCP 8788** (broker), **UDP/TCP 3478** (STUN/TURN), **UDP 49152-65535** (TURN relay range)
-
-### 1. Clone / copy the `server/` directory onto TOWER
-
-```
-scp -r server/ user@tower:/opt/granbridge-broker/
-```
-
-### 2. Set required environment variables
-
-Create `/opt/granbridge-broker/.env`:
-
-```
-TURN_SECRET=<long random secret>
-TURN_REALM=granbridge.yourdomain.com
-```
-
-Generate a secret: `openssl rand -hex 32`
-
-### 3. Start both services
+## Verify
 
 ```bash
-cd /opt/granbridge-broker
-docker compose up -d --build
+curl https://$DOMAIN/healthz                 # {"status":"ok",...}
+curl https://$DOMAIN/turn                     # {"username","credential","uris":[...]}
+docker compose ps                             # broker healthy; all up
+docker compose logs -f coturn                 # "turns:// enabled (cert found)"
 ```
 
-Check logs:
+WebRTC relay check (browser console, on an HTTPS page): create an `RTCPeerConnection` with
+`iceTransportPolicy:"relay"` and the `/turn` ICE servers; you should gather `relay` candidates.
 
-```bash
-docker compose logs -f
-```
+## Maintenance: none
 
-### 4. Verify the broker is up
+- Caddy auto-renews TLS; coturn's watcher reloads the renewed cert automatically (SIGHUP), or restarts
+  to enable `turns://` if the cert appears after first boot.
+- `restart: unless-stopped` + the broker `HEALTHCHECK` recover from crashes/reboots.
 
-```bash
-# Should return a 101 Switching Protocols (connection upgrade)
-curl -i --include --no-buffer \
-  -H "Connection: Upgrade" \
-  -H "Upgrade: websocket" \
-  -H "Host: tower.example.com:8788" \
-  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  -H "Sec-WebSocket-Version: 13" \
-  http://tower.example.com:8788/
-```
+## Client
 
----
+Build the app with `VITE_BROKER_URL=wss://$DOMAIN`. The client fetches TURN credentials from
+`https://$DOMAIN/turn` at join and falls back to STUN-only if it is unreachable. Manual override:
+the in-app broker URL field (persisted to `localStorage`).
 
-## TLS / wss:// (Recommended for Production)
+## Scaling (far off)
 
-The broker speaks plain WebSocket (`ws://`). For encrypted connections:
-
-1. Put a reverse proxy (Caddy or nginx) in front on port 443:
-
-   **Caddy** (`Caddyfile`):
-   ```
-   broker.yourdomain.com {
-       reverse_proxy localhost:8788
-   }
-   ```
-   Caddy obtains a Let's Encrypt cert automatically.
-
-2. Clients then connect to `wss://broker.yourdomain.com`.
-
----
-
-## TURN / coturn Configuration
-
-The `coturn` service in `docker-compose.yml` uses **time-limited HMAC credentials** (`--use-auth-secret`). Clients generate temporary credentials from `TURN_SECRET` and the current Unix time. The GRANBRIDGE app does this automatically when given the TURN secret or a credential-generation endpoint.
-
-For full TLS TURN support (`turns://`), mount certificates into the container and add `--tls-listening-port=5349 --cert=... --pkey=...` flags to the command.
-
----
-
-## Client Configuration
-
-In the GRANBRIDGE app, set the broker URL:
-
-```
-broker_url = "ws://tower.example.com:8788"
-# or, with TLS reverse proxy:
-broker_url = "wss://broker.yourdomain.com"
-```
-
-The TURN server details (server URL, secret/credentials) are configured separately in the app's WebRTC ICE server list.
-
----
-
-## Scaling
-
-The broker is single-process and in-memory. For the current scale (a handful of rooms at a time) this is fine. If you later need multi-instance scaling, introduce a Redis pub/sub layer to fan messages across broker instances behind a load balancer — but that day is far off.
+Single-process, in-memory — ample for current scale. If ever needed, add Redis pub/sub to fan messages
+across broker instances behind a load balancer.
