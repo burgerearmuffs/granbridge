@@ -16,6 +16,8 @@ manual check. This tool confirms the broker, TLS, and the /turn endpoint work.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import socket
@@ -33,8 +35,11 @@ def build_stun_binding_request() -> bytes:
     return struct.pack(">HHI", 0x0001, 0, _STUN_MAGIC) + os.urandom(12)
 
 
-def parse_xor_mapped_address(data: bytes):
-    """Return (ip, port) from a STUN response's XOR-MAPPED-ADDRESS (IPv4), or None."""
+def parse_xor_mapped_address(data: bytes, attr_type: int = 0x0020):
+    """Return (ip, port) from a STUN response's XOR-MAPPED-ADDRESS (IPv4), or None.
+
+    Pass attr_type=0x0016 to decode XOR-RELAYED-ADDRESS instead.
+    """
     if len(data) < 20:
         return None
     _mtype, mlen, magic = struct.unpack(">HHI", data[:8])
@@ -44,7 +49,7 @@ def parse_xor_mapped_address(data: bytes):
     while off + 4 <= end:
         atype, alen = struct.unpack(">HH", data[off:off + 4])
         val = data[off + 4:off + 4 + alen]
-        if atype == 0x0020 and len(val) >= 8 and val[1] == 0x01:  # XOR-MAPPED-ADDRESS, IPv4
+        if atype == attr_type and len(val) >= 8 and val[1] == 0x01:  # XOR-*-ADDRESS, IPv4
             xport = struct.unpack(">H", val[2:4])[0]
             xaddr = struct.unpack(">I", val[4:8])[0]
             port = xport ^ (_STUN_MAGIC >> 16)
@@ -79,6 +84,87 @@ def check_stun(host: str, port: int = 3478, timeout: float = 5.0) -> tuple[bool,
     return True, f"stun {host}:{port}/udp: reachable"
 
 
+_ALLOCATE = 0x0003
+_REQUESTED_TRANSPORT_UDP = b"\x11\x00\x00\x00"  # protocol 17 (UDP) + 3 reserved
+
+
+def _get_attr(data: bytes, want_type: int):
+    """Raw value bytes of the first STUN attribute of `want_type`, or None."""
+    if len(data) < 20:
+        return None
+    _mtype, mlen, _magic = struct.unpack(">HHI", data[:8])
+    off, end = 20, min(20 + mlen, len(data))
+    while off + 4 <= end:
+        atype, alen = struct.unpack(">HH", data[off:off + 4])
+        if atype == want_type:
+            return data[off + 4:off + 4 + alen]
+        off += 4 + alen + ((4 - alen % 4) % 4)
+    return None
+
+
+def _stun_attr(atype: int, value: bytes) -> bytes:
+    pad = (4 - len(value) % 4) % 4
+    return struct.pack(">HH", atype, len(value)) + value + b"\x00" * pad
+
+
+def _long_term_key(username: str, realm: str, credential: str) -> bytes:
+    return hashlib.md5(f"{username}:{realm}:{credential}".encode()).digest()
+
+
+def _build_initial_allocate(txn: bytes) -> bytes:
+    body = _stun_attr(0x0019, _REQUESTED_TRANSPORT_UDP)
+    return struct.pack(">HHI", _ALLOCATE, len(body), _STUN_MAGIC) + txn + body
+
+
+def _build_authed_allocate(txn: bytes, username: str, realm: bytes, nonce: bytes, key: bytes) -> bytes:
+    body = (
+        _stun_attr(0x0006, username.encode())   # USERNAME
+        + _stun_attr(0x0014, realm)             # REALM (echo from 401)
+        + _stun_attr(0x0015, nonce)             # NONCE (echo from 401)
+        + _stun_attr(0x0019, _REQUESTED_TRANSPORT_UDP)
+    )
+    # MESSAGE-INTEGRITY: the header Message-Length must already include the 24-byte
+    # MI attribute (4 header + 20 value); the HMAC covers header+body (not the MI attr).
+    header = struct.pack(">HHI", _ALLOCATE, len(body) + 24, _STUN_MAGIC) + txn
+    mi = hmac.new(key, header + body, hashlib.sha1).digest()
+    return header + body + struct.pack(">HH", 0x0008, 20) + mi
+
+
+def check_turn_relay(host: str, port: int, username: str, credential: str,
+                     timeout: float = 5.0) -> tuple[bool, str]:
+    """Authenticated TURN Allocate: confirms coturn accepts the creds and allocates a relay."""
+    if not host:
+        return False, "turn relay: no host"
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    try:
+        sock.sendto(_build_initial_allocate(os.urandom(12)), (host, port))
+        challenge, _ = sock.recvfrom(2048)
+        realm = _get_attr(challenge, 0x0014)
+        nonce = _get_attr(challenge, 0x0015)
+        if realm is None or nonce is None:
+            mt = struct.unpack(">H", challenge[:2])[0] if len(challenge) >= 2 else 0
+            return False, f"turn relay: no realm/nonce in challenge (msg type {hex(mt)})"
+        key = _long_term_key(username, realm.decode("utf-8", "replace"), credential)
+        sock.sendto(_build_authed_allocate(os.urandom(12), username, realm, nonce, key), (host, port))
+        reply, _ = sock.recvfrom(2048)
+        mtype = struct.unpack(">H", reply[:2])[0]
+        if mtype == 0x0103:  # Allocate Success
+            relayed = parse_xor_mapped_address(reply, 0x0016)  # XOR-RELAYED-ADDRESS
+            if relayed:
+                return True, f"turn relay: coturn accepted creds, relay allocated {relayed[0]}:{relayed[1]}"
+            return True, "turn relay: coturn accepted creds (allocate succeeded)"
+        if mtype == 0x0113:  # Allocate Error
+            return False, "turn relay: coturn rejected the credentials (error response)"
+        return False, f"turn relay: unexpected response type {hex(mtype)}"
+    except socket.timeout:
+        return False, f"turn relay {host}:{port}/udp: timeout"
+    except Exception as exc:
+        return False, f"turn relay: {exc}"
+    finally:
+        sock.close()
+
+
 def _http_base(ws_url: str) -> str:
     if "://" not in ws_url:
         raise ValueError(f"URL missing scheme (expected ws:// or wss://): {ws_url!r}")
@@ -96,10 +182,14 @@ def check_health(http_base: str) -> tuple[bool, str]:
         return False, f"/healthz: {exc}"
 
 
+def _fetch_turn(http_base: str, timeout: float = 5.0) -> dict:
+    with urllib.request.urlopen(http_base + "/turn", timeout=timeout) as resp:
+        return json.loads(resp.read())
+
+
 def check_turn(http_base: str) -> tuple[bool, str]:
     try:
-        with urllib.request.urlopen(http_base + "/turn", timeout=5) as resp:
-            data = json.loads(resp.read())
+        data = _fetch_turn(http_base)
         ok = (
             isinstance(data.get("uris"), list) and bool(data["uris"])
             and isinstance(data.get("username"), str) and bool(data["username"])
@@ -135,12 +225,13 @@ async def check_ws(ws_url: str) -> tuple[bool | None, str]:
 async def run(ws_url: str) -> bool:
     base = _http_base(ws_url)
     host = urlparse(ws_url).hostname or ""
-    results = [
-        check_health(base),
-        check_turn(base),
-        check_stun(host, 3478),
-        await check_ws(ws_url),
-    ]
+    results = [check_health(base), check_turn(base), check_stun(host, 3478)]
+    try:
+        creds = _fetch_turn(base)
+        results.append(check_turn_relay(host, 3478, creds["username"], creds["credential"]))
+    except Exception as exc:
+        results.append((False, f"turn relay: couldn't fetch creds: {exc}"))
+    results.append(await check_ws(ws_url))
     all_ok = True
     for ok, detail in results:
         if ok is None:
