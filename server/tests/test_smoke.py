@@ -30,3 +30,19 @@ async def test_checks_pass_against_local_broker(server):
 async def test_health_fails_on_dead_endpoint():
     ok, _ = await asyncio.to_thread(smoke.check_health, "http://127.0.0.1:9")
     assert ok is False
+
+
+def test_http_base_rejects_missing_scheme():
+    with pytest.raises(ValueError):
+        smoke._http_base("naked-host")
+
+
+def test_http_base_prefix_based_for_ws_in_hostname():
+    assert smoke._http_base("ws://wsserver.example.com") == "http://wsserver.example.com"
+
+
+async def test_ws_check_skips_without_websockets(monkeypatch):
+    import sys
+    monkeypatch.setitem(sys.modules, "websockets", None)  # forces ImportError on `import websockets`
+    ok, detail = await smoke.check_ws("ws://127.0.0.1:8798")
+    assert ok is None and "SKIP" in detail

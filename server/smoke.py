@@ -22,9 +22,10 @@ import urllib.request
 
 
 def _http_base(ws_url: str) -> str:
+    if "://" not in ws_url:
+        raise ValueError(f"URL missing scheme (expected ws:// or wss://): {ws_url!r}")
     scheme = "https" if ws_url.startswith("wss") else "http"
-    rest = ws_url[ws_url.index("://"):] if "://" in ws_url else "://" + ws_url
-    return (scheme + rest).rstrip("/")
+    return (scheme + ws_url[ws_url.index("://"):]).rstrip("/")
 
 
 def check_health(http_base: str) -> tuple[bool, str]:
@@ -46,16 +47,20 @@ def check_turn(http_base: str) -> tuple[bool, str]:
             and isinstance(data.get("username"), str) and bool(data["username"])
             and isinstance(data.get("credential"), str) and bool(data["credential"])
         )
-        return ok, f"/turn: username={'set' if data.get('username') else 'MISSING'} uris={data.get('uris')}"
+        return ok, (
+            f"/turn: username={'set' if data.get('username') else 'MISSING'} "
+            f"credential={'set' if data.get('credential') else 'MISSING'} "
+            f"uris={data.get('uris')}"
+        )
     except Exception as exc:
         return False, f"/turn: {exc}"
 
 
-async def check_ws(ws_url: str) -> tuple[bool, str]:
+async def check_ws(ws_url: str) -> tuple[bool | None, str]:
     try:
         import websockets
     except ImportError:
-        return True, "wss connect: SKIPPED (install 'websockets' to enable this check)"
+        return None, "wss connect: SKIPPED (install 'websockets' to enable this check)"
     try:
         async with websockets.connect(ws_url, open_timeout=5) as ws:
             await ws.send(json.dumps({
@@ -71,15 +76,17 @@ async def check_ws(ws_url: str) -> tuple[bool, str]:
 
 async def run(ws_url: str) -> bool:
     base = _http_base(ws_url)
-    results = [
-        check_health(base),
-        check_turn(base),
-        await check_ws(ws_url),
-    ]
+    results = [check_health(base), check_turn(base), await check_ws(ws_url)]
     all_ok = True
     for ok, detail in results:
-        print(("PASS  " if ok else "FAIL  ") + detail)
-        all_ok = all_ok and ok
+        if ok is None:
+            label = "SKIP  "
+        elif ok:
+            label = "PASS  "
+        else:
+            label = "FAIL  "
+            all_ok = False
+        print(label + detail)
     return all_ok
 
 
@@ -88,7 +95,11 @@ def main(argv=None) -> int:
     if not argv:
         print("usage: python smoke.py <ws://host:port | wss://domain>")
         return 2
-    ok = asyncio.run(run(argv[0]))
+    try:
+        ok = asyncio.run(run(argv[0]))
+    except ValueError as exc:
+        print(f"error: {exc}")
+        return 2
     print("\nRESULT: " + ("OK" if ok else "FAILED"))
     return 0 if ok else 1
 
