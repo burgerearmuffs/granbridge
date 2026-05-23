@@ -274,3 +274,22 @@ Spec `docs/superpowers/specs/2026-05-22-mp-broker-tower-deploy-design.md`; plan
   server suite 16 passed; main Python suite 193 passed (no regressions); UI suite 232 passed; UI build
   clean. Real TLS/TURN traversal is manual-verify on TOWER (runbook in `server/README.md`).
 - Broker tests require `pytest-asyncio` (declared in the `dev` extra; `asyncio_mode=auto` in pyproject) — install via the dev extra.
+
+### Server hardening v2
+
+Spec `docs/superpowers/specs/2026-05-23-server-hardening-design.md`; plan
+`docs/superpowers/plans/2026-05-23-server-hardening.md`. Built on `server-hardening`.
+
+- **Per-IP rate limits (broker):** `RateLimiter` (sliding-window, zero deps) keyed by the real client
+  IP from Caddy's authoritative `X-Real-IP`. Three independent limiters: `/turn` requests
+  (`TURN_RATE_PER_MIN`, default 30), WebSocket upgrades (`CONN_RATE_PER_MIN`, default 60), and
+  per-connection message flood for `signal`/`msg` (`MSG_RATE_PER_SEC`, default 20). `0` disables any
+  limiter. Over-limit HTTP requests → 429; over-limit messages → silently dropped (sender stays connected).
+- **coturn relay quotas:** entrypoint passes `--total-quota=${TURN_TOTAL_QUOTA:-200}` (max simultaneous
+  relay allocations) and, when non-zero, `--max-bps=$TURN_MAX_BPS` (per-allocation bytes/sec cap).
+- **ACME email:** `caddy` service injects a `{ email ... }` global block at startup when `ACME_EMAIL`
+  is set in `.env`; no-op when unset. Ensures Let's Encrypt sends renewal/expiry notices.
+- **ALLOWED_ORIGINS documented:** comma-separated browser-origin allowlist for browser-only deployments;
+  leave unset for the native app (null origin bypasses enforcement by design).
+- **Tests:** server suite **30 passed** (16 prior + 14 new: `test_ratelimit.py` ×10 + `test_rate_limits.py` ×4);
+  main Python suite 193 passed (no regressions); UI suite 232 passed; `npm run build` clean.

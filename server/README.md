@@ -39,6 +39,46 @@ WebRTC relay check (browser console, on an HTTPS page): create an `RTCPeerConnec
   to enable `turns://` if the cert appears after first boot.
 - `restart: unless-stopped` + the broker `HEALTHCHECK` recover from crashes/reboots.
 
+## Hardening
+
+All limits are env-configurable; `0` disables the check. Defaults are shown.
+
+### Per-IP rate limits (broker)
+
+The broker reads `X-Real-IP` set authoritatively by Caddy, so the real client IP
+is used even behind the reverse proxy.
+
+| Env var | Default | What it limits |
+|---|---|---|
+| `TURN_RATE_PER_MIN` | `30` | `/turn` credential requests per IP per minute |
+| `CONN_RATE_PER_MIN` | `60` | WebSocket upgrades per IP per minute |
+| `MSG_RATE_PER_SEC` | `20` | `signal`/`msg` messages per connection per second |
+
+Requests that exceed a limit receive HTTP 429; excess messages are silently dropped
+(the sender stays connected).
+
+### coturn relay quotas
+
+| Env var | Default | What it limits |
+|---|---|---|
+| `TURN_TOTAL_QUOTA` | `200` | Maximum simultaneous relay allocations across all clients |
+| `TURN_MAX_BPS` | `0` (disabled) | Per-allocation bytes/sec cap |
+
+Set via `.env`; the entrypoint passes `--total-quota` and (when non-zero) `--max-bps`
+to `turnserver`.
+
+### ACME email
+
+Set `ACME_EMAIL=you@example.com` in `.env` to receive Let's Encrypt renewal and
+expiry notices. The `caddy` service injects the email global block at startup when
+the variable is set; leave unset to suppress it.
+
+### Origin allowlist
+
+Set `ALLOWED_ORIGINS=https://play.example.com` (comma-separated) to restrict WebSocket
+upgrades to browser origins you control. Leave **unset** for the native GRANBRIDGE app,
+which sends a null origin and is deliberately excluded from origin enforcement.
+
 ## Client
 
 Build the app with `VITE_BROKER_URL=wss://$DOMAIN`. The client fetches TURN credentials from
