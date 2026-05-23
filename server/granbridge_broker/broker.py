@@ -206,7 +206,7 @@ class BrokerServer:
                         # First joiner creates the room and sets password
                         room = _Room(password_hash=pw_hash)
                         self._rooms[room_name] = room
-                        self._log.info("room created name=%s (rooms=%d)", room_name, len(self._rooms))
+                        self._log.info("room created name=%r (rooms=%d)", room_name, len(self._rooms))
 
                     # Build member
                     member = _Member(peer_id=peer_id, ws=ws, player=player)
@@ -303,7 +303,7 @@ class BrokerServer:
         if not room.members:
             # Reap empty room
             del self._rooms[room_name]
-            self._log.info("room reaped name=%s (rooms=%d)", room_name, len(self._rooms))
+            self._log.info("room reaped name=%r (rooms=%d)", room_name, len(self._rooms))
         else:
             # Notify remaining members
             await self._broadcast_peers(room, exclude_peer_id=None)

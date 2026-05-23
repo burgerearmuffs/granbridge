@@ -36,6 +36,7 @@ async def test_join_existing_room_still_ok_at_cap(server):
         await _join(b, "r2", "p", "B"); await _recv(b)   # rooms = 2 (at cap)
         await _join(c, "r1", "p", "C")                   # EXISTING room — allowed
         joined = await _recv(c)
+        await _recv(a)  # drain the peers broadcast a receives when c joins
         assert joined["type"] == "joined"
     finally:
         for ws in (a, b, c): await ws.close()
