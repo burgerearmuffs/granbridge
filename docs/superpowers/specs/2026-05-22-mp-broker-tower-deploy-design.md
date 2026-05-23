@@ -215,9 +215,9 @@ Designed so deployment is one command and there are **no recurring manual tasks*
 
 - **One required variable.** Only `DOMAIN` must be set. `ACME_EMAIL` is recommended; everything else has
   a sane default.
-- **Self-generating secret.** If `TURN_SECRET` is unset, the broker generates it once on first boot and
-  persists it to a shared `secrets` volume; coturn reads the same file. Clients never receive it — only
-  short-lived derived creds.
+- **Self-generating secret.** If `TURN_SECRET` is unset, it is generated once on first boot (a one-shot
+  `init` step, run as root for deterministic volume permissions) and persisted to a shared `secrets`
+  volume that both the broker and coturn read. Clients never receive it — only short-lived derived creds.
 - **Zero-touch TLS.** Caddy auto-renews; a background watcher in the coturn container detects the
   renewed cert and SIGHUPs coturn to reload it live (no restart, no dropped relays).
 - **Self-healing.** `restart: unless-stopped` + a broker `HEALTHCHECK` bring the stack back after
