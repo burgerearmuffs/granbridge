@@ -17,12 +17,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
 
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
+
+from granbridge_broker.http import json_response, origin_allowed
+from granbridge_broker.turn import make_turn_credentials
 
 DEFAULT_ROOM_SIZE_CAP = 4
 
@@ -68,10 +73,24 @@ class BrokerServer:
         host: str = "0.0.0.0",
         port: int = 8788,
         room_size_cap: int = DEFAULT_ROOM_SIZE_CAP,
+        *,
+        max_rooms: int = 200,
+        max_size: int = 65536,
+        allowed_origins: Optional[tuple[str, ...]] = None,
+        turn_secret: str = "",
+        turn_domain: str = "granbridge.local",
+        turn_ttl: int = 86400,
     ) -> None:
         self._host = host
         self._port = port
         self._room_size_cap = room_size_cap
+        self._max_rooms = max_rooms
+        self._max_size = max_size
+        self._allowed_origins = allowed_origins
+        self._turn_secret = turn_secret
+        self._turn_domain = turn_domain
+        self._turn_ttl = turn_ttl
+        self._log = logging.getLogger("granbridge.broker")
         # room_name -> _Room
         self._rooms: dict[str, _Room] = {}
         # peer_id -> _Member (with .ws for direct send)
@@ -85,12 +104,49 @@ class BrokerServer:
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        self._server = await serve(self._handle, self._host, self._port)
+        self._server = await serve(
+            self._handle,
+            self._host,
+            self._port,
+            process_request=self._process_request,
+            max_size=self._max_size,
+        )
 
     async def stop(self) -> None:
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
+
+    # ------------------------------------------------------------------
+    # HTTP (same port as the WebSocket) — health + TURN credentials
+    # ------------------------------------------------------------------
+
+    def _http_route(self, path: str):
+        if path == "/healthz":
+            return json_response(
+                200,
+                {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)},
+            )
+        if path == "/turn":
+            return json_response(
+                200,
+                make_turn_credentials(
+                    self._turn_secret, self._turn_domain, self._turn_ttl, time.time()
+                ),
+            )
+        return None
+
+    def _process_request(self, connection, request):
+        resp = self._http_route(request.path)
+        if resp is not None:
+            return resp
+        # WebSocket upgrade path — optional Origin allowlist (default permissive)
+        if self._allowed_origins is not None:
+            origin = request.headers.get("Origin")
+            if not origin_allowed(origin, self._allowed_origins):
+                self._log.warning("rejected WS upgrade: forbidden origin %r", origin)
+                return json_response(403, {"error": "forbidden_origin"}, reason="Forbidden")
+        return None
 
     # ------------------------------------------------------------------
     # Connection handler
