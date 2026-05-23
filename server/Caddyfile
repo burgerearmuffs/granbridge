@@ -1,0 +1,10 @@
+# Caddy obtains + auto-renews a Let's Encrypt cert for $DOMAIN and reverse-proxies
+# everything to the broker: WebSocket upgrades (wss:// play) and the plain-HTTP
+# /turn and /healthz endpoints all share one origin.
+#
+# Optional: to receive renewal/expiry notices, add a global options block above
+# the site, e.g.:   {  email you@example.com  }
+
+{$DOMAIN} {
+	reverse_proxy broker:8788
+}
