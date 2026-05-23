@@ -38,6 +38,12 @@ This slice makes it actually deployable and actually usable remotely. Gaps it cl
 - **Approach A — "Full premium" TURN:** coturn offers `turns://` on 5349 (Caddy's cert) **and** plain
   `turn://` on 3478. (Approach B = `turn://`-only was the documented fallback; not chosen.)
 - **"TURN agent" = the coturn service/sidecar** (not a separate process manager).
+- **Turnkey + low-maintenance (user priority):** one-command deploy, ~one config variable, and **no
+  recurring manual tasks** (see Operability). `TURN_SECRET` auto-generates and persists on first run;
+  coturn reloads renewed certs automatically.
+- **Profiles & stats stay client-local (confirmed):** the broker remains stateless; this slice adds no
+  server-side datastore. Voice/video, profiles, avatars, and per-player stats all work per-device;
+  cross-device/server-side profiles+stats are a deliberate future slice (out of scope).
 
 ## Architecture & file layout
 
@@ -91,12 +97,12 @@ relay  ──49152–65535 udp────▶ coturn
   and mounts the Caddy cert volume read-only.
 - **Host firewall opens:** 80/tcp, 443/tcp, 3478 udp+tcp, 5349/tcp, 49152–65535/udp.
 
-All configuration flows from one `.env`:
+All configuration flows from one `.env` — in practice **only `DOMAIN` is required**:
 
 | Var | Required | Meaning |
 |-----|----------|---------|
 | `DOMAIN` | yes | Public hostname pointed at TOWER (Caddy cert subject + coturn realm + TURN uris) |
-| `TURN_SECRET` | yes | Shared HMAC secret; minted by broker, verified by coturn (`openssl rand -hex 32`) |
+| `TURN_SECRET` | no | Shared HMAC secret (broker mints, coturn verifies). **Auto-generated + persisted to a volume on first run if unset**; set it only to pin a known value. |
 | `ACME_EMAIL` | no | Let's Encrypt account email (recommended) |
 | `TURN_REALM` | no | Defaults to `DOMAIN` |
 | `TURN_TTL` | no | Credential lifetime seconds; default 86400 |
@@ -106,9 +112,10 @@ All configuration flows from one `.env`:
 
 Started by `entrypoint.sh`, which on boot polls (up to ~60 s) for Caddy's issued cert under the mounted
 `caddy_data` volume (glob for `<DOMAIN>.crt`/`.key`, robust to the ACME-CA subdir name), copies them to
-a coturn-readable path, then execs coturn. If the cert is still absent after the wait, coturn starts
-**`turn://`-only** with a clear warning log (graceful degradation to Approach-B behavior until a later
-`docker compose restart coturn` picks up the cert).
+a coturn-readable path, then launches coturn. If the cert is still absent after the wait, coturn starts
+**`turn://`-only** with a clear warning log (graceful degradation to Approach-B behavior); the same
+background watcher below will SIGHUP coturn to enable `turns://` as soon as the cert appears — still
+zero-touch.
 
 Flags:
 ```
@@ -128,10 +135,11 @@ Flags:
 --denied-peer-ip=127.0.0.0-127.255.255.255
 ```
 
-**Cert rotation upkeep:** coturn does not auto-reload TLS certs. After each ~60-day renewal, a single
-`docker compose restart coturn` re-runs the entrypoint and picks up the fresh cert. Shipped as a
-documented one-liner + an optional cron snippet in the runbook. This is the only recurring cost of
-Approach A.
+**Cert rotation (automated, zero-touch):** after launching coturn, the entrypoint runs a lightweight
+background watcher on the mounted Caddy cert (mtime poll). When Caddy auto-renews (~every 60 days), the
+watcher re-copies the cert and sends coturn **SIGHUP**, which reloads TLS without a restart or dropped
+relays — no human action, ever. (SIGHUP cert-reload is verified at implementation; documented fallback
+is an automatic `coturn` container restart on cert change.)
 
 ## Broker hardening (surgical)
 
@@ -201,22 +209,39 @@ manual-verify (need the real host).
   returns creds; a forced-relay (`iceTransportPolicy:"relay"`) call connects through coturn; cert-reload
   via `docker compose restart coturn`.
 
-## Deploy / ops & what needs the user
+## Operability & maintenance (user priority: low-touch)
+
+Designed so deployment is one command and there are **no recurring manual tasks**:
+
+- **One required variable.** Only `DOMAIN` must be set. `ACME_EMAIL` is recommended; everything else has
+  a sane default.
+- **Self-generating secret.** If `TURN_SECRET` is unset, the broker generates it once on first boot and
+  persists it to a shared `secrets` volume; coturn reads the same file. Clients never receive it — only
+  short-lived derived creds.
+- **Zero-touch TLS.** Caddy auto-renews; a background watcher in the coturn container detects the
+  renewed cert and SIGHUPs coturn to reload it live (no restart, no dropped relays).
+- **Self-healing.** `restart: unless-stopped` + a broker `HEALTHCHECK` bring the stack back after
+  crashes or host reboots.
+- **Contained.** One `docker compose` stack (Caddy + broker + coturn); no external services/accounts
+  beyond the DNS name. (Three services, not one image: coturn requires host networking.)
+
+## Deploy / what needs the user (one-time)
 
 1. Point `DOMAIN` at TOWER's public IP (A record or dynamic-DNS).
-2. `cp .env.example .env`; set `DOMAIN`, `TURN_SECRET` (`openssl rand -hex 32`), `ACME_EMAIL`; set
-   `TURN_EXTERNAL_IP` only if TOWER is behind a router.
-3. Open the firewall ports (above).
+2. `cp .env.example .env`; set `DOMAIN` (optionally `ACME_EMAIL`; set `TURN_EXTERNAL_IP` only if TOWER is
+   behind a router). Leave `TURN_SECRET` unset to auto-generate.
+3. Open the firewall ports listed above.
 4. `docker compose up -d --build`; verify with the runbook checks.
-5. Build the app with `VITE_BROKER_URL=wss://<domain>`.
-6. Recurring: `docker compose restart coturn` after cert renewals (scripted + documented).
+5. Build the app once with `VITE_BROKER_URL=wss://<domain>`.
 
-The updated `server/README.md` carries the full runbook, replacing the LAN-only instructions.
+**Recurring maintenance: none** (see Operability). The updated `server/README.md` carries the full
+runbook, replacing the LAN-only instructions.
 
 ## Out of scope (flagged)
 
 - Multi-instance / Redis fan-out scaling (single process is ample for current scale).
-- Accounts/auth beyond anonymous IDs (server-side profiles remain a separate future slice).
+- Server-side profiles **and stats** (cross-device identity, shared leaderboard) — confirmed local-only
+  for this slice; a deliberate future slice (it would add the only stateful/maintenance piece).
 - `turns://` on **443** via SNI/layer-4 routing (Approach C) — only matters on the most hostile
   firewalls; revisit if a real user hits it.
 - Metrics/Prometheus endpoint; per-IP rate limiting (noted as future hardening).
@@ -234,3 +259,5 @@ The updated `server/README.md` carries the full runbook, replacing the LAN-only 
    `turn.ts`) are covered. Real TLS/TURN traversal is documented as manual-verify.
 6. Repro: pinned `websockets` + pinned `coturn` image; no obsolete compose keys; broker container runs
    non-root.
+7. Turnkey: only `DOMAIN` is required to deploy; `TURN_SECRET` auto-generates; TLS renews and reloads
+   with no manual step; the stack self-heals across reboots.
