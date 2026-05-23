@@ -4,6 +4,9 @@ coturn's time-limited credential contract:
   username   = "<unix-expiry-timestamp>"
   credential = base64( HMAC-SHA1( static_auth_secret, username ) )
 The static secret never leaves the server; clients receive only short-lived creds.
+
+The returned dict uses the key ``uris`` (matching the broker's wire format); the
+WebRTC client maps this to the ``RTCIceServer.urls`` field on the receiving end.
 """
 from __future__ import annotations
 
