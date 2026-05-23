@@ -27,6 +27,7 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
 from granbridge_broker.http import json_response, origin_allowed
+from granbridge_broker.ratelimit import RateLimiter, client_ip
 from granbridge_broker.turn import make_turn_credentials
 
 DEFAULT_ROOM_SIZE_CAP = 4
@@ -80,6 +81,10 @@ class BrokerServer:
         turn_secret: str = "",
         turn_domain: str = "granbridge.local",
         turn_ttl: int = 86400,
+        turn_rate_per_min: int = 0,
+        conn_rate_per_min: int = 0,
+        msg_rate_per_sec: int = 0,
+        clock=time.time,
     ) -> None:
         self._host = host
         self._port = port
@@ -98,6 +103,10 @@ class BrokerServer:
         # peer_id -> room_name (for cleanup)
         self._peer_room: dict[str, str] = {}
         self._server: Optional[Server] = None
+        self._clock = clock
+        self._turn_limiter = RateLimiter(turn_rate_per_min, 60.0)
+        self._conn_limiter = RateLimiter(conn_rate_per_min, 60.0)
+        self._msg_limiter = RateLimiter(msg_rate_per_sec, 1.0)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -121,26 +130,32 @@ class BrokerServer:
     # HTTP (same port as the WebSocket) — health + TURN credentials
     # ------------------------------------------------------------------
 
-    def _http_route(self, path: str):
+    def _http_route(self, path: str, client_ip: str = "-"):
         if path == "/healthz":
             return json_response(
                 200,
                 {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)},
             )
         if path == "/turn":
+            if not self._turn_limiter.allow(client_ip, self._clock()):
+                return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
             return json_response(
                 200,
                 make_turn_credentials(
-                    self._turn_secret, self._turn_domain, self._turn_ttl, time.time()
+                    self._turn_secret, self._turn_domain, self._turn_ttl, self._clock()
                 ),
             )
         return None
 
     def _process_request(self, connection, request):
-        resp = self._http_route(request.path)
+        ip = client_ip(request.headers, connection.remote_address)
+        resp = self._http_route(request.path, ip)
         if resp is not None:
             return resp
-        # WebSocket upgrade path — optional Origin allowlist (default permissive)
+        # WebSocket upgrade: per-IP connection rate limit
+        if not self._conn_limiter.allow(ip, self._clock()):
+            self._log.warning("rate-limited WS upgrade ip=%s", ip)
+            return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
         if self._allowed_origins is not None:
             origin = request.headers.get("Origin")
             if not origin_allowed(origin, self._allowed_origins):
@@ -234,6 +249,9 @@ class BrokerServer:
                     if member is None:
                         await _error(ws, "bad_request", "must join before signaling")
                         continue
+                    if not self._msg_limiter.allow(peer_id, self._clock()):
+                        self._log.warning("dropped signal flood peer=%s", peer_id)
+                        continue
                     target_id = msg.get("to")
                     data = msg.get("data")
                     if not isinstance(target_id, str) or data is None:
@@ -253,6 +271,9 @@ class BrokerServer:
                 elif mtype == "msg":
                     if member is None:
                         await _error(ws, "bad_request", "must join before messaging")
+                        continue
+                    if not self._msg_limiter.allow(peer_id, self._clock()):
+                        self._log.warning("dropped msg flood peer=%s", peer_id)
                         continue
                     payload = msg.get("payload")
                     if payload is None:

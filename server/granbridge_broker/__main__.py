@@ -28,6 +28,9 @@ async def _main() -> None:
         turn_secret=cfg.turn_secret,
         turn_domain=cfg.turn_domain,
         turn_ttl=cfg.turn_ttl,
+        turn_rate_per_min=cfg.turn_rate_per_min,
+        conn_rate_per_min=cfg.conn_rate_per_min,
+        msg_rate_per_sec=cfg.msg_rate_per_sec,
     )
     loop = asyncio.get_running_loop()
     stop = loop.create_future()

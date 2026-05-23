@@ -24,6 +24,9 @@ class BrokerConfig:
     turn_secret: str
     turn_domain: str
     turn_ttl: int
+    turn_rate_per_min: int
+    conn_rate_per_min: int
+    msg_rate_per_sec: int
 
 
 def resolve_secret(env_secret: Optional[str], secret_path: str) -> str:
@@ -51,4 +54,7 @@ def from_env(env=None) -> BrokerConfig:
         turn_secret=secret,
         turn_domain=domain,
         turn_ttl=int(env.get("TURN_TTL", "86400")),
+        turn_rate_per_min=int(env.get("TURN_RATE_PER_MIN", "30")),
+        conn_rate_per_min=int(env.get("CONN_RATE_PER_MIN", "60")),
+        msg_rate_per_sec=int(env.get("MSG_RATE_PER_SEC", "20")),
     )
