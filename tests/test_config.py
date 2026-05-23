@@ -9,3 +9,13 @@ def test_defaults_present():
 def test_env_override(monkeypatch):
     monkeypatch.setenv("GRANBRIDGE_WS_PORT", "9999")
     assert Settings().ws_port == 9999
+
+def test_writable_paths_in_appdata():
+    s = Settings()
+    assert "granbridge" in s.overrides_path.parts
+    assert s.overrides_path.name == "segment_map.overrides.json"
+    assert "granbridge" in s.log_dir.parts
+    assert s.log_dir.name == "logs"
+
+def test_allowed_origins_default_empty():
+    assert Settings().allowed_origins == []
