@@ -233,3 +233,24 @@ Spec `docs/superpowers/specs/2026-05-22-count-up-mode-design.md`; plan
   isn't a supported Count-Up action.
 
 **Next:** Medley (a match of sequenced games — its own sub-project); real app icons.
+
+### Medley mode ✅ (quick parity)
+Spec `docs/superpowers/specs/2026-05-22-medley-mode-design.md`; plan
+`docs/superpowers/plans/2026-05-22-medley-mode.md`. Built subagent-driven on `medley-mode`.
+
+- **Engine:** new `MedleyMode` — a match of a sequence of games (default `[x01, cricket, count_up]`),
+  one per leg, run as **best-of-N** by the engine's existing best-of-legs machinery (`MedleyMode` sets
+  `best_of_legs = len(sequence)`). It delegates each leg to the existing sub-mode and advances the
+  sequence inside `on_start` (the engine's per-leg hook). Sequence/index live in `mode_view["medley"]`,
+  so it is instance-stateless and undo-safe. **No engine logic change** — only a registry line.
+- **UI:** `MedleyBoard` renders a "Game x / N — <mode>" header and delegates to the existing sub-board
+  (X01/Cricket/ATC/Count-Up). Medley in the local Setup form (default sequence) + the Multiplayer
+  start-match select.
+- **Tests:** +6 Python (default sequence/first leg, leg-win advances the sequence, match ends at the
+  majority of legs, unknown sub-mode aborts start, undo across a leg boundary, 2-player advance) →
+  188 Python; +3 UI (MedleyBoard delegation ×2, Setup option) → 224 UI. Full suites + build green.
+- **Limitations:** sub-modes use default options inside a medley (501 X01, 8-round Count-Up); a custom
+  sequence-picker UI is deferred (the mode supports `options.sequence`); `free_play`/`medley` can't be
+  sequence entries.
+
+**Next:** real app icons; (later) server-side profiles/accounts.
