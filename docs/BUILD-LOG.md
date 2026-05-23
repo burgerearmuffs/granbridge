@@ -312,3 +312,18 @@ Plan `docs/superpowers/plans/2026-05-23-server-smoke-tool.md`. Built on `server-
   forms.
 - **Server suite total: 36 passed** (30 prior + 6 new in `test_smoke.py`). Main Python suite 193
   passed (no regressions); UI suite 232 passed.
+
+### Smoke tool — STUN reachability check
+
+Plan `docs/superpowers/plans/2026-05-23-smoke-stun-check.md`. Built on `smoke-stun-check`.
+
+- **`server/smoke.py`** extended with a STUN Binding check (RFC 5389): `build_stun_binding_request`
+  (20-byte packet, random transaction ID), `parse_xor_mapped_address` (IPv4 XOR-MAPPED-ADDRESS),
+  and `check_stun(host, port=3478)` which sends one UDP Binding Request and confirms coturn responds.
+  Wired into `run()` after `check_turn`; host derived from the broker URL, port fixed at 3478. This
+  catches a firewall blocking UDP 3478 — a common deployment failure that `/healthz` cannot detect.
+- **`server/tests/test_smoke_stun.py`** — 5 pure unit tests: packet shape (type/length/magic),
+  XOR-MAPPED-ADDRESS roundtrip (1.2.3.4:1234), garbage-input returns `None`, and dead-host timeout
+  returns `(False, ...)` with "stun" in the detail. No live network required.
+- **Server suite total: 41 passed** (36 prior + 5 new in `test_smoke_stun.py`). Main Python suite
+  and UI suite (232) unchanged.
