@@ -17,8 +17,66 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import socket
+import struct
 import sys
 import urllib.request
+from urllib.parse import urlparse
+
+
+_STUN_MAGIC = 0x2112A442
+
+
+def build_stun_binding_request() -> bytes:
+    """A 20-byte STUN Binding Request (RFC 5389): type, length=0, magic, random txn id."""
+    return struct.pack(">HHI", 0x0001, 0, _STUN_MAGIC) + os.urandom(12)
+
+
+def parse_xor_mapped_address(data: bytes):
+    """Return (ip, port) from a STUN response's XOR-MAPPED-ADDRESS (IPv4), or None."""
+    if len(data) < 20:
+        return None
+    _mtype, mlen, magic = struct.unpack(">HHI", data[:8])
+    if magic != _STUN_MAGIC:
+        return None
+    off, end = 20, min(20 + mlen, len(data))
+    while off + 4 <= end:
+        atype, alen = struct.unpack(">HH", data[off:off + 4])
+        val = data[off + 4:off + 4 + alen]
+        if atype == 0x0020 and len(val) >= 8 and val[1] == 0x01:  # XOR-MAPPED-ADDRESS, IPv4
+            xport = struct.unpack(">H", val[2:4])[0]
+            xaddr = struct.unpack(">I", val[4:8])[0]
+            port = xport ^ (_STUN_MAGIC >> 16)
+            addr = xaddr ^ _STUN_MAGIC
+            ip = ".".join(str((addr >> shift) & 0xFF) for shift in (24, 16, 8, 0))
+            return ip, port
+        off += 4 + alen + ((4 - alen % 4) % 4)  # advance past value + 4-byte padding
+    return None
+
+
+def check_stun(host: str, port: int = 3478, timeout: float = 5.0) -> tuple[bool, str]:
+    """Send one STUN Binding Request over UDP; confirm the TURN server is reachable."""
+    if not host:
+        return False, "stun: no host"
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    try:
+        req = build_stun_binding_request()
+        sock.sendto(req, (host, port))
+        data, _ = sock.recvfrom(2048)
+    except socket.timeout:
+        return False, f"stun {host}:{port}/udp: timeout (UDP 3478 blocked or coturn down?)"
+    except Exception as exc:
+        return False, f"stun {host}:{port}/udp: {exc}"
+    finally:
+        sock.close()
+    if len(data) < 20 or data[8:20] != req[8:20]:
+        return False, f"stun {host}:{port}/udp: unexpected response"
+    mapped = parse_xor_mapped_address(data)
+    if mapped:
+        return True, f"stun {host}:{port}/udp: reachable (reflexive {mapped[0]}:{mapped[1]})"
+    return True, f"stun {host}:{port}/udp: reachable"
 
 
 def _http_base(ws_url: str) -> str:
@@ -76,7 +134,13 @@ async def check_ws(ws_url: str) -> tuple[bool | None, str]:
 
 async def run(ws_url: str) -> bool:
     base = _http_base(ws_url)
-    results = [check_health(base), check_turn(base), await check_ws(ws_url)]
+    host = urlparse(ws_url).hostname or ""
+    results = [
+        check_health(base),
+        check_turn(base),
+        check_stun(host, 3478),
+        await check_ws(ws_url),
+    ]
     all_ok = True
     for ok, detail in results:
         if ok is None:
