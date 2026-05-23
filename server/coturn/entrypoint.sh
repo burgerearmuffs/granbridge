@@ -43,6 +43,8 @@ COMMON="-n --log-file=stdout --no-cli --fingerprint \
   --denied-peer-ip=127.0.0.0-127.255.255.255"
 
 [ -n "${TURN_EXTERNAL_IP:-}" ] && COMMON="$COMMON --external-ip=$TURN_EXTERNAL_IP"
+COMMON="$COMMON --total-quota=${TURN_TOTAL_QUOTA:-200}"
+[ -n "${TURN_MAX_BPS:-}" ] && [ "${TURN_MAX_BPS:-0}" != "0" ] && COMMON="$COMMON --max-bps=$TURN_MAX_BPS"
 
 if [ -f "$CERT_DIR/turn.crt" ]; then
   TLS="--tls-listening-port=5349 --cert=$CERT_DIR/turn.crt --pkey=$CERT_DIR/turn.key"
