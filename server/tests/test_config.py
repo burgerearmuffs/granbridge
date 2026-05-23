@@ -1,0 +1,29 @@
+from granbridge_broker.config import resolve_secret, from_env
+
+
+def test_resolve_secret_prefers_env(tmp_path):
+    f = tmp_path / "turn_secret"
+    f.write_text("from-file")
+    assert resolve_secret("from-env", str(f)) == "from-env"
+
+
+def test_resolve_secret_reads_file_when_env_absent(tmp_path):
+    f = tmp_path / "turn_secret"
+    f.write_text("  file-secret\n")
+    assert resolve_secret(None, str(f)) == "file-secret"
+
+
+def test_from_env_parses_and_defaults():
+    env = {"TURN_SECRET": "x", "DOMAIN": "play.example.com", "ALLOWED_ORIGINS": "a, b"}
+    cfg = from_env(env)
+    assert cfg.turn_secret == "x"
+    assert cfg.turn_domain == "play.example.com"
+    assert cfg.allowed_origins == ("a", "b")
+    assert cfg.port == 8788
+    assert cfg.max_rooms == 200
+    assert cfg.room_size_cap == 4
+
+
+def test_from_env_origins_empty_means_permissive():
+    cfg = from_env({"TURN_SECRET": "x", "DOMAIN": "d"})
+    assert cfg.allowed_origins is None
