@@ -1,50 +1,81 @@
-version: "3.9"
-
-# TOWER deployment: both services run on the same host.
-# Expose port 8788 on the public IP for the broker.
-# Expose TURN ports (3478 TCP/UDP + relay range) for coturn.
-# Set TURN_SECRET in your environment or a .env file before running.
+# GRANBRIDGE multiplayer stack for TOWER.
+# One command:  docker compose up -d --build
+# Only DOMAIN is required (set it in .env). TURN_SECRET auto-generates if unset.
 
 services:
+
+  # One-shot: generate the shared TURN secret once (root → deterministic perms).
+  init:
+    image: alpine:3.20
+    command: >
+      sh -c '[ -n "$$TURN_SECRET" ] && exit 0;
+             [ -s /secrets/turn_secret ] && exit 0;
+             head -c 32 /dev/urandom | base64 | tr -d "\n" > /secrets/turn_secret;
+             chmod 644 /secrets/turn_secret;
+             echo "generated /secrets/turn_secret"'
+    environment:
+      TURN_SECRET: "${TURN_SECRET:-}"
+    volumes:
+      - secrets:/secrets
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend]
 
   broker:
     build: .
     restart: unless-stopped
-    ports:
-      - "8788:8788"
+    depends_on:
+      init:
+        condition: service_completed_successfully
     environment:
       BROKER_HOST: "0.0.0.0"
       BROKER_PORT: "8788"
+      DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
+      TURN_SECRET: "${TURN_SECRET:-}"
+      TURN_TTL: "${TURN_TTL:-86400}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
+      SECRET_PATH: "/secrets/turn_secret"
+    volumes:
+      - secrets:/secrets:ro
+    networks: [backend]
+    # No host port: only Caddy reaches the broker (smaller public surface).
 
   coturn:
-    image: coturn/coturn:latest
-    # Use host networking so coturn can discover the public IP automatically
-    # and relay UDP/TCP across a port range without complex port-mapping.
-    # On TOWER: make sure firewall allows UDP 3478 and UDP 49152-65535.
-    network_mode: host
+    image: coturn/coturn:4.6.2
     restart: unless-stopped
+    network_mode: host          # needs the relay port range + 3478/5349 on the host
+    depends_on:
+      init:
+        condition: service_completed_successfully
     environment:
-      # Replace with your actual public IP or domain.
-      DETECT_EXTERNAL_IP: "yes"
-      # coturn reads these from the command line via the entrypoint;
-      # override by mounting a custom turnserver.conf if you need more control.
-    # Minimum coturn flags for WebRTC TURN (time-limited HMAC credentials):
-    command: >
-      -n
-      --log-file=stdout
-      --lt-cred-mech
-      --use-auth-secret
-      --static-auth-secret=${TURN_SECRET}
-      --realm=${TURN_REALM:-granbridge.local}
-      --no-tls
-      --no-dtls
-      --min-port=49152
-      --max-port=65535
-      --listening-port=3478
-    # NOTE: --no-tls/--no-dtls is fine behind a TURN-aware reverse proxy.
-    # For direct production use, add --tls-listening-port=5349 and mount certs.
+      DOMAIN: "${DOMAIN:?set DOMAIN in .env}"
+      TURN_REALM: "${TURN_REALM:-${DOMAIN}}"
+      TURN_SECRET: "${TURN_SECRET:-}"
+      TURN_EXTERNAL_IP: "${TURN_EXTERNAL_IP:-}"
+    volumes:
+      - caddy_data:/caddy-data:ro      # read Caddy's Let's Encrypt cert
+      - secrets:/secrets:ro
+      - ./coturn/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
-# Port summary (open on TOWER firewall):
-#   TCP  8788   — WebSocket broker  (or 443 if behind reverse proxy for wss://)
-#   UDP/TCP 3478  — STUN/TURN
-#   UDP  49152-65535 — TURN relay range
+networks:
+  backend:
+
+volumes:
+  caddy_data:
+  caddy_config:
+  secrets:
