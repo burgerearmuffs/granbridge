@@ -3,6 +3,8 @@
 RateLimiter is a sliding-window counter keyed by an arbitrary string (client IP
 or peer id). limit <= 0 disables it (always allows). The clock is passed in so
 callers (and tests) stay deterministic.
+
+Note: `now` is expected to be monotonically non-decreasing (wall clock).
 """
 from __future__ import annotations
 
@@ -11,14 +13,19 @@ from typing import Optional
 
 
 class RateLimiter:
-    def __init__(self, limit: int, window: float) -> None:
+    def __init__(self, limit: int, window: float, prune_every: int = 1024) -> None:
         self._limit = limit
         self._window = window
+        self._prune_every = prune_every
         self._events: dict[str, deque[float]] = {}
+        self._ops = 0
 
     def allow(self, key: str, now: float) -> bool:
         if self._limit <= 0:
             return True
+        self._ops += 1
+        if self._prune_every > 0 and self._ops % self._prune_every == 0:
+            self.prune(now)
         dq = self._events.get(key)
         if dq is None:
             dq = deque()

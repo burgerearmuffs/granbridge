@@ -41,3 +41,22 @@ def test_client_ip_prefers_x_real_ip():
 def test_client_ip_falls_back_to_remote_then_unknown():
     assert client_ip({}, ("10.0.0.1", 555)) == "10.0.0.1"
     assert client_ip({}, None) == "unknown"
+
+
+def test_boundary_event_at_cutoff_is_expired():
+    rl = RateLimiter(limit=1, window=10.0)
+    assert rl.allow("a", 1000.0) is True
+    assert rl.allow("a", 1010.0) is True   # event at exactly the cutoff (1010-10=1000) is expired
+
+
+def test_client_ip_comma_list_takes_first():
+    assert client_ip({"X-Real-IP": "1.2.3.4, 5.6.7.8"}, None) == "1.2.3.4"
+
+
+def test_self_prunes_idle_keys():
+    rl = RateLimiter(limit=1, window=10.0, prune_every=4)
+    for i in range(4):
+        rl.allow(f"k{i}", 1000.0)          # 4 distinct keys at t=1000
+    for i in range(4):
+        rl.allow(f"j{i}", 2000.0)          # t=2000; the 4th call (ops=8) triggers prune
+    assert rl.key_count() == 4             # k0..k3 (stale) pruned; j0..j3 remain
