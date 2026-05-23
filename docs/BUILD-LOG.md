@@ -254,3 +254,23 @@ Spec `docs/superpowers/specs/2026-05-22-medley-mode-design.md`; plan
   sequence entries.
 
 **Next:** real app icons; (later) server-side profiles/accounts.
+
+### MP — Broker + coturn for real TOWER deployment
+Spec `docs/superpowers/specs/2026-05-22-mp-broker-tower-deploy-design.md`; plan
+`docs/superpowers/plans/2026-05-22-broker-tower-deploy.md`. Built on `broker-tower-deploy`.
+
+- **Contained stack:** one `docker compose` (init + caddy + broker + coturn). Only `DOMAIN` required;
+  `TURN_SECRET` auto-generates onto a shared volume. **Zero recurring maintenance** (Caddy auto-renews;
+  coturn watcher reloads the cert via SIGHUP / restart).
+- **Broker:** split into `turn.py` (HMAC REST creds) + `config.py` + `http.py`; single-port WS+HTTP
+  (`/turn`, `/healthz` via `process_request`); hardened (64 KiB frame cap, room-count cap → `server_full`,
+  optional Origin allowlist, structured logging, graceful SIGTERM). Pinned `websockets==15.0.1`,
+  non-root image + HEALTHCHECK.
+- **coturn:** `turn://` + `turns://` (reusing Caddy's Let's Encrypt cert), `--external-ip` for NAT,
+  RFC1918 `--denied-peer-ip` SSRF hardening, pinned image.
+- **Client:** `fetchIceServers` pulls short-lived TURN creds from `/turn` (STUN-only fallback); broker
+  URL defaults via `VITE_BROKER_URL`.
+- **Tests:** +12 server (turn×2/config×4/http×4/caps×2) and +8 UI (turn×6/store readBrokerUrl×2);
+  server suite 16 passed; main Python suite 193 passed (no regressions); UI suite 232 passed; UI build
+  clean. Real TLS/TURN traversal is manual-verify on TOWER (runbook in `server/README.md`).
+- Broker tests require `pytest-asyncio` (declared in the `dev` extra; `asyncio_mode=auto` in pyproject) — install via the dev extra.
