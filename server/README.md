@@ -33,6 +33,28 @@ docker compose logs -f coturn                 # "turns:// enabled (cert found)"
 WebRTC relay check (browser console, on an HTTPS page): create an `RTCPeerConnection` with
 `iceTransportPolicy:"relay"` and the `/turn` ICE servers; you should gather `relay` candidates.
 
+### Validate a deployment
+
+After `docker compose up -d --build`, run the smoke tool from the `server/` directory:
+
+```bash
+python smoke.py wss://$DOMAIN
+```
+
+This confirms in one command that:
+
+- **`/healthz`** — broker is up and returns `status: ok`.
+- **`/turn`** — credential endpoint returns a well-formed payload (`username`, `credential`, `uris`).
+- **`wss://` room join** — WebSocket is reachable and a `join` handshake completes.
+  Install `websockets` (`pip install websockets`) to enable the WS check; without it the check
+  is skipped and the tool still reports the HTTP results.
+
+Output ends with `RESULT: OK` (exit 0) on success or `RESULT: FAILED` (exit 1) on any failure.
+
+**Note:** actual TURN *relay* requires a real WebRTC peer — verify that manually in a browser
+(see the WebRTC relay check above). The smoke tool confirms the broker, TLS, and credential
+endpoint; relay traversal itself is out of scope.
+
 ## Maintenance: none
 
 - Caddy auto-renews TLS; coturn's watcher reloads the renewed cert automatically (SIGHUP), or restarts

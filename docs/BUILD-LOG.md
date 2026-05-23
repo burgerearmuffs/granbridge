@@ -293,3 +293,22 @@ Spec `docs/superpowers/specs/2026-05-23-server-hardening-design.md`; plan
   leave unset for the native app (null origin bypasses enforcement by design).
 - **Tests:** server suite **30 passed** (16 prior + 14 new: `test_ratelimit.py` ×10 + `test_rate_limits.py` ×4);
   main Python suite 193 passed (no regressions); UI suite 232 passed; `npm run build` clean.
+
+### Server deployment smoke tool
+
+Plan `docs/superpowers/plans/2026-05-23-server-smoke-tool.md`. Built on `server-smoke-tool`.
+
+- **`server/smoke.py`** — zero-dependency CLI (`urllib` only) that validates a live broker deployment
+  from the client side. Checks: `/healthz` (broker up, `status: ok`), `/turn` (credential payload
+  has `username`, `credential`, and non-empty `uris`), and a `wss://` connect + room `join` handshake.
+  The WS check (`check_ws`) requires the `websockets` package; without it the check reports SKIP
+  and the tool still exits 0 if the HTTP checks pass. Actual TURN *relay* needs a real WebRTC peer
+  and remains a browser manual-verify — the tool says so explicitly.
+- **Integration test** (`server/tests/test_smoke.py`) — spins up a real `BrokerServer` on a loopback
+  port and runs all three `check_*` functions against it over a live TCP socket, closing the coverage
+  gap where `/healthz` and `/turn` were only exercised through mocked handler calls, not a real HTTP
+  request/response cycle. Also covers `_http_base` scheme mapping, dead-endpoint failure, missing-scheme
+  rejection, SKIP behaviour when `websockets` is absent (via `sys.modules` patching), and edge-case URL
+  forms.
+- **Server suite total: 36 passed** (30 prior + 6 new in `test_smoke.py`). Main Python suite 193
+  passed (no regressions); UI suite 232 passed.
