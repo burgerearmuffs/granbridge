@@ -43,11 +43,19 @@ Status legend: ✅ built · ◐ foundation/partial · ○ designed-not-built · 
 - ◐ Auto-tracked stats exist locally. Need: a **profile** (display name, avatar, persistent ID),
   career stats (averages, checkouts, win rate, per-segment heatmap) that persist and travel with the
   player across matches/devices.
-- ⚙ For online play, profiles imply **identity/accounts** (even lightweight: a generated player ID +
-  optional auth) stored server-side, so opponents and stats are stable across sessions.
+- ✅ **Server-side per-identity stats store (backend built):** `StatsStore` (SQLite on the `data`
+  volume), `stats_submit` WS write + `GET /stats/player/{id}` reads, TOFU write-token auth, sanity
+  caps, co-signed match verification. Player identified by a public UUID; a private write-token
+  acts as the recovery key (TOFU). Client integration (export/upload, offline queue, profile UI
+  wired to server data) is Plan 2.
+- ◐ Cross-device profile card (display name, avatar, persistent ID) — client UI exists (MP-4);
+  server-side identity wired but client upload not yet hooked up (Plan 2).
+- ○ Opponent profile card pulled from server (currently local-only, Plan 2).
 
 ## E. Streaming & social — partially ✅
 - ✅ OBS overlays. ○ In-match spectator links, share match results, Discord rich presence (plugin exists for events).
+- ◐ **Leaderboard (backend built):** `GET /stats/leaderboard` serves verified-only rankings (min 3
+  co-signed matches, sortable by 3-dart avg or wins). Leaderboard view UI is Plan 2.
 
 ## F. Future / stretch — ○ (foundations only)
 - ◐ AI commentary (offline template built; LLM seam flagged). ○ Tournaments/leagues/brackets.

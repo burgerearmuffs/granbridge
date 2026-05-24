@@ -350,3 +350,44 @@ Plan `docs/superpowers/plans/2026-05-23-turn-relay-check.md`. Built on `turn-rel
   and attribute encoding are all correct. Skipped automatically when Docker is absent.
 - **Server suite total: 47 passed** (41 prior + 6 new: 4 pure unit tests + 2 docker-gated
   integration tests). Main Python suite 193 passed (no regressions); UI suite 232 passed.
+
+### Server-side stats backend (2026-05-24, branch `server-side-stats`)
+
+Spec `docs/superpowers/specs/2026-05-24-server-side-stats-design.md`; plan
+`docs/superpowers/plans/2026-05-24-server-side-stats-backend.md`.
+
+- **`StatsStore`** (`server/granbridge_broker/stats.py`) — SQLite-backed, identity-keyed match
+  stats. Schema: `players` (TOFU token hash, display name, avatar), `matches` (per-reporter summary
+  row + co-sign verification), `match_throws` (optional per-dart heatmap rows). WAL mode; one
+  connection per call (safe for `asyncio.to_thread`). Persisted to the `data` Docker named volume
+  at `STATS_DB_PATH=/data/stats.db`.
+- **Write path:** `stats_submit` WebSocket message (WS used instead of `POST` because
+  `websockets 15`'s `process_request` cannot read an HTTP body). TOFU auth: first writer for a
+  player id registers `sha256(token)`; all later writes must match. Sanity caps: `darts ≤ 5000`,
+  `total_scored ≤ darts × 60` (bounding 3-dart avg to ≤ 180). Reply: `stats_ack` on success or
+  `error` with codes `token_mismatch`, `implausible`, `unsupported`, `rate_limited`, `bad_request`.
+- **Read path:** `GET /stats/player/{id}` (summary + heatmap) and `GET /stats/leaderboard`
+  (verified-only, min 3 verified games, sortable by `avg` or `wins`). Both served on the broker's
+  single port via `_process_request`.
+- **Verified matches:** a match is co-signed when two reporters submit the same `match_id` with
+  the same `winner_id`; disagreeing reporters remain unverified. Solo matches never verify. Only
+  verified matches appear on the leaderboard — preventing stat inflation from uncontested
+  submissions.
+- **Refinements vs. spec:** (1) writes are a WS `stats_submit` message, not `POST /stats/submit`
+  — required by `websockets 15`'s `process_request` design; (2) `matches` carries summary columns
+  (`darts`, `total_scored`); per-throw `match_throws` is optional (stored only when supplied) —
+  this resolves the spec's guest-recording open item: a guest can submit an aggregate contribution
+  without server-side guest recording.
+- **`/healthz`** now returns `players` and `matches` counts when stats are enabled.
+- **`smoke.py`** extended with `check_stats`: submits a throwaway match over WS then reads it
+  back via `GET /stats/player/{id}`, confirming the full round-trip.
+- **Ops:** `data` named volume in `docker-compose.yml` mounted at `/data`; `STATS_DB_PATH` and
+  `STATS_RATE_PER_MIN` (default 30) env vars; documented in `server/README.md` (wire shapes,
+  TOFU auth, backup: `docker compose cp broker:/data/stats.db ./stats-backup.db`).
+- **Tests:** 19 new server tests across `test_stats_store.py` (9: schema/TOFU/idempotency/
+  validation/verification), `test_stats_api.py` (9: HTTP GET reads, WS submit/ack/errors,
+  smoke round-trip), `test_stats_integration.py` (1: persistence across StatsStore reopen,
+  simulating container restart on a mounted volume). **Server suite: 66 passed** (47 prior +
+  19 new). Main Python suite 193 passed (no regressions); UI suite 232 passed.
+- **Client integration is Plan 2** (app `export/latest`, UI identity/recovery-key/match-id/
+  stats-client/offline-queue, Profile/Multiplayer/Leaderboard surfaces, upload toggle).
