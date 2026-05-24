@@ -4,6 +4,7 @@
  * records are migrated on read.
  */
 import { defaultAvatarColor } from "./avatar";
+import { importRecoveryKey } from "./recoveryKey";
 
 export interface AvatarSpec {
   color: string;
@@ -61,6 +62,15 @@ export function setPlayerName(name: string): Profile {
 export function setPlayerColor(color: string): Profile {
   const current = getOrCreatePlayer();
   const updated: Profile = { ...current, avatar: { ...current.avatar, color } };
+  _persist(updated);
+  return updated;
+}
+
+/** Restore identity from a recovery key (replaces this device's id + writeToken). */
+export function applyRecoveryKey(key: string): Profile {
+  const { id, writeToken } = importRecoveryKey(key); // throws on malformed
+  const current = getOrCreatePlayer();
+  const updated: Profile = { ...current, id, writeToken, avatar: { color: defaultAvatarColor(id) } };
   _persist(updated);
   return updated;
 }
