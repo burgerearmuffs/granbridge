@@ -433,7 +433,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("submitMatch", () => {
   it("sends a stats_submit envelope and resolves on stats_ack", async () => {
     const p = submitMatch(REC, IDY, "ws://h");
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0)); // drain the macrotask so FakeWS.onopen fires
     const sent = JSON.parse(FakeWS.last!.sent[0]);
     expect(sent.type).toBe("stats_submit");
     expect(sent.id).toBe("P1");
@@ -446,7 +446,7 @@ describe("submitMatch", () => {
 
   it("rejects with the error code on a server error", async () => {
     const p = submitMatch(REC, IDY, "ws://h");
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0)); // drain the macrotask so FakeWS.onopen fires
     FakeWS.last!.reply({ type: "error", code: "token_mismatch", message: "no" });
     await expect(p).rejects.toThrow("token_mismatch");
   });
@@ -598,8 +598,6 @@ function write(q: QueueEntry[]): void {
 
 export function pendingCount(): number { return read().length; }
 
-let flushing = false;
-
 /** Append an entry and kick a background flush. */
 export function enqueue(entry: QueueEntry): void {
   const q = read();
@@ -608,30 +606,34 @@ export function enqueue(entry: QueueEntry): void {
   void flush();
 }
 
+// Serialize all flushes through a single promise chain. A boolean lock would let
+// a background flush kicked by enqueue() block a concurrent explicit flush (and
+// concurrent flushes could otherwise double-submit or drop entries via the shift).
+let chain: Promise<void> = Promise.resolve();
+
 /**
  * Submit queued entries oldest-first. Drops an entry on success or a terminal
  * error; stops (keeping the entry) on a transient/network error. Idempotent —
- * the server dedupes on (match_id, reporter_id).
+ * the server dedupes on (match_id, reporter_id). Concurrent calls run serially.
  */
-export async function flush(submit: Submit = submitMatch): Promise<void> {
-  if (flushing) return;
-  flushing = true;
-  try {
-    for (;;) {
-      const q = read();
-      if (q.length === 0) break;
-      try {
-        await submit(q[0].record, q[0].identity);
-      } catch (e) {
-        if (!TERMINAL.has((e as Error).message)) break; // transient: keep + stop
-        // terminal: fall through to drop
-      }
-      const q2 = read(); // re-read in case enqueue() appended during the await
-      q2.shift();
-      write(q2);
+export function flush(submit: Submit = submitMatch): Promise<void> {
+  chain = chain.then(() => _flushOnce(submit), () => _flushOnce(submit));
+  return chain;
+}
+
+async function _flushOnce(submit: Submit): Promise<void> {
+  for (;;) {
+    const q = read();
+    if (q.length === 0) break;
+    try {
+      await submit(q[0].record, q[0].identity);
+    } catch (e) {
+      if (!TERMINAL.has((e as Error).message)) break; // transient: keep + stop
+      // terminal: fall through to drop
     }
-  } finally {
-    flushing = false;
+    const q2 = read(); // re-read in case enqueue() appended during the await
+    q2.shift();
+    write(q2);
   }
 }
 ```
@@ -1136,7 +1138,7 @@ describe("useStatsSubmission", () => {
     render(<Harness />);
     useStore.getState().applyEvent({ type: "game_state", state: { ...FINISHED("Ann"), status: "in_progress" } });
     useStore.getState().applyEvent({ type: "game_state", state: FINISHED("Ann") });
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0)); // drain the macrotask so FakeWS.onopen fires
     expect(enq).not.toHaveBeenCalled();
   });
 });
