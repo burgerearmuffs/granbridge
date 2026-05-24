@@ -15,11 +15,14 @@ import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 import { Multiplayer } from "./views/Multiplayer";
 import { Profile } from "./views/Profile";
+import { useUpdater } from "./useUpdater";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 type NavTab = "live" | "history" | "multiplayer" | "profile";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
+  const updater = useUpdater();
   const connection = useStore((s) => s.connection);
   const gameState = useStore((s) => s.gameState);
   const banners = useStore((s) => s.banners);
@@ -118,6 +121,7 @@ export default function App() {
           </div>
         </header>
       )}
+      {!kiosk && <UpdateBanner state={updater} />}
       <Banners banners={banners} />
       {activeTab === "profile" ? (
         <Profile />
