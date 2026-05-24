@@ -83,4 +83,14 @@ describe("Profile view", () => {
     expect(JSON.parse(localStorage.getItem("granbridge.player")!).id).toBe("restored-id");
     expect(JSON.parse(localStorage.getItem("granbridge.player")!).writeToken).toBe("restored-tok");
   });
+
+  it("toggles the upload preference and persists it", async () => {
+    mockFetch({ player: { three_dart_avg: 0, wins: 0, games_played: 0 } });
+    await act(async () => { render(<Profile />); });
+    const toggle = screen.getByRole("checkbox", { name: /upload my stats/i });
+    expect((toggle as HTMLInputElement).checked).toBe(true); // default on
+    await act(async () => { fireEvent.click(toggle); });
+    expect(localStorage.getItem("granbridge.uploadStats")).toBe("false");
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+  });
 });

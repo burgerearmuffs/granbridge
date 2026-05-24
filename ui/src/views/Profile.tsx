@@ -5,6 +5,7 @@ import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
 import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
 import { exportRecoveryKey } from "../multiplayer/recoveryKey";
+import { getUploadEnabled, setUploadEnabled } from "../stats/uploadPref";
 
 export function Profile() {
   const [profile, setProfile] = useState(() => getOrCreatePlayer());
@@ -14,6 +15,7 @@ export function Profile() {
   const [keyInput, setKeyInput] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
+  const [upload, setUpload] = useState(() => getUploadEnabled());
 
   useEffect(() => {
     let cancelled = false;
@@ -128,6 +130,20 @@ export function Profile() {
           <button onClick={restoreKey} aria-label="Restore" className="text-xs text-amber-300 underline">Restore</button>
         </div>
         {keyError && <p role="alert" className="text-red-300 text-xs mt-1">{keyError}</p>}
+      </div>
+
+      <div className="border-t border-neutral-800 pt-4">
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={upload}
+            onChange={(e) => { setUploadEnabled(e.target.checked); setUpload(e.target.checked); }}
+            aria-label="Upload my stats to the server"
+            className="accent-amber-400 w-4 h-4"
+          />
+          <span className="text-sm text-neutral-300">Upload my stats to the server</span>
+        </label>
+        <p className="text-neutral-600 text-xs mt-1">When off, finished games stay on this device only.</p>
       </div>
 
       <div>
