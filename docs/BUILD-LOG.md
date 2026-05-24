@@ -340,13 +340,13 @@ Plan `docs/superpowers/plans/2026-05-23-turn-relay-check.md`. Built on `turn-rel
   via `parse_xor_mapped_address`. Credentials are fetched live from `/turn` by `run()`. This
   confirms coturn accepts the broker's HMAC-minted credentials and allocates a relay over UDP 3478
   **without a browser**.
-- **Pure unit tests** (`server/tests/test_turn_relay.py`, 5 tests): long-term key derivation
+- **Pure unit tests** (`server/tests/test_turn_relay.py`, 4 tests): long-term key derivation
   (MD5 hash), full authed-Allocate structure + MI value, `_get_attr` extraction, and
   XOR-RELAYED-ADDRESS parsing.
-- **Docker-gated integration test** (`server/tests/test_turn_relay_integration.py`) — the
+- **Docker-gated integration tests** (`server/tests/test_turn_relay_integration.py`) — the
   correctness oracle: spins up a real `coturn:4.6.2` container, mints credentials via
   `granbridge_broker.turn.make_turn_credentials`, and calls `check_turn_relay` against it. Because
   coturn validates the HMAC itself, a successful Allocate proves the key derivation, MI length-trick,
   and attribute encoding are all correct. Skipped automatically when Docker is absent.
-- **Server suite total: 47 passed** (41 prior + 6 new: 5 pure unit tests + 1 docker-gated
-  integration test). Main Python suite 193 passed (no regressions); UI suite 232 passed.
+- **Server suite total: 47 passed** (41 prior + 6 new: 4 pure unit tests + 2 docker-gated
+  integration tests). Main Python suite 193 passed (no regressions); UI suite 232 passed.

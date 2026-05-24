@@ -5,13 +5,17 @@ Usage:
     python smoke.py ws://127.0.0.1:8788
 
 Checks (no WebRTC/browser needed):
-  * GET /healthz           — broker up, returns status ok
-  * GET /turn              — credential endpoint returns a well-formed payload
-  * wss:// connect + join  — WebSocket reachable, room join works (skipped if the
-                             'websockets' package isn't installed)
+  * GET /healthz            — broker up, returns status ok
+  * GET /turn               — credential endpoint returns a well-formed payload
+  * STUN  (UDP 3478)        — coturn reachable; returns the server-reflexive address
+  * TURN relay (UDP 3478)   — authenticated Allocate: coturn accepts the broker's
+                              /turn credentials and allocates a relay
+  * wss:// connect + join   — WebSocket reachable, room join works (skipped if the
+                              'websockets' package isn't installed)
 
-Note: actual TURN *relay* needs a real WebRTC peer (browser) — that stays a
-manual check. This tool confirms the broker, TLS, and the /turn endpoint work.
+Expects the full stack (broker + coturn). The TURN relay check verifies the
+credential + allocation flow in-process; a real two-player A/V session (media
+relay + game sync) still needs two browsers.
 """
 from __future__ import annotations
 
