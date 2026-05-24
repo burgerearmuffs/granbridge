@@ -22,3 +22,8 @@ ui/vite.config.d.ts
 ui/*.tsbuildinfo
 ui/tsconfig*.tsbuildinfo
 ui/src-tauri/gen/
+
+# Updater signing key (never commit)
+*.key
+*.key.pub
+.granbridge-updater.key*

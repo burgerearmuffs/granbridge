@@ -9,6 +9,10 @@ v0.1.1.
 2. `GRANBRIDGE_<ver>_x64-setup.exe` — NSIS setup
 3. `granbridge-<ver>-portable-win64.zip` — no-install portable build
 4. **`QUICKSTART.md`** — the quick-start guide (required, every release)
+5. **`GRANBRIDGE_<ver>_x64-setup.exe.sig`** — minisign signature of the NSIS setup (auto-updater)
+6. **`latest.json`** — auto-updater manifest (auto-updater). The installed app fetches this from
+   `releases/latest/download/latest.json`, so it MUST be attached to every release that should be
+   offered as an update. Only NSIS-installed users auto-update; portable-zip users update manually.
 
 ## Prerequisites / environment gotchas
 - Python venv at `.venv` with PyInstaller. Build-time `Pillow` only needed if regenerating the icon.
@@ -16,6 +20,11 @@ v0.1.1.
   - cargo: `export PATH="$HOME/.cargo/bin:$PATH"` (it's `~/.cargo/bin/cargo.exe`).
   - gh: `"C:\Program Files\GitHub CLI\gh.exe"` (authed as the repo owner).
 - Heavy native builds (PyInstaller, cargo/MSVC) may need the shell sandbox disabled.
+- **Updater signing** (one time): generate a minisign keypair —
+  `npm --prefix ui run tauri -- signer generate -w "$HOME/.granbridge-updater.key"`.
+  The **public** key lives in `ui/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`); keep the
+  **private** key file and its password **off-repo** (never commit — `.gitignore` blocks `*.key`).
+  The auto-updater refuses any release whose `.sig` doesn't verify against the public key.
 
 ## Steps
 
@@ -38,12 +47,18 @@ v0.1.1.
    cp dist/sidecar/granbridge.exe ui/src-tauri/binaries/granbridge-x86_64-pc-windows-msvc.exe
    ```
 
-4. **Build the installers** (cargo must be on PATH):
+4. **Build the installers** (cargo must be on PATH). Set the signing env vars so `tauri build` signs
+   the NSIS artifact and emits `latest.json` (because `bundle.createUpdaterArtifacts` is on):
    ```
    export PATH="$HOME/.cargo/bin:$PATH"
+   export TAURI_SIGNING_PRIVATE_KEY="$(cat "$HOME/.granbridge-updater.key")"
+   export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<your key password>"
    npm --prefix ui run tauri -- build
    # → ui/src-tauri/target/release/bundle/{msi,nsis}/GRANBRIDGE_<ver>_*
+   #   plus GRANBRIDGE_<ver>_x64-setup.exe.sig and a generated latest.json (under bundle/)
    ```
+   If the env vars are unset, the build still produces installers but WITHOUT a signature/`latest.json`,
+   and the auto-updater will reject them — so they are required for any release meant to be auto-updated.
 
 5. **Make the portable zip** from the onedir build:
    ```
@@ -64,9 +79,14 @@ v0.1.1.
      --title "GRANBRIDGE v<ver>" --notes-file <notes.md> \
      "ui\src-tauri\target\release\bundle\msi\GRANBRIDGE_<ver>_x64_en-US.msi" \
      "ui\src-tauri\target\release\bundle\nsis\GRANBRIDGE_<ver>_x64-setup.exe" \
+     "ui\src-tauri\target\release\bundle\nsis\GRANBRIDGE_<ver>_x64-setup.exe.sig" \
      "dist\granbridge-<ver>-portable-win64.zip" \
-     "QUICKSTART.md"
+     "QUICKSTART.md" \
+     "<path-to-generated>\latest.json"
    ```
+   The `.sig` and `latest.json` are emitted by step 4 (look under `ui/src-tauri/target/release/bundle/`).
+   `latest.json` carries the new version, the NSIS download URL, and the signature the updater verifies.
+   **Both must be attached** or installed clients won't see/accept the update.
    Drop `--prerelease` once the project hits a stable milestone.
 
 10. **Verify**: `gh release view v<ver> --json tagName,assets` shows the tag + all four assets.
