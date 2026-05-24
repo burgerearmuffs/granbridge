@@ -22,3 +22,6 @@ ui/vite.config.d.ts
 ui/*.tsbuildinfo
 ui/tsconfig*.tsbuildinfo
 ui/src-tauri/gen/
+
+# pytest repo-local scratch (system temp has broken ACLs in this env)
+.pytest_tmp/
