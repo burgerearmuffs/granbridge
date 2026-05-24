@@ -39,3 +39,16 @@ describe("reads", () => {
     await expect(fetchPlayerSummary("P1", "https://h")).rejects.toThrow();
   });
 });
+
+import { toCareerSummary } from "./statsClient";
+
+describe("toCareerSummary", () => {
+  it("maps a PlayerSummary to a CareerSummary", () => {
+    const s = { id: "P1", display_name: "Ann", avatar_color: "#f00", games_played: 5,
+      wins: 2, verified_games: 3, darts: 90, total_scored: 1500, three_dart_avg: 50, heatmap: {} };
+    expect(toCareerSummary(s)).toEqual({ threeDartAvg: 50, wins: 2, gamesPlayed: 5 });
+  });
+  it("coerces missing fields to zero", () => {
+    expect(toCareerSummary({} as never)).toEqual({ threeDartAvg: 0, wins: 0, gamesPlayed: 0 });
+  });
+});

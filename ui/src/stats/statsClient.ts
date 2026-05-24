@@ -1,5 +1,15 @@
 import { readBrokerUrl } from "../multiplayer/store";
 import type { PlayerSummary, LeaderRow, MatchRecord, Identity } from "./types";
+import type { CareerSummary } from "../multiplayer/careerSummary";
+
+/** Map the broker's PlayerSummary to the UI's CareerSummary (defensive on missing fields). */
+export function toCareerSummary(s: PlayerSummary): CareerSummary {
+  return {
+    threeDartAvg: s?.three_dart_avg ?? 0,
+    wins: s?.wins ?? 0,
+    gamesPlayed: s?.games_played ?? 0,
+  };
+}
 
 /** Map the broker WS URL to its HTTP origin (ws->http, wss->https; trailing slash stripped). */
 export function brokerHttpBase(wsUrl: string = readBrokerUrl()): string {
