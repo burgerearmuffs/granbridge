@@ -55,6 +55,7 @@ interface MpState {
   cam: boolean;
   error: string | undefined;
   brokerUrl: string;
+  remoteMatchId: string | null;
 
   // Actions
   setMpStatus: (s: MpStatus) => void;
@@ -65,6 +66,7 @@ interface MpState {
   setCam: (v: boolean) => void;
   setError: (msg: string | undefined) => void;
   setBrokerUrl: (url: string) => void;
+  setRemoteMatchId: (id: string | null) => void;
   resetMp: () => void;
 }
 
@@ -77,6 +79,7 @@ export const useMpStore = create<MpState>((set) => ({
   cam: readBool(LS_CAM, true),
   error: undefined,
   brokerUrl: readBrokerUrl(),
+  remoteMatchId: null,
 
   setMpStatus: (s) => set({ mpStatus: s }),
   setRoom: (r) => set({ room: r }),
@@ -95,6 +98,7 @@ export const useMpStore = create<MpState>((set) => ({
     try { localStorage.setItem(LS_BROKER_URL, url); } catch { /* ignore */ }
     set({ brokerUrl: url });
   },
+  setRemoteMatchId: (id) => set({ remoteMatchId: id }),
   resetMp: () =>
     set({
       mpStatus: "idle",
@@ -102,5 +106,6 @@ export const useMpStore = create<MpState>((set) => ({
       selfId: "",
       peers: [],
       error: undefined,
+      remoteMatchId: null,
     }),
 }));
