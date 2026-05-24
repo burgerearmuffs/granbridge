@@ -111,6 +111,65 @@ Set `ALLOWED_ORIGINS=https://play.example.com` (comma-separated) to restrict Web
 upgrades to browser origins you control. Leave **unset** for the native GRANBRIDGE app,
 which sends a null origin and is deliberately excluded from origin enforcement.
 
+## Stats
+
+The broker stores per-player match stats in a SQLite database on the `data` named volume.
+
+### Wire shapes
+
+**Write (WebSocket `stats_submit` message):**
+```json
+{
+  "type": "stats_submit",
+  "id": "<player-public-uuid>",
+  "writeToken": "<private-write-token>",
+  "player": { "id": "<player-public-uuid>", "name": "Ann", "avatar": { "color": "#f00" } },
+  "match": {
+    "match_id": "<uuid>", "mode": "x01",
+    "opponent_id": "<uuid-or-null>", "winner_id": "<uuid-or-null>",
+    "is_remote": true, "darts": 9, "total_scored": 180,
+    "started_at": "2026-05-24T10:00:00.000Z", "ended_at": "2026-05-24T10:05:00.000Z",
+    "throws": [{ "bed": "T20", "score": 60, "ts": "2026-05-24T10:00:01.000Z" }]
+  }
+}
+```
+Response: `{"type": "stats_ack", "match_id": "<uuid>", "verified": false}` on success,
+or `{"type": "error", "code": "...", "message": "..."}` on rejection
+(`token_mismatch`, `implausible`, `unsupported`, `rate_limited`, `bad_request`).
+
+**Read (HTTP GET):**
+- `GET /stats/player/{id}` — returns `{id, display_name, avatar_color, games_played, wins,
+  verified_games, darts, total_scored, three_dart_avg, heatmap}`.
+- `GET /stats/leaderboard?metric=avg&limit=20` — returns `{metric, players:[...]}`. Only
+  players with `verified_games >= 3` appear (both sides of a match must co-sign the same
+  `match_id` with the same `winner_id`).
+
+### Storage + TOFU auth
+
+Stats live in SQLite on the `data` volume (`STATS_DB_PATH=/data/stats.db`), keyed by the
+player's **public UUID**. Writes are authorized by a **private write-token** (trust-on-first-use:
+the first writer for an id registers `sha256(token)`; later writes must match). Set
+`STATS_DB_PATH` to an empty string in `.env` to disable stats entirely.
+
+### Backup
+
+Stats are in the `data` Docker named volume. To back up:
+
+```bash
+docker compose cp broker:/data/stats.db ./stats-backup.db
+```
+
+Or copy the named volume directly. No automated backup is configured.
+
+### Tuning
+
+| Env var | Default | What it limits |
+|---|---|---|
+| `STATS_RATE_PER_MIN` | `30` | Stats submit/read requests per IP per minute |
+
+Set `STATS_DB_PATH=` (empty) in `.env` to disable stats entirely; the broker omits
+`/stats/*` routes and replies `unsupported` to `stats_submit` WS messages.
+
 ## Client
 
 Build the app with `VITE_BROKER_URL=wss://$DOMAIN`. The client fetches TURN credentials from
