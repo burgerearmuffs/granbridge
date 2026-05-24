@@ -151,3 +151,17 @@ async def test_stats_unknown_subpath_is_404(tmp_path):
             assert e.code == 404
     finally:
         await s.stop()
+
+
+from smoke import check_stats  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_smoke_check_stats_round_trip(tmp_path):
+    s, _, port = await _start(tmp_path)
+    try:
+        ok, detail = await check_stats(f"ws://127.0.0.1:{port}", f"http://127.0.0.1:{port}")
+        assert ok is True
+        assert "stats" in detail
+    finally:
+        await s.stop()
