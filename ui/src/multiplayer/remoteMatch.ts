@@ -43,7 +43,8 @@ export interface PeerCard {
 export type SyncMsg =
   | { t: "state"; state: GameState }
   | { t: "dart"; bed: string }
-  | { t: "card"; profile: Profile; summary: CareerSummary };
+  | { t: "card"; profile: Profile; summary: CareerSummary }
+  | { t: "matchid"; id: string };
 
 export interface RemoteMatchOptions {
   role: RemoteRole;
@@ -59,6 +60,8 @@ export interface RemoteMatchOptions {
   selfCard?: PeerCard | null;
   /** Called when the peer's card arrives. */
   onOpponentCard?: (profile: Profile, summary: CareerSummary) => void;
+  /** Called with the shared remote match id (host on mint, guest on receive). */
+  onMatchId?: (id: string) => void;
 }
 
 /**
@@ -89,6 +92,7 @@ function isSyncMsg(o: unknown): o is SyncMsg {
       typeof summary.wins === "number" && typeof summary.gamesPlayed === "number"
     );
   }
+  if (t === "matchid") return typeof (o as { id?: unknown }).id === "string";
   return false;
 }
 
@@ -97,9 +101,10 @@ export class RemoteMatch {
   private _unsub: (() => void) | null = null;
   private _lastState: GameState | null = null;
   private _started = false;
+  private _matchId: string | null = null;
 
   constructor(opts: RemoteMatchOptions) {
-    this._opts = { hostSlot: "p1", guestSlot: "p2", selfCard: null, onOpponentCard: () => {}, ...opts };
+    this._opts = { hostSlot: "p1", guestSlot: "p2", selfCard: null, onOpponentCard: () => {}, onMatchId: () => {}, ...opts };
   }
 
   /** Wire peer + bridge callbacks. Idempotent. */
@@ -112,11 +117,15 @@ export class RemoteMatch {
 
     const sendCard = () => {
       const card = this._opts.selfCard;
-      if (card) peer.sendData({ t: "card", profile: card.profile, summary: card.summary });
+      if (!card) return;
+      const p = card.profile;
+      // Never put the private writeToken on the wire — send only public fields.
+      peer.sendData({ t: "card", profile: { id: p.id, name: p.name, avatar: p.avatar }, summary: card.summary });
     };
 
     if (role === "host") {
       peer.onChannelOpen = () => {
+        if (this._matchId) peer.sendData({ t: "matchid", id: this._matchId });
         if (this._lastState) peer.sendData({ t: "state", state: this._lastState });
         sendCard();
       };
@@ -139,6 +148,9 @@ export class RemoteMatch {
   /** Host only: begin a remote match — set the engine role, then start the game. */
   startGame(mode: string, players: string[], options: Record<string, unknown>): void {
     if (this._opts.role !== "host") return;
+    this._matchId = crypto.randomUUID();
+    this._opts.peer.sendData({ t: "matchid", id: this._matchId });
+    this._opts.onMatchId(this._matchId);
     this._opts.bridge.send({ command: "set_remote_role", player: this._opts.hostSlot });
     this._opts.bridge.send({ command: "start_game", mode, players, options });
   }
@@ -164,9 +176,14 @@ export class RemoteMatch {
   private _onPeerMessage(obj: unknown): void {
     if (!isSyncMsg(obj)) return;
     const msg = obj;
-    const { role, bridge, guestSlot, applyState, onOpponentCard } = this._opts;
+    const { role, bridge, guestSlot, applyState, onOpponentCard, onMatchId } = this._opts;
     if (msg.t === "card") {
       onOpponentCard(msg.profile, msg.summary);
+      return;
+    }
+    if (msg.t === "matchid") {
+      this._matchId = msg.id;
+      onMatchId(msg.id);
       return;
     }
     if (role === "host") {
