@@ -327,3 +327,26 @@ Plan `docs/superpowers/plans/2026-05-23-smoke-stun-check.md`. Built on `smoke-st
   returns `(False, ...)` with "stun" in the detail. No live network required.
 - **Server suite total: 41 passed** (36 prior + 5 new in `test_smoke_stun.py`). Main Python suite
   and UI suite (232) unchanged.
+
+### TURN relay auto-check
+
+Plan `docs/superpowers/plans/2026-05-23-turn-relay-check.md`. Built on `turn-relay-check`.
+
+- **`server/smoke.py`** extended with `check_turn_relay`: a two-step authenticated TURN Allocate
+  (RFC 5766 + RFC 5389 long-term credentials). Step 1 sends an unauthenticated Allocate to elicit
+  a 401 with REALM + NONCE; Step 2 sends a properly-keyed Allocate with MESSAGE-INTEGRITY
+  (HMAC-SHA1 over the full header+body, with the length-trick: the header Message-Length already
+  includes the 24-byte MI attribute). On success (Allocate 0x0103), the relay address is parsed
+  via `parse_xor_mapped_address`. Credentials are fetched live from `/turn` by `run()`. This
+  confirms coturn accepts the broker's HMAC-minted credentials and allocates a relay over UDP 3478
+  **without a browser**.
+- **Pure unit tests** (`server/tests/test_turn_relay.py`, 5 tests): long-term key derivation
+  (MD5 hash), full authed-Allocate structure + MI value, `_get_attr` extraction, and
+  XOR-RELAYED-ADDRESS parsing.
+- **Docker-gated integration test** (`server/tests/test_turn_relay_integration.py`) — the
+  correctness oracle: spins up a real `coturn:4.6.2` container, mints credentials via
+  `granbridge_broker.turn.make_turn_credentials`, and calls `check_turn_relay` against it. Because
+  coturn validates the HMAC itself, a successful Allocate proves the key derivation, MI length-trick,
+  and attribute encoding are all correct. Skipped automatically when Docker is absent.
+- **Server suite total: 47 passed** (41 prior + 6 new: 5 pure unit tests + 1 docker-gated
+  integration test). Main Python suite 193 passed (no regressions); UI suite 232 passed.

@@ -48,6 +48,11 @@ This confirms in one command that:
 - **UDP 3478 STUN reachability** — sends a STUN Binding Request to the same host on UDP 3478 and
   confirms coturn responds. This catches the common failure of a firewall silently blocking UDP 3478,
   which `/healthz` cannot detect.
+- **UDP 3478 TURN relay** (`turn relay` line) — performs an authenticated TURN Allocate (RFC 5766
+  long-term credentials + MESSAGE-INTEGRITY) using the broker's own `/turn` credentials. A successful
+  Allocate confirms that coturn accepts the broker's HMAC-minted credentials and allocates a relay
+  address, verifying the full TURN credential flow end-to-end **without a browser**. Uses UDP 3478
+  (`turns://` 5349 relay is a future addition).
 - **`wss://` room join** — WebSocket is reachable and a `join` handshake completes.
   Install `websockets` (`pip install websockets`) to enable the WS check; without it the check
   is skipped and the tool still reports the HTTP results.
@@ -55,9 +60,10 @@ This confirms in one command that:
 Output ends with `RESULT: OK` (exit 0) on success or `RESULT: FAILED` (exit 1) on any failure.
 
 **Note:** the smoke tool expects the **full stack** (broker **and** coturn). If you point it at a
-broker-only target with no coturn, the STUN check will FAIL — that is the correct and expected
-result, not a bug. Actual TURN *relay* requires a real WebRTC peer; verify that manually in a
-browser (see the WebRTC relay check above).
+broker-only target with no coturn, the STUN and TURN relay checks will FAIL — that is the correct
+and expected result, not a bug. The `turn relay` check confirms coturn accepts the credentials and
+allocates a relay over UDP 3478; full end-to-end WebRTC relay (ICE + media) still requires two
+real peers and a browser (see the WebRTC relay check above).
 
 ## Maintenance: none
 
