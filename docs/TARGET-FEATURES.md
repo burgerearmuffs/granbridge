@@ -48,14 +48,18 @@ Status legend: ✅ built · ◐ foundation/partial · ○ designed-not-built · 
   caps, co-signed match verification. Player identified by a public UUID; a private write-token
   acts as the recovery key (TOFU). Client integration (export/upload, offline queue, profile UI
   wired to server data) is Plan 2.
-- ◐ Cross-device profile card (display name, avatar, persistent ID) — client UI exists (MP-4);
-  server-side identity wired but client upload not yet hooked up (Plan 2).
-- ○ Opponent profile card pulled from server (currently local-only, Plan 2).
+- ✅ **Cross-device career stats (client built):** Profile view shows server career stats via
+  `fetchPlayerSummary` + `toCareerSummary` mapper (local `fetchMyCareerSummary` fallback); upload
+  toggle and recovery-key export/import wired in the Profile view (Plan 2b).
+- ✅ **Opponent profile card from server (client built):** in-match opponent card calls
+  `fetchPlayerSummary` for the peer's id and prefers the server summary; falls back to the
+  data-channel `CareerSummary` when the broker is unreachable (Plan 2b).
 
 ## E. Streaming & social — partially ✅
 - ✅ OBS overlays. ○ In-match spectator links, share match results, Discord rich presence (plugin exists for events).
-- ◐ **Leaderboard (backend built):** `GET /stats/leaderboard` serves verified-only rankings (min 3
-  co-signed matches, sortable by 3-dart avg or wins). Leaderboard view UI is Plan 2.
+- ✅ **Leaderboard (built, verified-only):** `GET /stats/leaderboard` serves verified-only rankings
+  (min 3 co-signed matches, sortable by 3-dart avg or wins); `Leaderboard.tsx` view with avg/wins
+  toggle + nav tab in `App.tsx` (Plan 2b).
 
 ## F. Future / stretch — ○ (foundations only)
 - ◐ AI commentary (offline template built; LLM seam flagged). ○ Tournaments/leagues/brackets.

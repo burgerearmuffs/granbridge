@@ -440,3 +440,41 @@ Spec `docs/superpowers/specs/2026-05-24-server-side-stats-client-design.md`; pla
 - **Plan 2b (surfaces) is next:** Profile recovery UI + server-stats card + upload-toggle control,
   opponent card populated from `/stats/player/{id}`, and a full Leaderboard view.
 
+### Client stats surfaces — Plan 2b (2026-05-24, branch `server-side-stats-client-2b`)
+
+Spec `docs/superpowers/specs/2026-05-24-server-side-stats-client-design.md` (§7–9); plan
+`docs/superpowers/plans/2026-05-24-server-side-stats-client-2b-surfaces.md`.
+
+- **`toCareerSummary` mapper** — `ui/src/stats/statsClient.ts` gains `toCareerSummary(PlayerSummary):
+  CareerSummary` (defensive: gracefully handles missing / zero denominator). Shared by Profile and
+  Multiplayer so the rest of the UI consumes the existing `CareerSummary` shape regardless of data source.
+- **Profile — server career card** — `Profile.tsx` now calls `fetchPlayerSummary` on mount, maps the
+  result via `toCareerSummary`, and displays the server career stats (3-dart avg, wins, games played).
+  Falls back to the local `fetchMyCareerSummary` result when the broker is unreachable, so the card
+  always renders.
+- **Profile — recovery-key export/import** — a "Backup / restore your identity" panel: Export copies
+  the base64url recovery key to the clipboard; Import accepts a paste of the recovery key and calls
+  `applyRecoveryKey`, migrating the profile in-place. Errors are shown inline; the panel is read-only
+  until the user clicks "Show / change".
+- **Profile — upload toggle** — a checkbox ("Share stats with the server") backed by
+  `getUploadEnabled`/`setUploadEnabled`. Matches the upload pref the submission hook already reads.
+- **In-match opponent card — server-preferred** — `Multiplayer.tsx` enriches the opponent card by
+  calling `fetchPlayerSummary` for the peer's player id when the card arrives over the data channel.
+  Falls back to the data-channel `CareerSummary` payload when the fetch fails or the broker is
+  unreachable, so the card is always shown.
+- **Leaderboard view** (`ui/src/views/Leaderboard.tsx`) — standalone view: calls `fetchLeaderboard`
+  on mount, displays a ranked table (rank, avatar, display name, 3-dart avg, wins, games) for verified
+  players only, with an avg/wins toggle to switch the sort metric. Shows a loading state while fetching
+  and an empty-state message when no verified players exist yet.
+- **Leaderboard nav tab** — `App.tsx` adds a `"leaderboard"` tab to the bottom nav bar and a render
+  branch that shows `<Leaderboard />` when active.
+- **Tests:** `statsClient.reads.test.ts` extended (toCareerSummary mapper); `Profile.test.tsx`
+  rewritten with a URL-aware fetch mock covering server card, local fallback, recovery-key
+  export/import, and upload toggle; `Leaderboard.test.tsx` (new: render/rank/toggle/empty/error
+  states); `App.test.tsx` extended (leaderboard tab). **UI suite: 301 passed** (260 prior + 41 new).
+  Server and Python suites unchanged.
+- **Server-side stats client is now feature-complete:** Plan 2a delivered identity + `statsClient` +
+  offline queue + match submission; Plan 2b delivers all UI surfaces (Profile, Multiplayer opponent
+  card, Leaderboard). The full server-side stats pipeline — ingestion (backend) → submission (2a) →
+  display (2b) — is end-to-end built.
+
