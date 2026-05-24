@@ -13,8 +13,9 @@ export function importRecoveryKey(key: string): { id: string; writeToken: string
     throw new Error("invalid recovery key");
   }
   const parts = decoded.split(":");
-  if (parts.length !== 3 || parts[0] !== PREFIX || !parts[1] || !parts[2]) {
+  const writeToken = parts.slice(2).join(":"); // rejoin so a token with ':' survives
+  if (parts.length < 3 || parts[0] !== PREFIX || !parts[1] || !writeToken) {
     throw new Error("invalid recovery key");
   }
-  return { id: parts[1], writeToken: parts[2] };
+  return { id: parts[1], writeToken };
 }

@@ -9,6 +9,10 @@ describe("brokerHttpBase", () => {
     expect(brokerHttpBase("wss://darts.example.com/")).toBe("https://darts.example.com");
     expect(brokerHttpBase("ws://127.0.0.1:8788")).toBe("http://127.0.0.1:8788");
   });
+
+  it("handles an uppercase scheme", () => {
+    expect(brokerHttpBase("WSS://H/")).toBe("https://H");
+  });
 });
 
 describe("reads", () => {

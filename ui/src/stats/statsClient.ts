@@ -3,9 +3,10 @@ import type { PlayerSummary, LeaderRow, MatchRecord, Identity } from "./types";
 
 /** Map the broker WS URL to its HTTP origin (ws->http, wss->https; trailing slash stripped). */
 export function brokerHttpBase(wsUrl: string = readBrokerUrl()): string {
-  let base = wsUrl.trim();
-  if (base.startsWith("wss://")) base = "https://" + base.slice(6);
-  else if (base.startsWith("ws://")) base = "http://" + base.slice(5);
+  const base = wsUrl.trim();
+  const lower = base.toLowerCase();
+  if (lower.startsWith("wss://")) return ("https://" + base.slice(6)).replace(/\/+$/, "");
+  if (lower.startsWith("ws://")) return ("http://" + base.slice(5)).replace(/\/+$/, "");
   return base.replace(/\/+$/, "");
 }
 
@@ -56,7 +57,8 @@ export function submitMatch(
     };
     ws.onmessage = (ev: MessageEvent) => {
       let msg: { type?: string; match_id?: string; verified?: boolean; code?: string };
-      try { msg = JSON.parse(typeof ev.data === "string" ? ev.data : ""); } catch { return; }
+      try { msg = JSON.parse(typeof ev.data === "string" ? ev.data : ""); }
+      catch { return; } // ignore non-JSON / partial frame; wait for the next message or the timeout
       if (msg.type === "stats_ack") finish(() => resolve({ match_id: msg.match_id ?? record.match_id, verified: !!msg.verified }));
       else if (msg.type === "error") finish(() => reject(new Error(msg.code || "error")));
     };

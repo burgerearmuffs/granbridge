@@ -47,4 +47,9 @@ describe("submitMatch", () => {
     FakeWS.last!.reply({ type: "error", code: "token_mismatch", message: "no" });
     await expect(p).rejects.toThrow("token_mismatch");
   });
+
+  it("rejects with timeout when no reply arrives", async () => {
+    const p = submitMatch(REC, IDY, "ws://h", 20);
+    await expect(p).rejects.toThrow("timeout");
+  });
 });

@@ -14,6 +14,11 @@ describe("recoveryKey codec", () => {
     expect(() => importRecoveryKey(btoa("wrongprefix:a:b"))).toThrow();
     expect(() => importRecoveryKey(btoa("granbridge:onlyone"))).toThrow();
   });
+
+  it("preserves a writeToken containing colons", () => {
+    const key = exportRecoveryKey({ id: "id-1", writeToken: "a:b:c" });
+    expect(importRecoveryKey(key)).toEqual({ id: "id-1", writeToken: "a:b:c" });
+  });
 });
 
 describe("applyRecoveryKey", () => {
