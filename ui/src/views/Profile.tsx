@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { getOrCreatePlayer, setPlayerName, setPlayerColor } from "../multiplayer/player";
+import { getOrCreatePlayer, setPlayerName, setPlayerColor, applyRecoveryKey } from "../multiplayer/player";
 import { AVATAR_PALETTE, defaultAvatarColor } from "../multiplayer/avatar";
 import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
 import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
+import { exportRecoveryKey } from "../multiplayer/recoveryKey";
 
 export function Profile() {
   const [profile, setProfile] = useState(() => getOrCreatePlayer());
   const [summary, setSummary] = useState<CareerSummary | null>(null);
   const [statsSource, setStatsSource] = useState<"server" | "local">("local");
   const [copied, setCopied] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,6 +28,23 @@ export function Profile() {
     })();
     return () => { cancelled = true; };
   }, [profile.id, profile.name]);
+
+  const exportKey = async () => {
+    try {
+      await navigator.clipboard?.writeText(exportRecoveryKey(profile));
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 1500);
+    } catch { /* ignore */ }
+  };
+  const restoreKey = () => {
+    try {
+      setProfile(applyRecoveryKey(keyInput.trim()));
+      setKeyError(null);
+      setKeyInput("");
+    } catch {
+      setKeyError("That doesn't look like a valid recovery key.");
+    }
+  };
 
   const copyId = async () => {
     try {
@@ -83,6 +104,30 @@ export function Profile() {
             {copied ? "Copied" : "Copy"}
           </button>
         </div>
+      </div>
+
+      <div className="border-t border-neutral-800 pt-4">
+        <h3 className="text-sm text-neutral-300 mb-1">Recovery key</h3>
+        <p className="text-neutral-600 text-xs mb-2">
+          Back this up to restore your stats on another device. Restoring replaces this device's identity.
+        </p>
+        <div className="flex items-center gap-2">
+          <button onClick={exportKey} aria-label="Export recovery key" className="text-xs text-amber-300 underline">
+            {keyCopied ? "Copied" : "Export recovery key"}
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            aria-label="Recovery key"
+            placeholder="Paste a recovery key"
+            className="flex-1 bg-neutral-800 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <button onClick={restoreKey} aria-label="Restore" className="text-xs text-amber-300 underline">Restore</button>
+        </div>
+        {keyError && <p role="alert" className="text-red-300 text-xs mt-1">{keyError}</p>}
       </div>
 
       <div>

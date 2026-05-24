@@ -48,7 +48,7 @@ describe("Profile view", () => {
     mockFetch({ serverOk: false, localRows: [{ player: "Ada", three_dart_avg: 40, wins: 1, games_played: 3 }] });
     render(<Profile />);
     await waitFor(() => expect(screen.getByText("40.0")).toBeInTheDocument());
-    expect(screen.getByText(/this device/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(this device\)/i)).toBeInTheDocument();
   });
 
   it("updates the display name on input", async () => {
@@ -58,5 +58,29 @@ describe("Profile view", () => {
     await act(async () => { fireEvent.change(input, { target: { value: "Zoe" } }); });
     expect((input as HTMLInputElement).value).toBe("Zoe");
     expect(JSON.parse(localStorage.getItem("granbridge.player")!).name).toBe("Zoe");
+  });
+
+  it("exports a recovery key to the clipboard", async () => {
+    localStorage.setItem("granbridge.player", JSON.stringify({ id: "id1", name: "Ada", avatar: { color: "#f59e0b" }, writeToken: "tok-1" }));
+    mockFetch({ player: { three_dart_avg: 0, wins: 0, games_played: 0 } });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    await act(async () => { render(<Profile />); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /export recovery key/i })); });
+    const expected = btoa("granbridge:id1:tok-1");
+    expect(writeText).toHaveBeenCalledWith(expected);
+  });
+
+  it("restores identity from a pasted recovery key", async () => {
+    localStorage.setItem("granbridge.player", JSON.stringify({ id: "old", name: "Ada", avatar: { color: "#f59e0b" }, writeToken: "oldtok" }));
+    mockFetch({ player: { three_dart_avg: 0, wins: 0, games_played: 0 } });
+    await act(async () => { render(<Profile />); });
+    const key = btoa("granbridge:restored-id:restored-tok");
+    await act(async () => {
+      fireEvent.change(screen.getByRole("textbox", { name: /recovery key/i }), { target: { value: key } });
+      fireEvent.click(screen.getByRole("button", { name: /^restore$/i }));
+    });
+    expect(JSON.parse(localStorage.getItem("granbridge.player")!).id).toBe("restored-id");
+    expect(JSON.parse(localStorage.getItem("granbridge.player")!).writeToken).toBe("restored-tok");
   });
 });
