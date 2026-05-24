@@ -12,23 +12,36 @@ import type { Identity, MatchRecord } from "./types";
  * MatchRecord and enqueues it for upload (gated by the upload toggle). Two paths:
  * remote (aggregate from the snapshot, shared match_id) vs local (full throws
  * from the app's export/latest, my-slice only).
+ *
+ * Uses a Zustand plain subscription so every individual store update is observed
+ * independently of React's render batching. This avoids re-running on every dart
+ * (we only react to status changes) while correctly detecting every game-finished
+ * edge even when two synchronous applyEvent calls are batched by React.
  */
 export function useStatsSubmission(): void {
-  const gameState = useStore((s) => s.gameState);
-  const prevStatus = useRef<string | null>(null);
   const startedAt = useRef<string | null>(null);
 
   useEffect(() => {
-    const status = gameState?.status ?? null;
-    const prev = prevStatus.current;
-    prevStatus.current = status;
-    if (prev !== "in_progress" && status === "in_progress") {
-      startedAt.current = new Date().toISOString();
-    }
-    if (prev !== "finished" && status === "finished" && gameState) {
-      void onFinished(gameState, startedAt.current);
-    }
-  }, [gameState]);
+    let prevStatus: string | null = useStore.getState().gameState?.status ?? null;
+
+    const unsub = useStore.subscribe((state) => {
+      const status = state.gameState?.status ?? null;
+      if (status === prevStatus) return;
+      const prev = prevStatus;
+      prevStatus = status;
+      // Capture start time on the first in_progress observation (covers landing on
+      // an already-running game, where prev is null).
+      if (status === "in_progress" && prev !== "in_progress") {
+        startedAt.current = new Date().toISOString();
+      }
+      if (prev !== "finished" && status === "finished") {
+        const gameState = useStore.getState().gameState;
+        if (gameState) void onFinished(gameState, startedAt.current);
+      }
+    });
+
+    return unsub;
+  }, []);
 }
 
 async function onFinished(state: GameState, startedAtIso: string | null): Promise<void> {
@@ -47,6 +60,9 @@ async function onFinished(state: GameState, startedAtIso: string | null): Promis
       started_at: startedAtIso ?? new Date().toISOString(), ended_at: new Date().toISOString(),
     };
     enqueue({ record, identity });
+    // Clear so a subsequent (non-remote) game isn't recorded under this match_id;
+    // the next remote game re-mints its own id via RemoteMatch.startGame.
+    useMpStore.getState().setRemoteMatchId(null);
     return;
   }
 
@@ -66,6 +82,7 @@ async function onFinished(state: GameState, startedAtIso: string | null): Promis
   const mine = (data.throws ?? []).filter((t) => t.player === me.name);
   const record: MatchRecord = {
     match_id: crypto.randomUUID(), mode: data.mode, opponent_id: null,
+    // Local games have no server-side opponent identity, so an opponent win is winner_id: null.
     winner_id: data.winner === me.name ? me.id : null,
     is_remote: false, darts: mine.length, total_scored: mine.reduce((s, t) => s + t.score, 0),
     started_at: data.started_at, ended_at: data.ended_at,
