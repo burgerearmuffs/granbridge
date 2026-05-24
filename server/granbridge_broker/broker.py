@@ -147,12 +147,11 @@ class BrokerServer:
             )
         return None
 
-    def _process_request(self, connection, request):
+    async def _process_request(self, connection, request):
         ip = client_ip(request.headers, connection.remote_address)
-        resp = self._http_route(request.path, ip)
+        resp = self._http_route(request.path.split("?", 1)[0], ip)
         if resp is not None:
             return resp
-        # WebSocket upgrade: per-IP connection rate limit
         if not self._conn_limiter.allow(ip, self._clock()):
             self._log.warning("rate-limited WS upgrade ip=%s", ip)
             return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
