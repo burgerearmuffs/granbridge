@@ -22,12 +22,14 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
+from urllib.parse import urlparse, parse_qs
 
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
 from granbridge_broker.http import json_response, origin_allowed
 from granbridge_broker.ratelimit import RateLimiter, client_ip
+from granbridge_broker.stats import StatsStore, ValidationError
 from granbridge_broker.turn import make_turn_credentials
 
 DEFAULT_ROOM_SIZE_CAP = 4
@@ -84,6 +86,8 @@ class BrokerServer:
         turn_rate_per_min: int = 0,
         conn_rate_per_min: int = 0,
         msg_rate_per_sec: int = 0,
+        stats_store: "StatsStore | None" = None,
+        stats_rate_per_min: int = 0,
         clock=time.time,
     ) -> None:
         self._host = host
@@ -107,6 +111,8 @@ class BrokerServer:
         self._turn_limiter = RateLimiter(turn_rate_per_min, 60.0)
         self._conn_limiter = RateLimiter(conn_rate_per_min, 60.0)
         self._msg_limiter = RateLimiter(msg_rate_per_sec, 1.0)
+        self._stats = stats_store
+        self._stats_limiter = RateLimiter(stats_rate_per_min, 60.0)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -149,6 +155,15 @@ class BrokerServer:
 
     async def _process_request(self, connection, request):
         ip = client_ip(request.headers, connection.remote_address)
+        path_only = request.path.split("?", 1)[0]
+        if self._stats is not None and path_only.startswith("/stats/"):
+            if not self._stats_limiter.allow(ip, self._clock()):
+                return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
+            return await self._handle_stats_get(path_only, request.path)
+        if self._stats is not None and path_only == "/healthz":
+            base = {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)}
+            base.update(await asyncio.to_thread(self._stats.counts))
+            return json_response(200, base)
         resp = self._http_route(request.path.split("?", 1)[0], ip)
         if resp is not None:
             return resp
@@ -161,6 +176,24 @@ class BrokerServer:
                 self._log.warning("rejected WS upgrade: forbidden origin %r", origin)
                 return json_response(403, {"error": "forbidden_origin"}, reason="Forbidden")
         return None
+
+    async def _handle_stats_get(self, path_only: str, full_path: str):
+        if path_only.startswith("/stats/player/"):
+            pid = path_only[len("/stats/player/"):]
+            if not pid:
+                return json_response(400, {"error": "missing player id"}, reason="Bad Request")
+            summary = await asyncio.to_thread(self._stats.player_summary, pid)
+            return json_response(200, summary)
+        if path_only == "/stats/leaderboard":
+            qs = parse_qs(urlparse(full_path).query)
+            metric = (qs.get("metric") or ["avg"])[0]
+            try:
+                limit = int((qs.get("limit") or ["20"])[0])
+            except ValueError:
+                limit = 20
+            board = await asyncio.to_thread(self._stats.leaderboard, metric, limit)
+            return json_response(200, {"metric": metric, "players": board})
+        return json_response(404, {"error": "not_found"}, reason="Not Found")
 
     # ------------------------------------------------------------------
     # Connection handler
