@@ -15,10 +15,11 @@ import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 import { Multiplayer } from "./views/Multiplayer";
 import { Profile } from "./views/Profile";
+import { Leaderboard } from "./views/Leaderboard";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
-type NavTab = "live" | "history" | "multiplayer" | "profile";
+type NavTab = "live" | "history" | "multiplayer" | "profile" | "leaderboard";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -113,6 +114,18 @@ export default function App() {
               >
                 Profile
               </button>
+              <button
+                onClick={() => setActiveTab("leaderboard")}
+                aria-pressed={activeTab === "leaderboard"}
+                className={[
+                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  activeTab === "leaderboard"
+                    ? "bg-amber-400 text-neutral-900"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                Leaderboard
+              </button>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -123,7 +136,9 @@ export default function App() {
         </header>
       )}
       <Banners banners={banners} />
-      {activeTab === "profile" ? (
+      {activeTab === "leaderboard" ? (
+        <Leaderboard />
+      ) : activeTab === "profile" ? (
         <Profile />
       ) : activeTab === "multiplayer" ? (
         <Multiplayer />

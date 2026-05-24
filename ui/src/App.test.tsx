@@ -12,4 +12,9 @@ describe("App with stats submission mounted", () => {
     render(<App />);
     expect(screen.getByText("GRANBRIDGE")).toBeInTheDocument();
   });
+
+  it("has a Leaderboard nav tab", () => {
+    render(<App />);
+    expect(screen.getByRole("button", { name: /leaderboard/i })).toBeInTheDocument();
+  });
 });
