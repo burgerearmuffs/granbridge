@@ -22,7 +22,14 @@ def coturn():
         capture_output=True, text=True,
     )
     assert proc.returncode == 0, proc.stderr
-    time.sleep(3)  # let coturn come up
+    for _ in range(30):
+        ok, _ = smoke.check_stun("127.0.0.1", 3478, timeout=0.5)
+        if ok:
+            break
+        time.sleep(0.5)
+    else:
+        subprocess.run(["docker", "rm", "-f", NAME], capture_output=True)
+        pytest.fail("coturn did not become reachable on UDP 3478")
     yield
     subprocess.run(["docker", "rm", "-f", NAME], capture_output=True)
 
@@ -37,3 +44,4 @@ def test_real_coturn_accepts_minted_creds(coturn):
 def test_real_coturn_rejects_bad_creds(coturn):
     ok, detail = smoke.check_turn_relay("127.0.0.1", 3478, "12345", "totally-wrong-credential")
     assert ok is False, detail
+    assert "rejected" in detail, detail

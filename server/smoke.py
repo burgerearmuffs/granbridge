@@ -138,16 +138,22 @@ def check_turn_relay(host: str, port: int, username: str, credential: str,
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(timeout)
     try:
-        sock.sendto(_build_initial_allocate(os.urandom(12)), (host, port))
+        txn1 = os.urandom(12)
+        sock.sendto(_build_initial_allocate(txn1), (host, port))
         challenge, _ = sock.recvfrom(2048)
+        if len(challenge) < 20 or challenge[8:20] != txn1:
+            return False, "turn relay: unexpected/stale challenge datagram"
         realm = _get_attr(challenge, 0x0014)
         nonce = _get_attr(challenge, 0x0015)
         if realm is None or nonce is None:
-            mt = struct.unpack(">H", challenge[:2])[0] if len(challenge) >= 2 else 0
+            mt = struct.unpack(">H", challenge[:2])[0]
             return False, f"turn relay: no realm/nonce in challenge (msg type {hex(mt)})"
         key = _long_term_key(username, realm.decode("utf-8", "replace"), credential)
-        sock.sendto(_build_authed_allocate(os.urandom(12), username, realm, nonce, key), (host, port))
+        txn2 = os.urandom(12)
+        sock.sendto(_build_authed_allocate(txn2, username, realm, nonce, key), (host, port))
         reply, _ = sock.recvfrom(2048)
+        if len(reply) < 20 or reply[8:20] != txn2:
+            return False, "turn relay: unexpected/stale reply datagram"
         mtype = struct.unpack(">H", reply[:2])[0]
         if mtype == 0x0103:  # Allocate Success
             relayed = parse_xor_mapped_address(reply, 0x0016)  # XOR-RELAYED-ADDRESS
