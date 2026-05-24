@@ -137,6 +137,8 @@ class StatsStore:
         PermissionError on token mismatch. Idempotent on (match_id, reporter_id).
         """
         validate_match(match)
+        display_name = (display_name or "")[:64]
+        avatar_color = (avatar_color or "")[:32]
         token_hash = _sha256(write_token)
         now = _utc_now()
         with _connect(self.db_path) as conn:

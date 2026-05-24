@@ -165,3 +165,52 @@ async def test_smoke_check_stats_round_trip(tmp_path):
         assert "stats" in detail
     finally:
         await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_stats_submit_unexpected_error_reports_server_error(tmp_path):
+    s, store, port = await _start(tmp_path)
+
+    def _boom(*a, **k):
+        raise RuntimeError("db exploded")
+    store.submit_match = _boom  # force an unexpected (non-Validation/Permission) error
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            await ws.send(json.dumps(_match_msg()))
+            err = json.loads(await ws.recv())
+        assert err["type"] == "error" and err["code"] == "server_error"
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_stats_player_overlong_id_is_400(tmp_path):
+    s, _, port = await _start(tmp_path)
+    try:
+        import urllib.error
+        try:
+            await _get(port, "/stats/player/" + "x" * 200)
+            assert False, "expected HTTP 400"
+        except urllib.error.HTTPError as e:
+            assert e.code == 400
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_stats_submit_rate_limited(tmp_path):
+    store = StatsStore(tmp_path / "stats.db")
+    s = BrokerServer("127.0.0.1", 0, turn_secret="sek", turn_domain="x.test",
+                     stats_store=store, stats_rate_per_min=1)  # 1 submit per minute
+    await s.start()
+    port = s._server.sockets[0].getsockname()[1]
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            await ws.send(json.dumps(_match_msg(match_id="m1")))
+            ack = json.loads(await ws.recv())
+            assert ack["type"] == "stats_ack"
+            await ws.send(json.dumps(_match_msg(match_id="m2")))  # 2nd in same window
+            err = json.loads(await ws.recv())
+        assert err["type"] == "error" and err["code"] == "rate_limited"
+    finally:
+        await s.stop()

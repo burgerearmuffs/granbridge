@@ -181,8 +181,8 @@ class BrokerServer:
         try:
             if path_only.startswith("/stats/player/"):
                 pid = path_only[len("/stats/player/"):]
-                if not pid:
-                    return json_response(400, {"error": "missing player id"}, reason="Bad Request")
+                if not pid or len(pid) > 128:
+                    return json_response(400, {"error": "bad player id"}, reason="Bad Request")
                 summary = await asyncio.to_thread(self._stats.player_summary, pid)
                 return json_response(200, summary)
             if path_only == "/stats/leaderboard":
@@ -348,11 +348,15 @@ class BrokerServer:
                     try:
                         result = await asyncio.to_thread(
                             self._stats.submit_match, pid, token, match, name, color)
-                    except ValidationError:
+                    except (ValidationError):
                         await _error(ws, "implausible", "match failed validation")
                         continue
                     except PermissionError:
                         await _error(ws, "token_mismatch", "write token does not match")
+                        continue
+                    except Exception:
+                        self._log.exception("stats_submit failed unexpectedly")
+                        await _error(ws, "server_error", "internal error processing stats")
                         continue
                     await _send(ws, {"type": "stats_ack",
                                      "match_id": result["match_id"], "verified": result["verified"]})
