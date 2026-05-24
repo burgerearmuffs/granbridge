@@ -45,3 +45,21 @@ describe("setPlayerName / setPlayerColor", () => {
     expect(JSON.parse(localStorage.getItem(KEY)!).avatar.color).toBe("#123456");
   });
 });
+
+describe("player writeToken", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("creates a writeToken for a brand-new profile", () => {
+    const p = getOrCreatePlayer();
+    expect(typeof p.writeToken).toBe("string");
+    expect(p.writeToken.length).toBeGreaterThan(0);
+  });
+
+  it("back-fills writeToken on a legacy {id,name,avatar} record and persists it", () => {
+    localStorage.setItem("granbridge.player", JSON.stringify({ id: "abc", name: "Ann", avatar: { color: "#f00" } }));
+    const p = getOrCreatePlayer();
+    expect(p.writeToken.length).toBeGreaterThan(0);
+    const again = getOrCreatePlayer();
+    expect(again.writeToken).toBe(p.writeToken); // stable across reads (persisted)
+  });
+});
