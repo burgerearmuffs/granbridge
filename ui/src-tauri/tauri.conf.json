@@ -23,7 +23,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_MINISIGN_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4MjA1OEQ5QUU5M0ZFMzEKUldReC9wT3UyVmdnK0grRUh2SHlkRUtvUmhIczZWSW81M2JkZ0lIRGpNT1lZdFJwMFBpbDhudFQK",
       "endpoints": [
         "https://github.com/burgerearmuffs/granbridge/releases/latest/download/latest.json"
       ],
