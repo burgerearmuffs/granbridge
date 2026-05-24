@@ -3,17 +3,27 @@ import { getOrCreatePlayer, setPlayerName, setPlayerColor } from "../multiplayer
 import { AVATAR_PALETTE, defaultAvatarColor } from "../multiplayer/avatar";
 import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
+import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
 
 export function Profile() {
   const [profile, setProfile] = useState(() => getOrCreatePlayer());
   const [summary, setSummary] = useState<CareerSummary | null>(null);
+  const [statsSource, setStatsSource] = useState<"server" | "local">("local");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyCareerSummary(profile.name).then((s) => { if (!cancelled) setSummary(s); });
+    (async () => {
+      try {
+        const s = await fetchPlayerSummary(profile.id);
+        if (!cancelled) { setSummary(toCareerSummary(s)); setStatsSource("server"); }
+      } catch {
+        const local = await fetchMyCareerSummary(profile.name);
+        if (!cancelled) { setSummary(local); setStatsSource("local"); }
+      }
+    })();
     return () => { cancelled = true; };
-  }, [profile.name]);
+  }, [profile.id, profile.name]);
 
   const copyId = async () => {
     try {
@@ -77,14 +87,19 @@ export function Profile() {
 
       <div>
         <h3 className="text-sm text-neutral-300 mb-2">
-          Career stats <span className="text-neutral-500">(this device)</span>
+          Career stats{" "}
+          <span className="text-neutral-500">{statsSource === "server" ? "(across devices)" : "(this device)"}</span>
         </h3>
         <div className="grid grid-cols-3 gap-3">
           <Stat label="3-Dart Avg" value={summary ? summary.threeDartAvg.toFixed(1) : "…"} />
           <Stat label="Wins" value={summary ? String(summary.wins) : "…"} />
           <Stat label="Games" value={summary ? String(summary.gamesPlayed) : "…"} />
         </div>
-        <p className="text-neutral-600 text-xs mt-2">Stats are local to this device and keyed by display name.</p>
+        <p className="text-neutral-600 text-xs mt-2">
+          {statsSource === "server"
+            ? "Synced from the stats server, keyed by your player ID."
+            : "Server unreachable — showing local stats (keyed by display name)."}
+        </p>
       </div>
     </div>
   );
