@@ -67,3 +67,40 @@ def test_solo_match_never_verifies(tmp_path):
     s = StatsStore(tmp_path / "stats.db")
     s.submit_match("P1", "t1", _match(match_id="solo", winner="P1", opponent=None, is_remote=False))
     assert s.player_summary("P1")["verified_games"] == 0
+
+
+def _verified_pair(s, match_id, winner, p_avg_total, p_darts):
+    # Two reporters co-sign `match_id`; reporter "HI" supplies darts/total for its avg.
+    s.submit_match("HI", "thi", _match(match_id=match_id, winner=winner, opponent="LO",
+                                       darts=p_darts, total=p_avg_total))
+    s.submit_match("LO", "tlo", _match(match_id=match_id, winner=winner, opponent="HI",
+                                       darts=p_darts, total=10))
+
+
+def test_leaderboard_ranks_only_verified_and_respects_min_games(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    # HI plays 3 verified matches (>= MIN_LEADERBOARD_GAMES), high avg
+    for i in range(3):
+        _verified_pair(s, f"v{i}", winner="HI", p_avg_total=180, p_darts=9)
+    # SOLO plays 5 unverified solo matches with a huge avg — must NOT appear
+    for i in range(5):
+        s.submit_match("SOLO", "ts", _match(match_id=f"s{i}", winner="SOLO",
+                                            opponent=None, is_remote=False, darts=3, total=180))
+    board = s.leaderboard(metric="avg", limit=10)
+    ids = [e["id"] for e in board]
+    assert "HI" in ids            # 3 verified games, qualifies
+    assert "SOLO" not in ids      # solo never verifies -> excluded from ranking
+    hi = next(e for e in board if e["id"] == "HI")
+    assert hi["three_dart_avg"] == 60.0  # 180 scored / 9 darts * 3
+    # NOTE: "LO" also legitimately qualifies (it co-signed 3 verified matches); we
+    # don't assert on LO here on purpose.
+
+
+def test_counts_reports_players_and_distinct_matches(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.submit_match("P1", "t1", _match(match_id="m1"))
+    s.submit_match("P2", "t2", _match(match_id="m1", opponent="P1"))  # same match, 2 reporters
+    s.submit_match("P1", "t1", _match(match_id="m2"))
+    c = s.counts()
+    assert c["players"] == 2
+    assert c["matches"] == 2  # distinct match_id

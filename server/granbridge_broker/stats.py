@@ -189,6 +189,45 @@ class StatsStore:
                      (1 if verified else 0, match_id))
         return verified
 
+    def leaderboard(self, metric: str = "avg", limit: int = 20) -> list[dict]:
+        if metric not in ("avg", "wins"):
+            metric = "avg"
+        limit = max(1, min(int(limit), 100))
+        with _connect(self.db_path) as conn:
+            rows = conn.execute("""
+                SELECT m.reporter_id AS id,
+                       COUNT(*) AS games,
+                       SUM(CASE WHEN m.winner_id = m.reporter_id THEN 1 ELSE 0 END) AS wins,
+                       COALESCE(SUM(m.darts), 0) AS darts,
+                       COALESCE(SUM(m.total_scored), 0) AS total_scored,
+                       p.display_name AS display_name,
+                       p.avatar_color AS avatar_color
+                FROM matches m
+                LEFT JOIN players p ON p.id = m.reporter_id
+                WHERE m.verified = 1
+                GROUP BY m.reporter_id
+                HAVING games >= ?
+            """, (MIN_LEADERBOARD_GAMES,)).fetchall()
+        out = []
+        for r in rows:
+            darts = r["darts"] or 0
+            total = r["total_scored"] or 0
+            out.append({
+                "id": r["id"], "display_name": r["display_name"],
+                "avatar_color": r["avatar_color"], "games": r["games"],
+                "wins": r["wins"] or 0,
+                "three_dart_avg": round(total / darts * 3, 2) if darts else 0.0,
+            })
+        out.sort(key=(lambda e: e["wins"]) if metric == "wins" else (lambda e: e["three_dart_avg"]),
+                 reverse=True)
+        return out[:limit]
+
+    def counts(self) -> dict:
+        with _connect(self.db_path) as conn:
+            players = conn.execute("SELECT COUNT(*) AS c FROM players").fetchone()["c"]
+            matches = conn.execute("SELECT COUNT(DISTINCT match_id) AS c FROM matches").fetchone()["c"]
+        return {"players": players, "matches": matches}
+
     def player_summary(self, player_id: str) -> dict:
         with _connect(self.db_path) as conn:
             prow = conn.execute(
