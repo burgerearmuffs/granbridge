@@ -21,9 +21,21 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_MINISIGN_PUBLIC_KEY",
+      "endpoints": [
+        "https://github.com/burgerearmuffs/granbridge/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
+    "createUpdaterArtifacts": true,
     "externalBin": ["binaries/granbridge"],
     "icon": ["icons/icon.ico", "icons/32x32.png", "icons/128x128.png"]
   }
