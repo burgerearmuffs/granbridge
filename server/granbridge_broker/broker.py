@@ -322,6 +322,36 @@ class BrokerServer:
                                     "payload": payload,
                                 })
 
+                # ---- stats_submit -------------------------------------
+                elif mtype == "stats_submit":
+                    if self._stats is None:
+                        await _error(ws, "unsupported", "stats not enabled")
+                        continue
+                    if not self._stats_limiter.allow(peer_id, self._clock()):
+                        await _error(ws, "rate_limited", "too many submissions")
+                        continue
+                    pid = msg.get("id")
+                    token = msg.get("writeToken")
+                    match = msg.get("match")
+                    if not isinstance(pid, str) or not pid or not isinstance(token, str) or not token:
+                        await _error(ws, "bad_request", "stats_submit missing id/writeToken")
+                        continue
+                    player = msg.get("player") if isinstance(msg.get("player"), dict) else {}
+                    name = player.get("name", "") if isinstance(player.get("name"), str) else ""
+                    avatar = player.get("avatar") if isinstance(player.get("avatar"), dict) else {}
+                    color = avatar.get("color", "") if isinstance(avatar.get("color"), str) else ""
+                    try:
+                        result = await asyncio.to_thread(
+                            self._stats.submit_match, pid, token, match, name, color)
+                    except ValidationError:
+                        await _error(ws, "implausible", "match failed validation")
+                        continue
+                    except PermissionError:
+                        await _error(ws, "token_mismatch", "write token does not match")
+                        continue
+                    await _send(ws, {"type": "stats_ack",
+                                     "match_id": result["match_id"], "verified": result["verified"]})
+
                 # ---- leave -----------------------------------------------
                 elif mtype == "leave":
                     break  # triggers finally cleanup below
