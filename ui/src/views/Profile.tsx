@@ -32,11 +32,16 @@ export function Profile() {
   }, [profile.id, profile.name]);
 
   const exportKey = async () => {
+    const key = exportRecoveryKey(profile);
     try {
-      await navigator.clipboard?.writeText(exportRecoveryKey(profile));
+      if (!navigator.clipboard) throw new Error("no clipboard");
+      await navigator.clipboard.writeText(key);
       setKeyCopied(true);
+      setKeyError(null);
       setTimeout(() => setKeyCopied(false), 1500);
-    } catch { /* ignore */ }
+    } catch {
+      setKeyError("Clipboard unavailable — copy your key manually: " + key);
+    }
   };
   const restoreKey = () => {
     try {
@@ -149,18 +154,22 @@ export function Profile() {
       <div>
         <h3 className="text-sm text-neutral-300 mb-2">
           Career stats{" "}
-          <span className="text-neutral-500">{statsSource === "server" ? "(across devices)" : "(this device)"}</span>
+          {summary && (
+            <span className="text-neutral-500">{statsSource === "server" ? "(across devices)" : "(this device)"}</span>
+          )}
         </h3>
         <div className="grid grid-cols-3 gap-3">
           <Stat label="3-Dart Avg" value={summary ? summary.threeDartAvg.toFixed(1) : "…"} />
           <Stat label="Wins" value={summary ? String(summary.wins) : "…"} />
           <Stat label="Games" value={summary ? String(summary.gamesPlayed) : "…"} />
         </div>
-        <p className="text-neutral-600 text-xs mt-2">
-          {statsSource === "server"
-            ? "Synced from the stats server, keyed by your player ID."
-            : "Server unreachable — showing local stats (keyed by display name)."}
-        </p>
+        {summary && (
+          <p className="text-neutral-600 text-xs mt-2">
+            {statsSource === "server"
+              ? "Synced from the stats server, keyed by your player ID."
+              : "Server unreachable — showing local stats (keyed by display name)."}
+          </p>
+        )}
       </div>
     </div>
   );

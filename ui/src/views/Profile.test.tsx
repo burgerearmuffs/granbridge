@@ -93,4 +93,14 @@ describe("Profile view", () => {
     expect(localStorage.getItem("granbridge.uploadStats")).toBe("false");
     expect((toggle as HTMLInputElement).checked).toBe(false);
   });
+
+  it("shows an error for a malformed recovery key", async () => {
+    mockFetch({ player: { three_dart_avg: 0, wins: 0, games_played: 0 } });
+    await act(async () => { render(<Profile />); });
+    await act(async () => {
+      fireEvent.change(screen.getByRole("textbox", { name: /recovery key/i }), { target: { value: "not-a-valid-key" } });
+      fireEvent.click(screen.getByRole("button", { name: /^restore$/i }));
+    });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
 });

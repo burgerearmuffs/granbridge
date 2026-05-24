@@ -47,4 +47,23 @@ describe("Leaderboard", () => {
     render(<Leaderboard />);
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
   });
+
+  it("ignores a slow avg response that resolves after switching to wins", async () => {
+    let resolveAvg!: (v: unknown) => void;
+    const gate = new Promise<unknown>((r) => { resolveAvg = r; });
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.includes("metric=wins")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ metric: "wins", players: [
+          { id: "p2", display_name: "Bob", avatar_color: "#0f0", games: 9, wins: 8, three_dart_avg: 40 }] }) });
+      }
+      return gate.then(() => ({ ok: true, json: () => Promise.resolve({ metric: "avg", players: [
+        { id: "p1", display_name: "Ann", avatar_color: "#f00", games: 5, wins: 3, three_dart_avg: 62.5 }] }) }));
+    }) as unknown as typeof globalThis.fetch);
+    render(<Leaderboard />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /wins/i })); });
+    await waitFor(() => expect(screen.getByText("Bob")).toBeInTheDocument());
+    await act(async () => { resolveAvg(null); await Promise.resolve(); });
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.queryByText("Ann")).not.toBeInTheDocument();
+  });
 });
