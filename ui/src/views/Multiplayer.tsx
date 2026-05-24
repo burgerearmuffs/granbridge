@@ -31,6 +31,16 @@ import { defaultAvatarColor } from "../multiplayer/avatar";
 import { fetchMyCareerSummary } from "../multiplayer/careerSummary";
 import type { Profile } from "../multiplayer/player";
 import type { CareerSummary } from "../multiplayer/careerSummary";
+import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
+
+/** Prefer the opponent's server career summary; fall back to the data-channel one. */
+export async function resolveOpponentSummary(opponentId: string, fallback: CareerSummary): Promise<CareerSummary> {
+  try {
+    return toCareerSummary(await fetchPlayerSummary(opponentId));
+  } catch {
+    return fallback;
+  }
+}
 
 // keyed by broker peer_id
 type StreamMap = Map<string, MediaStream>;
@@ -83,7 +93,11 @@ export function Multiplayer() {
       bridge: bridgeLink,
       applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
       selfCard: selfCardRef.current,
-      onOpponentCard: (profile, summary) => setOpponentCard({ profile, summary }),
+      onOpponentCard: (profile, summary) => {
+        void resolveOpponentSummary(profile.id, summary).then((resolved) =>
+          setOpponentCard({ profile, summary: resolved }),
+        );
+      },
       onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
     });
     rm.start();
