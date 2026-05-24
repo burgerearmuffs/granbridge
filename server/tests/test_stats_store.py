@@ -41,3 +41,29 @@ def test_implausible_match_rejected(tmp_path):
     s = StatsStore(tmp_path / "stats.db")
     with pytest.raises(ValidationError):
         s.submit_match("P1", "tok-1", _match(darts=3, total=181))  # > darts*60
+
+
+def test_match_verifies_when_both_report_same_winner(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    # P1 reports the match (winner P1); not yet verified (only one reporter)
+    out1 = s.submit_match("P1", "t1", _match(match_id="shared", winner="P1", opponent="P2"))
+    assert out1["verified"] is False
+    # P2 reports the SAME match_id, same winner -> verifies both rows
+    out2 = s.submit_match("P2", "t2", _match(match_id="shared", winner="P1", opponent="P1"))
+    assert out2["verified"] is True
+    assert s.player_summary("P1")["verified_games"] == 1
+    assert s.player_summary("P2")["verified_games"] == 1
+
+
+def test_disagreeing_winners_stay_unverified(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.submit_match("P1", "t1", _match(match_id="dispute", winner="P1", opponent="P2"))
+    s.submit_match("P2", "t2", _match(match_id="dispute", winner="P2", opponent="P1"))
+    assert s.player_summary("P1")["verified_games"] == 0
+    assert s.player_summary("P2")["verified_games"] == 0
+
+
+def test_solo_match_never_verifies(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.submit_match("P1", "t1", _match(match_id="solo", winner="P1", opponent=None, is_remote=False))
+    assert s.player_summary("P1")["verified_games"] == 0
