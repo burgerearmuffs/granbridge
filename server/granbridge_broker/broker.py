@@ -136,12 +136,12 @@ class BrokerServer:
     # HTTP (same port as the WebSocket) — health + TURN credentials
     # ------------------------------------------------------------------
 
+    def _healthz_base(self) -> dict:
+        return {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)}
+
     def _http_route(self, path: str, ip: str = "-"):
         if path == "/healthz":
-            return json_response(
-                200,
-                {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)},
-            )
+            return json_response(200, self._healthz_base())
         if path == "/turn":
             if not self._turn_limiter.allow(ip, self._clock()):
                 return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
@@ -161,10 +161,10 @@ class BrokerServer:
                 return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
             return await self._handle_stats_get(path_only, request.path)
         if self._stats is not None and path_only == "/healthz":
-            base = {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)}
+            base = self._healthz_base()
             base.update(await asyncio.to_thread(self._stats.counts))
             return json_response(200, base)
-        resp = self._http_route(request.path.split("?", 1)[0], ip)
+        resp = self._http_route(path_only, ip)
         if resp is not None:
             return resp
         if not self._conn_limiter.allow(ip, self._clock()):
@@ -178,22 +178,27 @@ class BrokerServer:
         return None
 
     async def _handle_stats_get(self, path_only: str, full_path: str):
-        if path_only.startswith("/stats/player/"):
-            pid = path_only[len("/stats/player/"):]
-            if not pid:
-                return json_response(400, {"error": "missing player id"}, reason="Bad Request")
-            summary = await asyncio.to_thread(self._stats.player_summary, pid)
-            return json_response(200, summary)
-        if path_only == "/stats/leaderboard":
-            qs = parse_qs(urlparse(full_path).query)
-            metric = (qs.get("metric") or ["avg"])[0]
-            try:
-                limit = int((qs.get("limit") or ["20"])[0])
-            except ValueError:
-                limit = 20
-            board = await asyncio.to_thread(self._stats.leaderboard, metric, limit)
-            return json_response(200, {"metric": metric, "players": board})
-        return json_response(404, {"error": "not_found"}, reason="Not Found")
+        try:
+            if path_only.startswith("/stats/player/"):
+                pid = path_only[len("/stats/player/"):]
+                if not pid:
+                    return json_response(400, {"error": "missing player id"}, reason="Bad Request")
+                summary = await asyncio.to_thread(self._stats.player_summary, pid)
+                return json_response(200, summary)
+            if path_only == "/stats/leaderboard":
+                qs = parse_qs(urlparse(full_path).query)
+                metric = (qs.get("metric") or ["avg"])[0]
+                if metric not in ("avg", "wins"):
+                    metric = "avg"
+                try:
+                    limit = int((qs.get("limit") or ["20"])[0])
+                except ValueError:
+                    limit = 20
+                board = await asyncio.to_thread(self._stats.leaderboard, metric, limit)
+                return json_response(200, {"metric": metric, "players": board})
+            return json_response(404, {"error": "not_found"}, reason="Not Found")
+        except Exception:
+            return json_response(500, {"error": "internal_error"}, reason="Internal Server Error")
 
     # ------------------------------------------------------------------
     # Connection handler

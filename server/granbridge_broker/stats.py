@@ -61,10 +61,12 @@ def validate_match(match: object) -> None:
         v = match.get(key)
         if v is not None and (not isinstance(v, str) or len(v) > 64):
             raise ValidationError(f"bad {key}")
-    for key in ("started_at", "ended_at"):
-        v = match.get(key)
-        if v is not None and (not isinstance(v, str) or len(v) > 40):
-            raise ValidationError(f"bad {key}")
+    started = match.get("started_at")
+    if not isinstance(started, str) or not (1 <= len(started) <= 40):
+        raise ValidationError("bad started_at")   # required: NOT NULL column + direct access below
+    ended = match.get("ended_at")
+    if ended is not None and (not isinstance(ended, str) or len(ended) > 40):
+        raise ValidationError("bad ended_at")
     throws = match.get("throws")
     if throws is not None:
         if not isinstance(throws, list) or len(throws) > MAX_THROWS:
