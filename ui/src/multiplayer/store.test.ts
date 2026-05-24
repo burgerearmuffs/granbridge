@@ -94,3 +94,25 @@ describe("readBrokerUrl default", () => {
     expect(readBrokerUrl()).toBe("ws://127.0.0.1:8788");
   });
 });
+
+describe("useMpStore session fields", () => {
+  beforeEach(() => useMpStore.getState().resetMp());
+
+  it("defaults connectionHealth to 'connected' and streams empty", () => {
+    const s = useMpStore.getState();
+    expect(s.connectionHealth).toBe("connected");
+    expect(s.localStream).toBeNull();
+    expect(s.remoteStreams.size).toBe(0);
+    expect(s.opponentCard).toBeNull();
+  });
+
+  it("setRemoteStream adds by peer id; resetMp clears everything", () => {
+    const fake = {} as MediaStream;
+    useMpStore.getState().setRemoteStream("peerA", fake);
+    useMpStore.getState().setConnectionHealth("reconnecting");
+    expect(useMpStore.getState().remoteStreams.get("peerA")).toBe(fake);
+    useMpStore.getState().resetMp();
+    expect(useMpStore.getState().remoteStreams.size).toBe(0);
+    expect(useMpStore.getState().connectionHealth).toBe("connected");
+  });
+});
