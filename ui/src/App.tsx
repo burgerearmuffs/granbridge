@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGranbridgeSocket } from "./useGranbridgeSocket";
 import { useStore } from "./store";
 import { Setup } from "./views/Setup";
@@ -15,6 +15,8 @@ import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 import { Multiplayer } from "./views/Multiplayer";
 import { Profile } from "./views/Profile";
+import { useStatsSubmission } from "./stats/useStatsSubmission";
+import { flush as flushStatsQueue } from "./stats/statsQueue";
 
 type NavTab = "live" | "history" | "multiplayer" | "profile";
 
@@ -26,6 +28,8 @@ export default function App() {
   const playing = gameState && gameState.status === "in_progress";
   const kiosk = new URLSearchParams(location.search).has("kiosk");
   const [activeTab, setActiveTab] = useState<NavTab>("live");
+  useStatsSubmission();
+  useEffect(() => { void flushStatsQueue(); }, []);
 
   // CheckoutOverlay owns the game_won "GAME SHOT" moment.
   // Confetti Celebration is kept for leg_won only to avoid double-celebration.

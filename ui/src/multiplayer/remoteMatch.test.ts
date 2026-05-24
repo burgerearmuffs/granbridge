@@ -145,7 +145,9 @@ describe("RemoteMatch guest", () => {
   });
 });
 
-const PROFILE: Profile = { id: "id-h", name: "Host", avatar: { color: "#f59e0b" } };
+const PROFILE: Profile = { id: "id-h", name: "Host", avatar: { color: "#f59e0b" }, writeToken: "tok" };
+// Wire-safe profile — writeToken is intentionally stripped before sending over the data channel.
+const WIRE_PROFILE = { id: PROFILE.id, name: PROFILE.name, avatar: PROFILE.avatar };
 const SUMMARY: CareerSummary = { threeDartAvg: 60, wins: 2, gamesPlayed: 5 };
 
 describe("RemoteMatch card exchange", () => {
@@ -154,14 +156,14 @@ describe("RemoteMatch card exchange", () => {
     new RemoteMatch({ role: "host", peer, bridge, applyState: () => {}, selfCard: { profile: PROFILE, summary: SUMMARY } }).start();
     peer.sent.length = 0;
     peer.fireOpen();
-    expect(peer.sent).toContainEqual({ t: "card", profile: PROFILE, summary: SUMMARY });
+    expect(peer.sent).toContainEqual({ t: "card", profile: WIRE_PROFILE, summary: SUMMARY });
   });
 
   it("guest sends its card on channel open when selfCard is set", () => {
     const peer = fakePeer(); const bridge = fakeBridge();
     new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {}, selfCard: { profile: PROFILE, summary: SUMMARY } }).start();
     peer.fireOpen();
-    expect(peer.sent).toEqual([{ t: "card", profile: PROFILE, summary: SUMMARY }]);
+    expect(peer.sent).toEqual([{ t: "card", profile: WIRE_PROFILE, summary: SUMMARY }]);
   });
 
   it("does not send a card when selfCard is absent", () => {

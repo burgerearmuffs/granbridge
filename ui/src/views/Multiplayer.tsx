@@ -84,6 +84,7 @@ export function Multiplayer() {
       applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
       selfCard: selfCardRef.current,
       onOpponentCard: (profile, summary) => setOpponentCard({ profile, summary }),
+      onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
     });
     rm.start();
     rmRef.current = rm;
