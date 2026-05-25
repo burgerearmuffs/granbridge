@@ -36,7 +36,7 @@ services:
     command:
       - |
         if [ -n "$$ACME_EMAIL" ]; then
-          sed "0,/^{/s//{\n\temail $$ACME_EMAIL/" /etc/caddy/Caddyfile > /tmp/Caddyfile
+          awk -v e="$$ACME_EMAIL" '{print} (ins==0 && $$0=="{"){print "\temail " e; ins=1}' /etc/caddy/Caddyfile > /tmp/Caddyfile
           exec caddy run --config /tmp/Caddyfile --adapter caddyfile
         fi
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
