@@ -1,19 +1,57 @@
 import { useEffect, useState } from "react";
-import { getOrCreatePlayer, setPlayerName, setPlayerColor } from "../multiplayer/player";
+import { getOrCreatePlayer, setPlayerName, setPlayerColor, applyRecoveryKey } from "../multiplayer/player";
 import { AVATAR_PALETTE, defaultAvatarColor } from "../multiplayer/avatar";
 import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
+import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
+import { exportRecoveryKey } from "../multiplayer/recoveryKey";
+import { getUploadEnabled, setUploadEnabled } from "../stats/uploadPref";
 
 export function Profile() {
   const [profile, setProfile] = useState(() => getOrCreatePlayer());
   const [summary, setSummary] = useState<CareerSummary | null>(null);
+  const [statsSource, setStatsSource] = useState<"server" | "local">("local");
   const [copied, setCopied] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [upload, setUpload] = useState(() => getUploadEnabled());
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyCareerSummary(profile.name).then((s) => { if (!cancelled) setSummary(s); });
+    (async () => {
+      try {
+        const s = await fetchPlayerSummary(profile.id);
+        if (!cancelled) { setSummary(toCareerSummary(s)); setStatsSource("server"); }
+      } catch {
+        const local = await fetchMyCareerSummary(profile.name);
+        if (!cancelled) { setSummary(local); setStatsSource("local"); }
+      }
+    })();
     return () => { cancelled = true; };
-  }, [profile.name]);
+  }, [profile.id, profile.name]);
+
+  const exportKey = async () => {
+    const key = exportRecoveryKey(profile);
+    try {
+      if (!navigator.clipboard) throw new Error("no clipboard");
+      await navigator.clipboard.writeText(key);
+      setKeyCopied(true);
+      setKeyError(null);
+      setTimeout(() => setKeyCopied(false), 1500);
+    } catch {
+      setKeyError("Clipboard unavailable — copy your key manually: " + key);
+    }
+  };
+  const restoreKey = () => {
+    try {
+      setProfile(applyRecoveryKey(keyInput.trim()));
+      setKeyError(null);
+      setKeyInput("");
+    } catch {
+      setKeyError("That doesn't look like a valid recovery key.");
+    }
+  };
 
   const copyId = async () => {
     try {
@@ -75,16 +113,63 @@ export function Profile() {
         </div>
       </div>
 
+      <div className="border-t border-neutral-800 pt-4">
+        <h3 className="text-sm text-neutral-300 mb-1">Recovery key</h3>
+        <p className="text-neutral-600 text-xs mb-2">
+          Back this up to restore your stats on another device. Restoring replaces this device's identity.
+        </p>
+        <div className="flex items-center gap-2">
+          <button onClick={exportKey} aria-label="Export recovery key" className="text-xs text-amber-300 underline">
+            {keyCopied ? "Copied" : "Export recovery key"}
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            aria-label="Recovery key"
+            placeholder="Paste a recovery key"
+            className="flex-1 bg-neutral-800 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <button onClick={restoreKey} aria-label="Restore" className="text-xs text-amber-300 underline">Restore</button>
+        </div>
+        {keyError && <p role="alert" className="text-red-300 text-xs mt-1">{keyError}</p>}
+      </div>
+
+      <div className="border-t border-neutral-800 pt-4">
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={upload}
+            onChange={(e) => { setUploadEnabled(e.target.checked); setUpload(e.target.checked); }}
+            aria-label="Upload my stats to the server"
+            className="accent-amber-400 w-4 h-4"
+          />
+          <span className="text-sm text-neutral-300">Upload my stats to the server</span>
+        </label>
+        <p className="text-neutral-600 text-xs mt-1">When off, finished games stay on this device only.</p>
+      </div>
+
       <div>
         <h3 className="text-sm text-neutral-300 mb-2">
-          Career stats <span className="text-neutral-500">(this device)</span>
+          Career stats{" "}
+          {summary && (
+            <span className="text-neutral-500">{statsSource === "server" ? "(across devices)" : "(this device)"}</span>
+          )}
         </h3>
         <div className="grid grid-cols-3 gap-3">
           <Stat label="3-Dart Avg" value={summary ? summary.threeDartAvg.toFixed(1) : "…"} />
           <Stat label="Wins" value={summary ? String(summary.wins) : "…"} />
           <Stat label="Games" value={summary ? String(summary.gamesPlayed) : "…"} />
         </div>
-        <p className="text-neutral-600 text-xs mt-2">Stats are local to this device and keyed by display name.</p>
+        {summary && (
+          <p className="text-neutral-600 text-xs mt-2">
+            {statsSource === "server"
+              ? "Synced from the stats server, keyed by your player ID."
+              : "Server unreachable — showing local stats (keyed by display name)."}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -122,6 +122,21 @@ describe("BrokerClient — receiving", () => {
     expect(cb).toHaveBeenCalledWith(peers);
   });
 
+  it("fans out 'peers' to all onPeers subscribers", () => {
+    const bc = new BrokerClient("ws://test");
+    const a: number[] = [];
+    const b: number[] = [];
+    bc.onPeers((peers) => a.push(peers.length));
+    bc.onPeers((peers) => b.push(peers.length));
+    bc.connect();
+    MockWS.last.open();
+
+    MockWS.last.receive({ type: "peers", peers: [{ peer_id: "z", player: { id: "p2", name: "G" } }] });
+
+    expect(a).toEqual([1]);
+    expect(b).toEqual([1]);
+  });
+
   it("incoming 'signal' fires onSignal with from + data", () => {
     const cb = vi.fn();
     const bc = new BrokerClient("ws://test");

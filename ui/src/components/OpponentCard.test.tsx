@@ -6,7 +6,7 @@ describe("OpponentCard", () => {
   it("renders the opponent name, avatar, and stats", () => {
     render(
       <OpponentCard
-        profile={{ id: "id2", name: "Bob", avatar: { color: "#3b82f6" } }}
+        profile={{ id: "id2", name: "Bob", avatar: { color: "#3b82f6" }, writeToken: "tok" }}
         summary={{ threeDartAvg: 48.6, wins: 4, gamesPlayed: 9 }}
       />,
     );

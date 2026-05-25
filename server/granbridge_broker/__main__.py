@@ -18,6 +18,8 @@ async def _main() -> None:
     )
     log = logging.getLogger("granbridge.broker")
     cfg = from_env()
+    from granbridge_broker.stats import StatsStore
+    stats_store = StatsStore(cfg.stats_db_path) if cfg.stats_db_path else None
     server = BrokerServer(
         cfg.host,
         cfg.port,
@@ -31,6 +33,8 @@ async def _main() -> None:
         turn_rate_per_min=cfg.turn_rate_per_min,
         conn_rate_per_min=cfg.conn_rate_per_min,
         msg_rate_per_sec=cfg.msg_rate_per_sec,
+        stats_store=stats_store,
+        stats_rate_per_min=cfg.stats_rate_per_min,
     )
     loop = asyncio.get_running_loop()
     stop = loop.create_future()
@@ -48,8 +52,9 @@ async def _main() -> None:
 
     await server.start()
     log.info(
-        "broker listening host=%s port=%s domain=%s max_rooms=%s origins=%s",
+        "broker listening host=%s port=%s domain=%s max_rooms=%s origins=%s stats=%s",
         cfg.host, cfg.port, cfg.turn_domain, cfg.max_rooms, cfg.allowed_origins,
+        bool(stats_store),
     )
 
     try:

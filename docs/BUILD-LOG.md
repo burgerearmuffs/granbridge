@@ -350,3 +350,131 @@ Plan `docs/superpowers/plans/2026-05-23-turn-relay-check.md`. Built on `turn-rel
   and attribute encoding are all correct. Skipped automatically when Docker is absent.
 - **Server suite total: 47 passed** (41 prior + 6 new: 4 pure unit tests + 2 docker-gated
   integration tests). Main Python suite 193 passed (no regressions); UI suite 232 passed.
+
+### Server-side stats backend (2026-05-24, branch `server-side-stats`)
+
+Spec `docs/superpowers/specs/2026-05-24-server-side-stats-design.md`; plan
+`docs/superpowers/plans/2026-05-24-server-side-stats-backend.md`.
+
+- **`StatsStore`** (`server/granbridge_broker/stats.py`) — SQLite-backed, identity-keyed match
+  stats. Schema: `players` (TOFU token hash, display name, avatar), `matches` (per-reporter summary
+  row + co-sign verification), `match_throws` (optional per-dart heatmap rows). WAL mode; one
+  connection per call (safe for `asyncio.to_thread`). Persisted to the `data` Docker named volume
+  at `STATS_DB_PATH=/data/stats.db`.
+- **Write path:** `stats_submit` WebSocket message (WS used instead of `POST` because
+  `websockets 15`'s `process_request` cannot read an HTTP body). TOFU auth: first writer for a
+  player id registers `sha256(token)`; all later writes must match. Sanity caps: `darts ≤ 5000`,
+  `total_scored ≤ darts × 60` (bounding 3-dart avg to ≤ 180). Reply: `stats_ack` on success or
+  `error` with codes `token_mismatch`, `implausible`, `unsupported`, `rate_limited`, `bad_request`.
+- **Read path:** `GET /stats/player/{id}` (summary + heatmap) and `GET /stats/leaderboard`
+  (verified-only, min 3 verified games, sortable by `avg` or `wins`). Both served on the broker's
+  single port via `_process_request`.
+- **Verified matches:** a match is co-signed when two reporters submit the same `match_id` with
+  the same `winner_id`; disagreeing reporters remain unverified. Solo matches never verify. Only
+  verified matches appear on the leaderboard — preventing stat inflation from uncontested
+  submissions.
+- **Refinements vs. spec:** (1) writes are a WS `stats_submit` message, not `POST /stats/submit`
+  — required by `websockets 15`'s `process_request` design; (2) `matches` carries summary columns
+  (`darts`, `total_scored`); per-throw `match_throws` is optional (stored only when supplied) —
+  this resolves the spec's guest-recording open item: a guest can submit an aggregate contribution
+  without server-side guest recording.
+- **`/healthz`** now returns `players` and `matches` counts when stats are enabled.
+- **`smoke.py`** extended with `check_stats`: submits a throwaway match over WS then reads it
+  back via `GET /stats/player/{id}`, confirming the full round-trip.
+- **Ops:** `data` named volume in `docker-compose.yml` mounted at `/data`; `STATS_DB_PATH` and
+  `STATS_RATE_PER_MIN` (default 30) env vars; documented in `server/README.md` (wire shapes,
+  TOFU auth, backup: `docker compose cp broker:/data/stats.db ./stats-backup.db`).
+- **Tests:** 19 new server tests across `test_stats_store.py` (9: schema/TOFU/idempotency/
+  validation/verification), `test_stats_api.py` (9: HTTP GET reads, WS submit/ack/errors,
+  smoke round-trip), `test_stats_integration.py` (1: persistence across StatsStore reopen,
+  simulating container restart on a mounted volume). **Server suite: 66 passed** (47 prior +
+  19 new). Main Python suite 193 passed (no regressions); UI suite 232 passed.
+- **Client integration is Plan 2** (app `export/latest`, UI identity/recovery-key/match-id/
+  stats-client/offline-queue, Profile/Multiplayer/Leaderboard surfaces, upload toggle).
+
+### Client stats ingestion — Plan 2a (2026-05-24, branch `server-side-stats-client`)
+
+Spec `docs/superpowers/specs/2026-05-24-server-side-stats-client-design.md`; plan
+`docs/superpowers/plans/2026-05-24-server-side-stats-client-2a-foundation.md`.
+
+- **`writeToken` identity + recovery-key codec** — `ui/src/multiplayer/player.ts` gains a
+  `writeToken` UUID persisted in `Profile` (with a migration that generates one for existing
+  profiles). `ui/src/multiplayer/recoveryKey.ts` is a pure, stateless encode/decode codec
+  (base64url over `player_id:writeToken`) — no persistence, no side effects.
+- **`statsClient`** (`ui/src/stats/statsClient.ts`) — `brokerHttpBase` derives the HTTP origin
+  from the WS URL. `submitMatch` opens a transient WebSocket, sends `stats_submit`, and resolves
+  on `stats_ack` (or rejects on `error`). `fetchPlayerSummary` and `fetchLeaderboard` are plain
+  HTTP GETs to `/stats/player/{id}` and `/stats/leaderboard`.
+- **Offline `statsQueue`** (`ui/src/stats/statsQueue.ts`) — localStorage FIFO keyed by match id.
+  `enqueue` adds an entry tagged as `terminal` (local full-throw match) or `transient` (remote
+  aggregate). `flushStatsQueue` drains the queue serially (promise-chain, one at a time): transient
+  entries are discarded if submission fails; terminal entries are retried on the next flush. This
+  ensures at-least-once delivery for fully-owned matches while never blocking the UI.
+- **`uploadPref` toggle** (`ui/src/stats/uploadPref.ts`) — `getUploadEnabled`/`setUploadEnabled`
+  backed by `localStorage`; defaults to `true`. Checked by the submission hook before any network
+  call.
+- **`/api/history/export/latest` endpoint** — `src/granbridge/history/store.py` gains
+  `export_latest_match()` (returns the most recent finished match from the history SQLite store as
+  a `MatchRecord`-shaped dict). `src/granbridge/cli.py` registers the route
+  `GET /api/history/export/latest`; the UI calls this to assemble the full-throws payload for
+  local matches. Covered by `tests/test_history_export.py` (2 tests).
+- **Host-minted shared remote `match_id`** — `ui/src/multiplayer/remoteMatch.ts` gains a
+  `{t:"matchid", id}` `SyncMsg` and `onMatchId` callback. The host generates a UUID and broadcasts
+  it to the guest over the existing data channel at game-start. `writeToken` is deliberately
+  stripped from the data-channel profile card before send — it never leaves the local browser.
+  `ui/src/multiplayer/store.ts` tracks `remoteMatchId` with `setRemoteMatchId` and clears it in
+  `resetMp`.
+- **`useStatsSubmission` hook** (`ui/src/stats/useStatsSubmission.ts`) — mounted once in
+  `App.tsx`. Watches for `gamePhase === "finished"`. Two assembly paths: (1) **local** — fetches
+  full throws from `/api/history/export/latest` and enqueues a `terminal` entry; (2) **remote** —
+  builds an aggregate-only `MatchRecord` (darts + total\_scored, no per-throw data) from the
+  Zustand game store and enqueues a `transient` entry keyed on `remoteMatchId`. Remote stats are
+  intentionally aggregate-only — no per-segment heatmap is ever sent for multiplayer matches.
+  After a remote submission, `remoteMatchId` is cleared in the store. The hook also fires
+  `flushStatsQueue()` on startup (via `useEffect` in `App.tsx`) to drain any entries left over
+  from a previous session.
+- **Tests:** new files `recoveryKey.test.ts`, `statsClient.test.ts`, `statsQueue.test.ts`,
+  `uploadPref.test.ts`, `useStatsSubmission.test.tsx`, `store.remoteMatch.test.ts`,
+  `remoteMatch.matchid.test.ts`; existing player + App tests extended. **UI suite: 260 passed**
+  (232 prior + 28 new). Python export suite: 2 passed. Server suite: 71 passed (no regressions).
+- **Plan 2b (surfaces) is next:** Profile recovery UI + server-stats card + upload-toggle control,
+  opponent card populated from `/stats/player/{id}`, and a full Leaderboard view.
+
+### Client stats surfaces — Plan 2b (2026-05-24, branch `server-side-stats-client-2b`)
+
+Spec `docs/superpowers/specs/2026-05-24-server-side-stats-client-design.md` (§7–9); plan
+`docs/superpowers/plans/2026-05-24-server-side-stats-client-2b-surfaces.md`.
+
+- **`toCareerSummary` mapper** — `ui/src/stats/statsClient.ts` gains `toCareerSummary(PlayerSummary):
+  CareerSummary` (defensive: gracefully handles missing / zero denominator). Shared by Profile and
+  Multiplayer so the rest of the UI consumes the existing `CareerSummary` shape regardless of data source.
+- **Profile — server career card** — `Profile.tsx` now calls `fetchPlayerSummary` on mount, maps the
+  result via `toCareerSummary`, and displays the server career stats (3-dart avg, wins, games played).
+  Falls back to the local `fetchMyCareerSummary` result when the broker is unreachable, so the card
+  always renders.
+- **Profile — recovery-key export/import** — a "Backup / restore your identity" panel: Export copies
+  the base64url recovery key to the clipboard; Import accepts a paste of the recovery key and calls
+  `applyRecoveryKey`, migrating the profile in-place. Errors are shown inline; the panel is read-only
+  until the user clicks "Show / change".
+- **Profile — upload toggle** — a checkbox ("Share stats with the server") backed by
+  `getUploadEnabled`/`setUploadEnabled`. Matches the upload pref the submission hook already reads.
+- **In-match opponent card — server-preferred** — `Multiplayer.tsx` enriches the opponent card by
+  calling `fetchPlayerSummary` for the peer's player id when the card arrives over the data channel.
+  Falls back to the data-channel `CareerSummary` payload when the fetch fails or the broker is
+  unreachable, so the card is always shown.
+- **Leaderboard view** (`ui/src/views/Leaderboard.tsx`) — standalone view: calls `fetchLeaderboard`
+  on mount, displays a ranked table (rank, avatar, display name, 3-dart avg, wins, games) for verified
+  players only, with an avg/wins toggle to switch the sort metric. Shows a loading state while fetching
+  and an empty-state message when no verified players exist yet.
+- **Leaderboard nav tab** — `App.tsx` adds a `"leaderboard"` tab to the bottom nav bar and a render
+  branch that shows `<Leaderboard />` when active.
+- **Tests:** `statsClient.reads.test.ts` extended (toCareerSummary mapper); `Profile.test.tsx`
+  rewritten with a URL-aware fetch mock covering server card, local fallback, recovery-key
+  export/import, and upload toggle; `Leaderboard.test.tsx` (new: render/rank/toggle/empty/error
+  states); `App.test.tsx` extended (leaderboard tab). **UI suite: 301 passed** (260 prior + 41 new).
+  Server and Python suites unchanged.
+- **Server-side stats client is now feature-complete:** Plan 2a delivered identity + `statsClient` +
+  offline queue + match submission; Plan 2b delivers all UI surfaces (Profile, Multiplayer opponent
+  card, Leaderboard). The full server-side stats pipeline — ingestion (backend) → submission (2a) →
+  display (2b) — is end-to-end built.
+

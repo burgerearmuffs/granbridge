@@ -8,8 +8,8 @@ from typing import Optional
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + \
-        f"{datetime.now(timezone.utc).microsecond // 1000:03d}Z"
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
@@ -119,6 +119,30 @@ class HistoryStore:
                     "three_dart_avg": avg,
                 })
             return result
+
+    def export_latest_match(self) -> dict:
+        """The most recent finished game as a canonical record (throws carry player)."""
+        with _connect(self.db_path) as conn:
+            g = conn.execute(
+                "SELECT * FROM games WHERE ended_at IS NOT NULL ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if g is None:
+                return {}
+            throws = conn.execute(
+                "SELECT player, bed, score, ts FROM throws WHERE game_id = ? ORDER BY id",
+                (g["id"],),
+            ).fetchall()
+        return {
+            "mode": g["mode"],
+            "players": json.loads(g["players_json"]),
+            "winner": g["winner"],
+            "started_at": g["started_at"],
+            "ended_at": g["ended_at"],
+            "throws": [
+                {"player": t["player"], "bed": t["bed"], "score": t["score"], "ts": t["ts"]}
+                for t in throws
+            ],
+        }
 
     def hit_counts(self, game_id: Optional[int] = None) -> dict[str, int]:
         """Return bed -> count across all throws, optionally scoped to a single game."""

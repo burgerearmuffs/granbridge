@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGranbridgeSocket } from "./useGranbridgeSocket";
 import { useStore } from "./store";
 import { Setup } from "./views/Setup";
@@ -17,8 +17,11 @@ import { Multiplayer } from "./views/Multiplayer";
 import { Profile } from "./views/Profile";
 import { useUpdater } from "./useUpdater";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { Leaderboard } from "./views/Leaderboard";
+import { useStatsSubmission } from "./stats/useStatsSubmission";
+import { flush as flushStatsQueue } from "./stats/statsQueue";
 
-type NavTab = "live" | "history" | "multiplayer" | "profile";
+type NavTab = "live" | "history" | "multiplayer" | "profile" | "leaderboard";
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -29,6 +32,8 @@ export default function App() {
   const playing = gameState && gameState.status === "in_progress";
   const kiosk = new URLSearchParams(location.search).has("kiosk");
   const [activeTab, setActiveTab] = useState<NavTab>("live");
+  useStatsSubmission();
+  useEffect(() => { void flushStatsQueue(); }, []);
 
   // CheckoutOverlay owns the game_won "GAME SHOT" moment.
   // Confetti Celebration is kept for leg_won only to avoid double-celebration.
@@ -112,6 +117,18 @@ export default function App() {
               >
                 Profile
               </button>
+              <button
+                onClick={() => setActiveTab("leaderboard")}
+                aria-pressed={activeTab === "leaderboard"}
+                className={[
+                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  activeTab === "leaderboard"
+                    ? "bg-amber-400 text-neutral-900"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                Leaderboard
+              </button>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -123,7 +140,9 @@ export default function App() {
       )}
       {!kiosk && <UpdateBanner state={updater} />}
       <Banners banners={banners} />
-      {activeTab === "profile" ? (
+      {activeTab === "leaderboard" ? (
+        <Leaderboard />
+      ) : activeTab === "profile" ? (
         <Profile />
       ) : activeTab === "multiplayer" ? (
         <Multiplayer />

@@ -22,12 +22,14 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
+from urllib.parse import urlparse, parse_qs
 
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
 from granbridge_broker.http import json_response, origin_allowed
 from granbridge_broker.ratelimit import RateLimiter, client_ip
+from granbridge_broker.stats import StatsStore, ValidationError
 from granbridge_broker.turn import make_turn_credentials
 
 DEFAULT_ROOM_SIZE_CAP = 4
@@ -84,6 +86,8 @@ class BrokerServer:
         turn_rate_per_min: int = 0,
         conn_rate_per_min: int = 0,
         msg_rate_per_sec: int = 0,
+        stats_store: "StatsStore | None" = None,
+        stats_rate_per_min: int = 0,
         clock=time.time,
     ) -> None:
         self._host = host
@@ -107,6 +111,8 @@ class BrokerServer:
         self._turn_limiter = RateLimiter(turn_rate_per_min, 60.0)
         self._conn_limiter = RateLimiter(conn_rate_per_min, 60.0)
         self._msg_limiter = RateLimiter(msg_rate_per_sec, 1.0)
+        self._stats = stats_store
+        self._stats_limiter = RateLimiter(stats_rate_per_min, 60.0)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -130,12 +136,12 @@ class BrokerServer:
     # HTTP (same port as the WebSocket) — health + TURN credentials
     # ------------------------------------------------------------------
 
+    def _healthz_base(self) -> dict:
+        return {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)}
+
     def _http_route(self, path: str, ip: str = "-"):
         if path == "/healthz":
-            return json_response(
-                200,
-                {"status": "ok", "rooms": len(self._rooms), "peers": len(self._peers)},
-            )
+            return json_response(200, self._healthz_base())
         if path == "/turn":
             if not self._turn_limiter.allow(ip, self._clock()):
                 return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
@@ -147,12 +153,20 @@ class BrokerServer:
             )
         return None
 
-    def _process_request(self, connection, request):
+    async def _process_request(self, connection, request):
         ip = client_ip(request.headers, connection.remote_address)
-        resp = self._http_route(request.path, ip)
+        path_only = request.path.split("?", 1)[0]
+        if self._stats is not None and path_only.startswith("/stats/"):
+            if not self._stats_limiter.allow(ip, self._clock()):
+                return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
+            return await self._handle_stats_get(path_only, request.path)
+        if self._stats is not None and path_only == "/healthz":
+            base = self._healthz_base()
+            base.update(await asyncio.to_thread(self._stats.counts))
+            return json_response(200, base)
+        resp = self._http_route(path_only, ip)
         if resp is not None:
             return resp
-        # WebSocket upgrade: per-IP connection rate limit
         if not self._conn_limiter.allow(ip, self._clock()):
             self._log.warning("rate-limited WS upgrade ip=%s", ip)
             return json_response(429, {"error": "rate_limited"}, reason="Too Many Requests")
@@ -162,6 +176,29 @@ class BrokerServer:
                 self._log.warning("rejected WS upgrade: forbidden origin %r", origin)
                 return json_response(403, {"error": "forbidden_origin"}, reason="Forbidden")
         return None
+
+    async def _handle_stats_get(self, path_only: str, full_path: str):
+        try:
+            if path_only.startswith("/stats/player/"):
+                pid = path_only[len("/stats/player/"):]
+                if not pid or len(pid) > 128:
+                    return json_response(400, {"error": "bad player id"}, reason="Bad Request")
+                summary = await asyncio.to_thread(self._stats.player_summary, pid)
+                return json_response(200, summary)
+            if path_only == "/stats/leaderboard":
+                qs = parse_qs(urlparse(full_path).query)
+                metric = (qs.get("metric") or ["avg"])[0]
+                if metric not in ("avg", "wins"):
+                    metric = "avg"
+                try:
+                    limit = int((qs.get("limit") or ["20"])[0])
+                except ValueError:
+                    limit = 20
+                board = await asyncio.to_thread(self._stats.leaderboard, metric, limit)
+                return json_response(200, {"metric": metric, "players": board})
+            return json_response(404, {"error": "not_found"}, reason="Not Found")
+        except Exception:
+            return json_response(500, {"error": "internal_error"}, reason="Internal Server Error")
 
     # ------------------------------------------------------------------
     # Connection handler
@@ -289,6 +326,40 @@ class BrokerServer:
                                     "from": peer_id,
                                     "payload": payload,
                                 })
+
+                # ---- stats_submit -------------------------------------
+                elif mtype == "stats_submit":
+                    if self._stats is None:
+                        await _error(ws, "unsupported", "stats not enabled")
+                        continue
+                    if not self._stats_limiter.allow(peer_id, self._clock()):
+                        await _error(ws, "rate_limited", "too many submissions")
+                        continue
+                    pid = msg.get("id")
+                    token = msg.get("writeToken")
+                    match = msg.get("match")
+                    if not isinstance(pid, str) or not pid or not isinstance(token, str) or not token:
+                        await _error(ws, "bad_request", "stats_submit missing id/writeToken")
+                        continue
+                    player = msg.get("player") if isinstance(msg.get("player"), dict) else {}
+                    name = player.get("name", "") if isinstance(player.get("name"), str) else ""
+                    avatar = player.get("avatar") if isinstance(player.get("avatar"), dict) else {}
+                    color = avatar.get("color", "") if isinstance(avatar.get("color"), str) else ""
+                    try:
+                        result = await asyncio.to_thread(
+                            self._stats.submit_match, pid, token, match, name, color)
+                    except (ValidationError):
+                        await _error(ws, "implausible", "match failed validation")
+                        continue
+                    except PermissionError:
+                        await _error(ws, "token_mismatch", "write token does not match")
+                        continue
+                    except Exception:
+                        self._log.exception("stats_submit failed unexpectedly")
+                        await _error(ws, "server_error", "internal error processing stats")
+                        continue
+                    await _send(ws, {"type": "stats_ack",
+                                     "match_id": result["match_id"], "verified": result["verified"]})
 
                 # ---- leave -----------------------------------------------
                 elif mtype == "leave":
