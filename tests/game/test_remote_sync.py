@@ -1,6 +1,6 @@
 from granbridge.core.bus import EventBus
 from granbridge.game.engine import GameEngine
-from granbridge.game.commands import StartGame, RemoteDart, SetRemoteRole
+from granbridge.game.commands import StartGame, RemoteDart, SetRemoteRole, RecordMiss, CorrectLast
 from granbridge.game.models import Dart
 
 
@@ -84,3 +84,24 @@ def test_set_remote_role_none_disables_gate():
     # role cleared -> a p1-tagged dart on p2's turn now applies (local semantics)
     eng.on_dart(Dart.from_bed("S20"), source_player_id="p1")
     assert eng.state.mode_view["scores"]["p2"] == 501 - 20
+
+
+def test_host_gated_record_miss_applies_to_active_guest():
+    eng = _engine(); _start_remote(eng, start_score=501)
+    for _ in range(3):                                       # advance to p2 (guest)
+        eng.on_dart(Dart.from_bed("S1"), source_player_id="p1")
+    assert eng.state.active_index == 1
+    eng.handle_command(RecordMiss(command="record_miss"))    # host forwards the guest's miss
+    assert eng.state.stats["p2"].darts == 1                  # counted for the guest
+    assert eng.state.mode_view["scores"]["p2"] == 501        # a miss scores 0
+
+
+def test_host_gated_correct_last_applies_to_active_guest():
+    eng = _engine(); _start_remote(eng, start_score=501)
+    for _ in range(3):
+        eng.on_dart(Dart.from_bed("S1"), source_player_id="p1")
+    assert eng.state.active_index == 1
+    eng.handle_command(RemoteDart(command="remote_dart", bed="S5", player="p2"))  # guest throws S5
+    assert eng.state.mode_view["scores"]["p2"] == 501 - 5
+    eng.handle_command(CorrectLast(command="correct_last", bed="T20"))            # host forwards guest's correction
+    assert eng.state.mode_view["scores"]["p2"] == 501 - 60
