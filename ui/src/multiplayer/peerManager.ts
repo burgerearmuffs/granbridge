@@ -44,12 +44,15 @@ export class PeerManager {
   private _selfPeerId: string;
   private _peers = new Map<string, PeerEntry>();
   private _available: boolean;
+  private _retries = new Map<string, number>();
+  private static MAX_ICE_RESTARTS = 3;
 
   // Public callbacks
   onRemoteStream: (peerId: string, stream: MediaStream) => void = () => {};
   onDataMessage: (peerId: string, obj: unknown) => void = () => {};
   onPeerState: (peerId: string, state: PeerState) => void = () => {};
   onChannelOpen: (peerId: string) => void = () => {};
+  onConnectionHealth: (peerId: string, health: "connected" | "reconnecting" | "lost") => void = () => {};
 
   constructor(
     broker: BrokerClient,
@@ -159,6 +162,8 @@ export class PeerManager {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState as PeerState;
       this.onPeerState(peerId, state);
+      if (state === "connected") { this._retries.set(peerId, 0); this.onConnectionHealth(peerId, "connected"); }
+      else if (state === "disconnected" || state === "failed") { this._attemptRestart(peerId); }
     };
 
     // Negotiation-needed (perfect-negotiation)
@@ -175,6 +180,23 @@ export class PeerManager {
     };
 
     return entry;
+  }
+
+  private _attemptRestart(peerId: string) {
+    const entry = this._peers.get(peerId);
+    if (!entry) return;
+    const n = this._retries.get(peerId) ?? 0;
+    if (n >= PeerManager.MAX_ICE_RESTARTS) { this.onConnectionHealth(peerId, "lost"); return; }
+    this._retries.set(peerId, n + 1);
+    this.onConnectionHealth(peerId, "reconnecting");
+    const delay = [1000, 2000, 4000][n] ?? 4000;
+    setTimeout(() => {
+      const e = this._peers.get(peerId);
+      if (!e || e.pc.connectionState === "connected") return;
+      if (typeof (e.pc as RTCPeerConnection & { restartIce?: () => void }).restartIce === "function") {
+        (e.pc as RTCPeerConnection & { restartIce?: () => void }).restartIce!();
+      }
+    }, delay);
   }
 
   private async _handleSignal(from: string, data: unknown) {
