@@ -194,7 +194,7 @@ describe("OpponentCard wiring smoke", () => {
   it("OpponentCard renders given a profile + summary", () => {
     render(
       <OpponentCard
-        profile={{ id: "x", name: "Eve", avatar: { color: "#ef4444" } }}
+        profile={{ id: "x", name: "Eve", avatar: { color: "#ef4444" }, writeToken: "tok" }}
         summary={{ threeDartAvg: 1, wins: 0, gamesPlayed: 0 }}
       />,
     );

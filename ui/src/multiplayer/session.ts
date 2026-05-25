@@ -77,6 +77,7 @@ class MpSession {
       applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
       selfCard: this.selfCard,
       onOpponentCard: (profile, summary) => useMpStore.getState().setOpponentCard({ profile, summary }),
+      onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
     });
     rm.start();
     this.rm = rm;

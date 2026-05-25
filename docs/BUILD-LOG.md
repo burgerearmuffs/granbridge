@@ -391,3 +391,52 @@ Spec `docs/superpowers/specs/2026-05-24-server-side-stats-design.md`; plan
   19 new). Main Python suite 193 passed (no regressions); UI suite 232 passed.
 - **Client integration is Plan 2** (app `export/latest`, UI identity/recovery-key/match-id/
   stats-client/offline-queue, Profile/Multiplayer/Leaderboard surfaces, upload toggle).
+
+### Client stats ingestion — Plan 2a (2026-05-24, branch `server-side-stats-client`)
+
+Spec `docs/superpowers/specs/2026-05-24-server-side-stats-client-design.md`; plan
+`docs/superpowers/plans/2026-05-24-server-side-stats-client-2a-foundation.md`.
+
+- **`writeToken` identity + recovery-key codec** — `ui/src/multiplayer/player.ts` gains a
+  `writeToken` UUID persisted in `Profile` (with a migration that generates one for existing
+  profiles). `ui/src/multiplayer/recoveryKey.ts` is a pure, stateless encode/decode codec
+  (base64url over `player_id:writeToken`) — no persistence, no side effects.
+- **`statsClient`** (`ui/src/stats/statsClient.ts`) — `brokerHttpBase` derives the HTTP origin
+  from the WS URL. `submitMatch` opens a transient WebSocket, sends `stats_submit`, and resolves
+  on `stats_ack` (or rejects on `error`). `fetchPlayerSummary` and `fetchLeaderboard` are plain
+  HTTP GETs to `/stats/player/{id}` and `/stats/leaderboard`.
+- **Offline `statsQueue`** (`ui/src/stats/statsQueue.ts`) — localStorage FIFO keyed by match id.
+  `enqueue` adds an entry tagged as `terminal` (local full-throw match) or `transient` (remote
+  aggregate). `flushStatsQueue` drains the queue serially (promise-chain, one at a time): transient
+  entries are discarded if submission fails; terminal entries are retried on the next flush. This
+  ensures at-least-once delivery for fully-owned matches while never blocking the UI.
+- **`uploadPref` toggle** (`ui/src/stats/uploadPref.ts`) — `getUploadEnabled`/`setUploadEnabled`
+  backed by `localStorage`; defaults to `true`. Checked by the submission hook before any network
+  call.
+- **`/api/history/export/latest` endpoint** — `src/granbridge/history/store.py` gains
+  `export_latest_match()` (returns the most recent finished match from the history SQLite store as
+  a `MatchRecord`-shaped dict). `src/granbridge/cli.py` registers the route
+  `GET /api/history/export/latest`; the UI calls this to assemble the full-throws payload for
+  local matches. Covered by `tests/test_history_export.py` (2 tests).
+- **Host-minted shared remote `match_id`** — `ui/src/multiplayer/remoteMatch.ts` gains a
+  `{t:"matchid", id}` `SyncMsg` and `onMatchId` callback. The host generates a UUID and broadcasts
+  it to the guest over the existing data channel at game-start. `writeToken` is deliberately
+  stripped from the data-channel profile card before send — it never leaves the local browser.
+  `ui/src/multiplayer/store.ts` tracks `remoteMatchId` with `setRemoteMatchId` and clears it in
+  `resetMp`.
+- **`useStatsSubmission` hook** (`ui/src/stats/useStatsSubmission.ts`) — mounted once in
+  `App.tsx`. Watches for `gamePhase === "finished"`. Two assembly paths: (1) **local** — fetches
+  full throws from `/api/history/export/latest` and enqueues a `terminal` entry; (2) **remote** —
+  builds an aggregate-only `MatchRecord` (darts + total\_scored, no per-throw data) from the
+  Zustand game store and enqueues a `transient` entry keyed on `remoteMatchId`. Remote stats are
+  intentionally aggregate-only — no per-segment heatmap is ever sent for multiplayer matches.
+  After a remote submission, `remoteMatchId` is cleared in the store. The hook also fires
+  `flushStatsQueue()` on startup (via `useEffect` in `App.tsx`) to drain any entries left over
+  from a previous session.
+- **Tests:** new files `recoveryKey.test.ts`, `statsClient.test.ts`, `statsQueue.test.ts`,
+  `uploadPref.test.ts`, `useStatsSubmission.test.tsx`, `store.remoteMatch.test.ts`,
+  `remoteMatch.matchid.test.ts`; existing player + App tests extended. **UI suite: 260 passed**
+  (232 prior + 28 new). Python export suite: 2 passed. Server suite: 71 passed (no regressions).
+- **Plan 2b (surfaces) is next:** Profile recovery UI + server-stats card + upload-toggle control,
+  opponent card populated from `/stats/player/{id}`, and a full Leaderboard view.
+

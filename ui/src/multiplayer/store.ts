@@ -56,6 +56,7 @@ interface MpState {
   cam: boolean;
   error: string | undefined;
   brokerUrl: string;
+  remoteMatchId: string | null;
   localStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   connectionHealth: ConnectionHealth;
@@ -70,6 +71,7 @@ interface MpState {
   setCam: (v: boolean) => void;
   setError: (msg: string | undefined) => void;
   setBrokerUrl: (url: string) => void;
+  setRemoteMatchId: (id: string | null) => void;
   setLocalStream: (s: MediaStream | null) => void;
   setRemoteStream: (peerId: string, s: MediaStream) => void;
   setConnectionHealth: (h: ConnectionHealth) => void;
@@ -86,6 +88,7 @@ export const useMpStore = create<MpState>((set) => ({
   cam: readBool(LS_CAM, true),
   error: undefined,
   brokerUrl: readBrokerUrl(),
+  remoteMatchId: null,
   localStream: null,
   remoteStreams: new Map(),
   connectionHealth: "connected",
@@ -108,6 +111,7 @@ export const useMpStore = create<MpState>((set) => ({
     try { localStorage.setItem(LS_BROKER_URL, url); } catch { /* ignore */ }
     set({ brokerUrl: url });
   },
+  setRemoteMatchId: (id) => set({ remoteMatchId: id }),
   setLocalStream: (s) => set({ localStream: s }),
   setRemoteStream: (peerId, s) => set((st) => ({ remoteStreams: new Map(st.remoteStreams).set(peerId, s) })),
   setConnectionHealth: (h) => set({ connectionHealth: h }),
@@ -119,6 +123,7 @@ export const useMpStore = create<MpState>((set) => ({
       selfId: "",
       peers: [],
       error: undefined,
+      remoteMatchId: null,
       localStream: null,
       remoteStreams: new Map(),
       connectionHealth: "connected",

@@ -81,6 +81,7 @@ def serve(
                 "/api/history/recent": store.recent_games,
                 "/api/history/stats": store.player_stats,
                 "/api/history/heatmap": store.hit_counts,
+                "/api/history/export/latest": store.export_latest_match,
             },
         )
         static.start()
