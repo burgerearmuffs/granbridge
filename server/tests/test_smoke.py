@@ -49,7 +49,6 @@ async def test_ws_check_skips_without_websockets(monkeypatch):
 
 
 from smoke import turns_endpoint, recv_stun_message
-import io
 
 
 def test_turns_endpoint_parses_host_and_port():

@@ -200,7 +200,11 @@ def recv_stun_message(sock) -> bytes:
         if not chunk:
             raise ConnectionError("closed before STUN header")
         header += chunk
-    mlen = struct.unpack(">HHI", header[:8])[1]
+    _mtype, mlen, magic = struct.unpack(">HHI", header[:8])
+    if magic != _STUN_MAGIC:
+        raise ValueError("not a STUN message (bad magic cookie)")
+    if mlen > 4096:  # real STUN/TURN messages are tiny; guards a misrouted non-STUN endpoint
+        raise ValueError(f"implausible STUN length {mlen}")
     body = b""
     while len(body) < mlen:
         chunk = sock.recv(mlen - len(body))
