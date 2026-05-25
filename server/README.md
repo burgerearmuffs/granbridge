@@ -5,7 +5,7 @@ A contained `docker compose` stack for GRANBRIDGE internet multiplayer:
 - **caddy** — automatic Let's Encrypt TLS; reverse-proxies `wss://` + `/turn` + `/healthz` to the broker.
 - **broker** — stateless WebSocket rooms (password + presence + WebRTC signaling) and a single-port HTTP
   `/turn` (short-lived TURN credentials) + `/healthz`.
-- **coturn** — `turn://` (3478) and `turns://` (5349, reusing Caddy's cert) for NAT/firewall traversal.
+- **coturn** — `turns://` over TLS, reached only via Caddy's ALPN demux on 443 (no host ports). Relay-only.
 - **init** — one-shot; generates the shared TURN secret on first boot.
 
 The broker is stateless (in-memory). Restart any time; clients rejoin automatically.
@@ -16,9 +16,13 @@ The broker is stateless (in-memory). Restart any time; clients rejoin automatica
 2. **Config:** `cp .env.example .env` and set `DOMAIN`. Set `TURN_EXTERNAL_IP` only if TOWER is behind a
    router. Leave `TURN_SECRET` unset to auto-generate.
 3. **Firewall (open on TOWER):**
-   - TCP **80, 443** (Caddy / `wss://` / `/turn`)
-   - UDP+TCP **3478**, TCP **5349** (STUN/TURN / `turns://`)
-   - UDP **49152–65535** (TURN relay range)
+   - TCP **80** — Let's Encrypt HTTP-01 challenge (cert issuance/renewal) + HTTP→HTTPS redirect.
+   - TCP **443** — everything else: `wss://` play, `/turn`, `/healthz`, **and** `turns://` (ALPN-demuxed).
+
+   That's it. UDP 3478, TCP 5349, and the UDP relay range (49152–65535) are **no longer needed** —
+   coturn runs on the internal Docker network and all TURN traffic is tunneled over TLS on 443. Both
+   clients relay (forced `iceTransportPolicy:"relay"`), so coturn routes media between the two TLS/443
+   connections internally and never exposes a UDP relay port.
 4. **Run:** `docker compose up -d --build`
 
 ## Verify
@@ -45,25 +49,22 @@ This confirms in one command that:
 
 - **`/healthz`** — broker is up and returns `status: ok`.
 - **`/turn`** — credential endpoint returns a well-formed payload (`username`, `credential`, `uris`).
-- **UDP 3478 STUN reachability** — sends a STUN Binding Request to the same host on UDP 3478 and
-  confirms coturn responds. This catches the common failure of a firewall silently blocking UDP 3478,
-  which `/healthz` cannot detect.
-- **UDP 3478 TURN relay** (`turn relay` line) — performs an authenticated TURN Allocate (RFC 5766
-  long-term credentials + MESSAGE-INTEGRITY) using the broker's own `/turn` credentials. A successful
-  Allocate confirms that coturn accepts the broker's HMAC-minted credentials and allocates a relay
-  address, verifying the full TURN credential flow end-to-end **without a browser**. Uses UDP 3478
-  (`turns://` 5349 relay is a future addition).
+- **TURNS-over-443 relay** (`turns relay` line) — opens a TLS connection to port 443 and performs an
+  authenticated TURN Allocate using the broker's `/turn` credentials. A successful Allocate confirms
+  that Caddy's ALPN demux routes non-HTTP TLS to coturn and that coturn accepts the broker's
+  HMAC-minted credentials, verifying the full 443-only TURN flow end-to-end **without a browser**.
 - **`wss://` room join** — WebSocket is reachable and a `join` handshake completes.
   Install `websockets` (`pip install websockets`) to enable the WS check; without it the check
   is skipped and the tool still reports the HTTP results.
+- **UDP 3478 checks** — SKIPPED by default (443-only mode). Pass `--legacy-udp` to test a legacy
+  UDP-3478 deployment.
 
 Output ends with `RESULT: OK` (exit 0) on success or `RESULT: FAILED` (exit 1) on any failure.
 
 **Note:** the smoke tool expects the **full stack** (broker **and** coturn). If you point it at a
-broker-only target with no coturn, the STUN and TURN relay checks will FAIL — that is the correct
-and expected result, not a bug. The `turn relay` check confirms coturn accepts the credentials and
-allocates a relay over UDP 3478; full end-to-end WebRTC relay (ICE + media) still requires two
-real peers and a browser (see the WebRTC relay check above).
+broker-only target with no coturn, the TURNS relay check will FAIL — that is the correct and expected
+result, not a bug. Full end-to-end WebRTC relay (ICE + media) still requires two real peers and a
+browser (see the WebRTC relay check above).
 
 ## Maintenance: none
 
@@ -173,7 +174,8 @@ Set `STATS_DB_PATH=` (empty) in `.env` to disable stats entirely; the broker omi
 ## Client
 
 Build the app with `VITE_BROKER_URL=wss://$DOMAIN`. The client fetches TURN credentials from
-`https://$DOMAIN/turn` at join and falls back to STUN-only if it is unreachable. Manual override:
+`https://$DOMAIN/turn` at join and uses relay-only ICE (`iceTransportPolicy:"relay"`); it returns
+`[]` on failure (no STUN fallback, since STUN is useless under relay-only). Manual override:
 the in-app broker URL field (persisted to `localStorage`).
 
 ## Scaling (far off)
