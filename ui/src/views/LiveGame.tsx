@@ -29,18 +29,18 @@ export function LiveGame({ state }: Props) {
       : false
   );
 
-  // Watch banners for the latest leg_won / game_won; trigger hero tilt
-  const prevBannerLengthRef = useRef(banners.length);
+  // Watch banners for the latest leg_won / game_won; trigger the hero swing.
+  // Keyed on the newest banner's monotonic `at` (not array length): the store caps
+  // `banners` at 5, so a length-growth check stops firing once the cap is reached.
+  const lastWinAtRef = useRef<number>(banners.length ? banners[banners.length - 1].at : 0);
   useEffect(() => {
-    const prevLen = prevBannerLengthRef.current;
-    prevBannerLengthRef.current = banners.length;
-    // Only react to newly appended banners
-    if (banners.length <= prevLen) return;
     const latest = banners[banners.length - 1];
+    if (!latest) return;
     if (latest.kind !== "leg_won" && latest.kind !== "game_won") return;
+    if (latest.at <= lastWinAtRef.current) return; // already reacted to this win
+    lastWinAtRef.current = latest.at;
     if (prefersReducedMotion.current) return;
 
-    // Activate hero tilt
     setBoardHero(true);
     if (heroTimerRef.current !== null) clearTimeout(heroTimerRef.current);
     heroTimerRef.current = setTimeout(() => {

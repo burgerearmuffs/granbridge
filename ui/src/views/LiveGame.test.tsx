@@ -68,5 +68,22 @@ describe("LiveGame", () => {
       expect(container.querySelector(".dartboard-3d.tilt-hero")).toBeNull();
       expect(container.querySelector(".dartboard-3d.tilt-play")).not.toBeNull();
     });
+
+    it("still swings to hero on a win after the banner list is capped (length stays constant)", () => {
+      const t0 = Date.now();
+      // The store caps banners at 5; fill it with non-win banners first.
+      const filler = Array.from({ length: 5 }, (_, i) => ({ kind: "info", text: `b${i}`, at: t0 + i }));
+      const { container } = render(<LiveGame state={baseState} />);
+      act(() => { useStore.setState({ banners: filler }); });
+      expect(container.querySelector(".dartboard-3d.tilt-hero")).toBeNull();
+      // A new win arrives: the cap slides (oldest dropped) so the array length stays 5,
+      // but the newest banner is a win with a newer timestamp.
+      act(() => {
+        useStore.setState({
+          banners: [...filler.slice(1), { kind: "leg_won", text: "Leg to Ann", at: t0 + 100 }],
+        });
+      });
+      expect(container.querySelector(".dartboard-3d.tilt-hero")).not.toBeNull();
+    });
   });
 });
