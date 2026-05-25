@@ -46,6 +46,8 @@ export class BrokerClient {
   private _url: string;
   private _ws: WebSocket | null = null;
   private _callbacks: BrokerCallbacks = {};
+  /** `peers` is multi-subscriber: both mpSession and PeerManager register. */
+  private _peersSubs: Array<(peers: PeerInfo[]) => void> = [];
   private _pendingJoin: { room: string; password: string; player: { id: string; name: string; avatar?: AvatarSpec } } | null = null;
   private _closed = false;
   private _retryCount = 0;
@@ -53,7 +55,7 @@ export class BrokerClient {
 
   /** Assign callbacks before calling connect(). */
   onJoined(cb: NonNullable<BrokerCallbacks["onJoined"]>) { this._callbacks.onJoined = cb; return this; }
-  onPeers(cb: NonNullable<BrokerCallbacks["onPeers"]>) { this._callbacks.onPeers = cb; return this; }
+  onPeers(cb: NonNullable<BrokerCallbacks["onPeers"]>) { this._peersSubs.push(cb); return this; }
   onSignal(cb: NonNullable<BrokerCallbacks["onSignal"]>) { this._callbacks.onSignal = cb; return this; }
   onMsg(cb: NonNullable<BrokerCallbacks["onMsg"]>) { this._callbacks.onMsg = cb; return this; }
   onError(cb: NonNullable<BrokerCallbacks["onError"]>) { this._callbacks.onError = cb; return this; }
@@ -135,7 +137,7 @@ export class BrokerClient {
         this._callbacks.onJoined?.(msg.self, msg.peers);
         break;
       case "peers":
-        this._callbacks.onPeers?.(msg.peers);
+        for (const cb of this._peersSubs) cb(msg.peers);
         break;
       case "signal":
         this._callbacks.onSignal?.(msg.from, msg.data);

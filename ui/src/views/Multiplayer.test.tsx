@@ -1,13 +1,13 @@
 /**
  * Multiplayer view — render + interaction tests.
  *
- * BrokerClient and getLocalStream are mocked so no WebSocket / WebRTC touches
- * jsdom, which has neither. Tests verify:
+ * mpSession is mocked so no WebSocket / WebRTC touches jsdom (which has
+ * neither). Tests verify:
  *  - join form fields render
  *  - Join button is present and initially disabled when fields are empty
  *  - filling room + password enables Join
- *  - clicking Join calls BrokerClient#connect and BrokerClient#join with the
- *    correct room / password
+ *  - clicking Join calls mpSession.join() with the correct room / password
+ *  - in-room view: host/guest roles, game board, reconnect banner
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -17,45 +17,18 @@ import { useStore } from "../store";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-// Mock BrokerClient so we never touch WebSocket in jsdom
-const mockBrokerInstance = {
-  onJoined: vi.fn().mockReturnThis(),
-  onPeers: vi.fn().mockReturnThis(),
-  onSignal: vi.fn().mockReturnThis(),
-  onMsg: vi.fn().mockReturnThis(),
-  onError: vi.fn().mockReturnThis(),
-  onClose: vi.fn().mockReturnThis(),
-  connect: vi.fn(),
-  join: vi.fn(),
+// vi.mock is hoisted to the top of the file, so the factory must be
+// self-contained (no references to variables declared in the outer scope).
+// We use vi.hoisted() to create the mock object before the hoist barrier.
+const mockMpSession = vi.hoisted(() => ({
+  join: vi.fn().mockResolvedValue(undefined),
   leave: vi.fn(),
-  close: vi.fn(),
-  sendSignal: vi.fn(),
-  sendMsg: vi.fn(),
-};
-
-vi.mock("../multiplayer/brokerClient", () => ({
-  BrokerClient: vi.fn(() => mockBrokerInstance),
+  startMatch: vi.fn(),
+  requestAction: vi.fn(),
 }));
 
-// Mock getLocalStream — returns null (no media in jsdom)
-vi.mock("../multiplayer/media", () => ({
-  getLocalStream: vi.fn().mockResolvedValue(null),
-}));
-
-// Mock PeerManager — no-op
-vi.mock("../multiplayer/peerManager", () => ({
-  PeerManager: vi.fn(() => ({
-    onRemoteStream: null,
-    onPeerState: null,
-    closeAll: vi.fn(),
-    sendData: vi.fn(),
-  })),
-  DEFAULT_ICE_SERVERS: [],
-}));
-
-// Mock fetchIceServers — resolves immediately so handleJoin doesn't block on network
-vi.mock("../multiplayer/turn", () => ({
-  fetchIceServers: vi.fn().mockResolvedValue([]),
+vi.mock("../multiplayer/session", () => ({
+  mpSession: mockMpSession,
 }));
 
 // ── Import component AFTER mocks are in place ─────────────────────────────────
@@ -81,11 +54,7 @@ beforeEach(() => {
   useMpStore.setState({ brokerUrl: "ws://127.0.0.1:8788", mic: true, cam: true, mpStatus: "idle", error: undefined });
   useStore.setState({ gameState: null });
   vi.clearAllMocks();
-  // Reset mock to return itself for chaining
-  mockBrokerInstance.onJoined.mockReturnThis();
-  mockBrokerInstance.onPeers.mockReturnThis();
-  mockBrokerInstance.onError.mockReturnThis();
-  mockBrokerInstance.onClose.mockReturnThis();
+  mockMpSession.join.mockResolvedValue(undefined);
 });
 
 describe("Multiplayer join form", () => {
@@ -129,19 +98,19 @@ describe("Multiplayer join form", () => {
     expect(screen.getByRole("button", { name: /join/i })).not.toBeDisabled();
   });
 
-  it("clicking Join calls BrokerClient.connect()", async () => {
+  it("clicking Join calls mpSession.join() with the entered room + password", async () => {
     render(<Multiplayer />);
     await act(async () => { fillAndJoin("my-room", "secret"); });
-    expect(mockBrokerInstance.connect).toHaveBeenCalled();
+    expect(mockMpSession.join).toHaveBeenCalledWith(
+      expect.objectContaining({ room: "my-room", password: "secret" }),
+    );
   });
 
-  it("clicking Join calls BrokerClient.join() with entered room + password", async () => {
+  it("clicking Join calls mpSession.join() with the entered room + password (arena case)", async () => {
     render(<Multiplayer />);
     await act(async () => { fillAndJoin("arena-42", "p@ssw0rd"); });
-    expect(mockBrokerInstance.join).toHaveBeenCalledWith(
-      "arena-42",
-      "p@ssw0rd",
-      expect.objectContaining({ name: expect.any(String), id: expect.any(String) }),
+    expect(mockMpSession.join).toHaveBeenCalledWith(
+      expect.objectContaining({ room: "arena-42", password: "p@ssw0rd" }),
     );
   });
 
@@ -189,6 +158,20 @@ describe("Multiplayer in-room match panel", () => {
     render(<Multiplayer />);
     expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);  // LiveGame header + scoreboard
     expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
+  });
+
+  it("shows reconnecting banner when connectionHealth is reconnecting", () => {
+    enterRoomAs("aaa", "zzz");
+    useMpStore.setState({ connectionHealth: "reconnecting" });
+    render(<Multiplayer />);
+    expect(screen.getByRole("status")).toHaveTextContent(/reconnecting/i);
+  });
+
+  it("shows lost banner when connectionHealth is lost", () => {
+    enterRoomAs("aaa", "zzz");
+    useMpStore.setState({ connectionHealth: "lost" });
+    render(<Multiplayer />);
+    expect(screen.getByRole("alert")).toHaveTextContent(/connection lost/i);
   });
 });
 

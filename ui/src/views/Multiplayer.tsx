@@ -3,37 +3,28 @@
  *
  * Flow:
  *   1. User enters display name, room ID, password, broker URL → clicks Join.
- *   2. getLocalStream() is called (returns null in jsdom/SSR — guarded).
- *   3. BrokerClient is constructed and connect()ed.
- *   4. On 'joined': PeerManager is started; status → in_room.
- *   5. On leave: broker.leave(), PeerManager.closeAll(), status → idle.
+ *   2. mpSession.join() is called — acquires media, connects broker, starts PM/RM.
+ *   3. Reactive state (localStream, remoteStreams, opponentCard, connectionHealth)
+ *      is read directly from useMpStore (populated by mpSession).
+ *   4. On leave: mpSession.leave() stops broker/PM/RM and resets the store.
+ *   5. Tab switches do NOT tear down the session — mpSession is module-scoped.
  *
  * WebRTC APIs (RTCPeerConnection, getUserMedia) are always guarded in
  * peerManager.ts and media.ts — this component is safely render-testable.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMpStore } from "../multiplayer/store";
-import { getOrCreatePlayer, setPlayerName } from "../multiplayer/player";
-import { BrokerClient } from "../multiplayer/brokerClient";
-import type { PeerInfo } from "../multiplayer/brokerClient";
-import { PeerManager } from "../multiplayer/peerManager";
-import { getLocalStream } from "../multiplayer/media";
-import { fetchIceServers } from "../multiplayer/turn";
+import { getOrCreatePlayer } from "../multiplayer/player";
 import { VideoTile } from "../components/VideoTile";
 import { MpControls } from "../components/MpControls";
 import { useStore } from "../store";
 import { LiveGame } from "./LiveGame";
-import { bridgeLink } from "../bridgeLink";
-import { RemoteMatch, hostRole } from "../multiplayer/remoteMatch";
 import { OpponentCard } from "../components/OpponentCard";
 import { defaultAvatarColor } from "../multiplayer/avatar";
-import { fetchMyCareerSummary } from "../multiplayer/careerSummary";
-import type { Profile } from "../multiplayer/player";
-import type { CareerSummary } from "../multiplayer/careerSummary";
-
-// keyed by broker peer_id
-type StreamMap = Map<string, MediaStream>;
+import { mpSession } from "../multiplayer/session";
+import { hostRole } from "../multiplayer/remoteMatch";
+import { GuestControls } from "../components/GuestControls";
 
 export function Multiplayer() {
   const mpStatus = useMpStore((s) => s.mpStatus);
@@ -44,8 +35,11 @@ export function Multiplayer() {
   const cam = useMpStore((s) => s.cam);
   const brokerUrl = useMpStore((s) => s.brokerUrl);
   const selfId = useMpStore((s) => s.selfId);
+  const localStream = useMpStore((s) => s.localStream);
+  const remoteStreams = useMpStore((s) => s.remoteStreams);
+  const connectionHealth = useMpStore((s) => s.connectionHealth);
+  const opponentCard = useMpStore((s) => s.opponentCard);
   const gameState = useStore((s) => s.gameState);
-  const { setMpStatus, setRoom, setSelfId, setPeers, setError, setBrokerUrl, resetMp } = useMpStore.getState();
 
   const identity = getOrCreatePlayer();
   const [displayName, setDisplayName] = useState(identity.name);
@@ -53,17 +47,6 @@ export function Multiplayer() {
   const [passwordInput, setPasswordInput] = useState("");
   const [brokerInput, setBrokerInput] = useState(brokerUrl);
   const [mpMode, setMpMode] = useState("x01");
-  const [opponentCard, setOpponentCard] = useState<{ profile: Profile; summary: CareerSummary } | null>(null);
-
-  // Local stream + remote streams
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStreams, setRemoteStreams] = useState<StreamMap>(new Map());
-
-  // Refs — stable across renders
-  const brokerRef = useRef<BrokerClient | null>(null);
-  const pmRef = useRef<PeerManager | null>(null);
-  const rmRef = useRef<RemoteMatch | null>(null);
-  const selfCardRef = useRef<{ profile: Profile; summary: CareerSummary } | null>(null);
 
   // Update local tracks when mic/cam toggles change
   useEffect(() => {
@@ -72,135 +55,20 @@ export function Multiplayer() {
     for (const track of localStream.getVideoTracks()) track.enabled = cam;
   }, [mic, cam, localStream]);
 
-  // Establish the host-authoritative remote match once we're in a room with a
-  // peer and a live PeerManager. Role is derived deterministically from peer ids.
-  useEffect(() => {
-    if (mpStatus !== "in_room" || !pmRef.current || peers.length === 0 || !selfId) return;
-    if (rmRef.current) return;
-    const rm = new RemoteMatch({
-      role: hostRole(selfId, peers),
-      peer: pmRef.current,
-      bridge: bridgeLink,
-      applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
-      selfCard: selfCardRef.current,
-      onOpponentCard: (profile, summary) => setOpponentCard({ profile, summary }),
-      onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
-    });
-    rm.start();
-    rmRef.current = rm;
-  }, [mpStatus, selfId, peers]);
-
-  // Unmount-only teardown: stop the remote match if the view unmounts (e.g. a
-  // tab switch) so the module-level bridgeLink subscription doesn't leak (and a
-  // remount can't stack a second forwarder). Empty deps → fires ONLY on unmount,
-  // never on presence/state churn (which must not clear the engine gate).
-  // stop(false) keeps the engine gate armed so scoring stays correct while the
-  // host is away — only an explicit leave (handleLeave) should clear the role.
-  useEffect(() => () => {
-    rmRef.current?.stop(false);
-    rmRef.current = null;
-  }, []);
-
-  // Clear the opponent card if the room empties (peer left).
-  useEffect(() => {
-    if (peers.length === 0) setOpponentCard(null);
-  }, [peers.length]);
-
-  const handleJoin = useCallback(async () => {
+  const handleJoin = useCallback(() => {
     if (!roomInput.trim() || !passwordInput.trim()) return;
+    void mpSession.join({ room: roomInput.trim(), password: passwordInput.trim(),
+      displayName: displayName.trim() || identity.name, brokerUrl: brokerInput.trim() });
+  }, [roomInput, passwordInput, displayName, brokerInput, identity.name]);
 
-    setError(undefined);
-    setMpStatus("connecting");
-    setRoom(roomInput.trim());
-
-    // Persist updated display name
-    const player = setPlayerName(displayName.trim() || identity.name);
-
-    // Save broker URL preference
-    if (brokerInput.trim()) setBrokerUrl(brokerInput.trim());
-
-    // Get local media (null in jsdom — guarded)
-    const stream = await getLocalStream({ video: cam, audio: mic });
-    setLocalStream(stream);
-
-    // Build the card we advertise to the opponent (profile + local career summary).
-    const summary = await fetchMyCareerSummary(player.name);
-    selfCardRef.current = { profile: player, summary };
-
-    // Resolve broker URL once; fetch TURN creds (STUN-only fallback inside).
-    const url = brokerInput.trim() || useMpStore.getState().brokerUrl;
-    const iceServers = await fetchIceServers(url);
-
-    // Construct broker client
-    const bc = new BrokerClient(url);
-    brokerRef.current = bc;
-
-    bc.onJoined((self: PeerInfo, initialPeers: PeerInfo[]) => {
-      setSelfId(self.peer_id);
-      setPeers(initialPeers);
-      setMpStatus("in_room");
-
-      // Start peer manager (with TURN if /turn was reachable)
-      const pm = new PeerManager(bc, self.peer_id, stream, iceServers);
-      pmRef.current = pm;
-
-      pm.onRemoteStream = (peerId, rs) => {
-        setRemoteStreams((prev) => new Map(prev).set(peerId, rs));
-      };
-      pm.onPeerState = (_peerId, state) => {
-        if (state === "failed") setError(`Peer connection failed`);
-      };
-
-      // Feed initial peers into PeerManager
-      if (initialPeers.length > 0) {
-        bc.onPeers((latestPeers: PeerInfo[]) => setPeers(latestPeers));
-      }
-    });
-
-    bc.onPeers((latestPeers: PeerInfo[]) => setPeers(latestPeers));
-
-    bc.onError((code, message) => {
-      setError(`${code}: ${message}`);
-      setMpStatus("error");
-    });
-
-    bc.onClose(() => {
-      if (useMpStore.getState().mpStatus === "in_room") {
-        setMpStatus("error");
-        setError("Disconnected from broker");
-      }
-    });
-
-    bc.connect();
-    bc.join(roomInput.trim(), passwordInput.trim(), { id: player.id, name: player.name, avatar: player.avatar });
-  }, [roomInput, passwordInput, displayName, brokerInput, cam, mic, identity.name,
-      setBrokerUrl, setError, setMpStatus, setPeers, setRoom, setSelfId]);
-
-  const handleLeave = useCallback(() => {
-    brokerRef.current?.leave();
-    brokerRef.current?.close();
-    brokerRef.current = null;
-
-    pmRef.current?.closeAll();
-    pmRef.current = null;
-
-    rmRef.current?.stop();
-    rmRef.current = null;
-
-    setOpponentCard(null);
-    localStream?.getTracks().forEach((t) => t.stop());
-    setLocalStream(null);
-    setRemoteStreams(new Map());
-    resetMp();
-  }, [localStream, resetMp]);
+  const handleLeave = useCallback(() => mpSession.leave(), []);
 
   const handleStartMatch = useCallback(() => {
-    const me = getOrCreatePlayer();
-    const opponent = peers[0]?.player.name ?? "Guest";
     const options = mpMode === "x01" ? { start_score: 501, double_out: true } : {};
-    rmRef.current?.startGame(mpMode, [me.name, opponent], options);
-  }, [mpMode, peers]);
+    mpSession.startMatch(mpMode, options);
+  }, [mpMode]);
 
+  // Role is derived deterministically from peer ids (host = smaller id)
   const role = selfId && peers.length ? hostRole(selfId, peers) : null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -299,6 +167,17 @@ export function Multiplayer() {
         <span className="text-sm text-neutral-400">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
       </div>
 
+      {connectionHealth === "reconnecting" && (
+        <div role="status" className="bg-amber-900/50 border border-amber-700 rounded-lg px-4 py-2 text-sm text-amber-200">
+          Reconnecting…
+        </div>
+      )}
+      {connectionHealth === "lost" && (
+        <div role="alert" className="bg-red-900/60 border border-red-700 rounded-lg px-4 py-2 text-sm text-red-200">
+          Connection lost. <button onClick={handleJoin} className="underline">Rejoin</button>
+        </div>
+      )}
+
       {/* Video grid */}
       <div className="grid grid-cols-2 gap-4">
         {/* Local tile — always muted */}
@@ -336,7 +215,10 @@ export function Multiplayer() {
       {/* Shared match */}
       <div className="border-t border-neutral-800 pt-4">
         {gameState && gameState.status === "in_progress" ? (
-          <LiveGame state={gameState} />
+          <>
+            <LiveGame state={gameState} />
+            {role === "guest" && <GuestControls state={gameState} guestSlot="p2" onAction={(a, bed) => mpSession.requestAction(a, bed)} />}
+          </>
         ) : role === "host" ? (
           <div className="flex items-center gap-3">
             <label className="text-sm text-neutral-300">
@@ -363,6 +245,8 @@ export function Multiplayer() {
               Start match
             </button>
           </div>
+        ) : role === "guest" && gameState ? (
+          <GuestControls state={gameState} guestSlot="p2" onAction={(a, bed) => mpSession.requestAction(a, bed)} />
         ) : (
           <p className="text-neutral-500 text-sm">Waiting for the host to start the match…</p>
         )}

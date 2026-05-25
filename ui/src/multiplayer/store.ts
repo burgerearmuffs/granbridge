@@ -19,6 +19,7 @@ import { create } from "zustand";
 import type { PeerInfo } from "./brokerClient";
 
 export type MpStatus = "idle" | "connecting" | "in_room" | "error";
+export type ConnectionHealth = "connected" | "reconnecting" | "lost";
 
 const LS_BROKER_URL = "granbridge.mp.brokerUrl";
 const LS_MIC = "granbridge.mp.mic";
@@ -56,6 +57,10 @@ interface MpState {
   error: string | undefined;
   brokerUrl: string;
   remoteMatchId: string | null;
+  localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
+  connectionHealth: ConnectionHealth;
+  opponentCard: { profile: import("./player").Profile; summary: import("./careerSummary").CareerSummary } | null;
 
   // Actions
   setMpStatus: (s: MpStatus) => void;
@@ -67,6 +72,10 @@ interface MpState {
   setError: (msg: string | undefined) => void;
   setBrokerUrl: (url: string) => void;
   setRemoteMatchId: (id: string | null) => void;
+  setLocalStream: (s: MediaStream | null) => void;
+  setRemoteStream: (peerId: string, s: MediaStream) => void;
+  setConnectionHealth: (h: ConnectionHealth) => void;
+  setOpponentCard: (c: MpState["opponentCard"]) => void;
   resetMp: () => void;
 }
 
@@ -80,6 +89,10 @@ export const useMpStore = create<MpState>((set) => ({
   error: undefined,
   brokerUrl: readBrokerUrl(),
   remoteMatchId: null,
+  localStream: null,
+  remoteStreams: new Map(),
+  connectionHealth: "connected",
+  opponentCard: null,
 
   setMpStatus: (s) => set({ mpStatus: s }),
   setRoom: (r) => set({ room: r }),
@@ -99,6 +112,10 @@ export const useMpStore = create<MpState>((set) => ({
     set({ brokerUrl: url });
   },
   setRemoteMatchId: (id) => set({ remoteMatchId: id }),
+  setLocalStream: (s) => set({ localStream: s }),
+  setRemoteStream: (peerId, s) => set((st) => ({ remoteStreams: new Map(st.remoteStreams).set(peerId, s) })),
+  setConnectionHealth: (h) => set({ connectionHealth: h }),
+  setOpponentCard: (c) => set({ opponentCard: c }),
   resetMp: () =>
     set({
       mpStatus: "idle",
@@ -107,5 +124,9 @@ export const useMpStore = create<MpState>((set) => ({
       peers: [],
       error: undefined,
       remoteMatchId: null,
+      localStream: null,
+      remoteStreams: new Map(),
+      connectionHealth: "connected",
+      opponentCard: null,
     }),
 }));

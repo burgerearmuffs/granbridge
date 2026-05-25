@@ -29,12 +29,25 @@ logic with fakes; this exercises the full cross-process / cross-machine path.
     On reconnect the host re-pushes the latest `game_state` snapshot — the guest's
     board re-syncs. (Darts thrown while disconnected are lost by design — host is truth.)
 
-## Known MVP limitations (note for MP-4+)
-- Guest **miss** isn't auto-detected (board has no out-zone sensor); the host can
-  `correct_last` / `record_miss`. Only the host has game controls in the remote view.
-- Host election is by peer-id ordering (fine for 2 players); >2 players / explicit
-  host choice is future work.
-- The remote match lives in the Multiplayer tab. Switching the host away mid-match
-  keeps the engine gate armed (scoring stays correct), but the host UI stops
-  forwarding `game_state` while unmounted, so the guest's board pauses until the
-  host returns and the next state is produced. Reconnect/snapshot covers larger gaps.
+## Hardening checks (MP-3 hardening)
+12. **Host tab-switch:** with a match in progress, the host switches to another tab
+    (Profile/History) and back. The match keeps running — the guest's board keeps
+    updating from the host's throws, and the host's video/peer connection is intact
+    (no Leave/rejoin needed).
+13. **Guest miss:** on the guest's turn, the guest clicks **Miss** — the host engine
+    records a miss for the guest; both boards advance correctly. On the host's turn the
+    guest's Miss button is disabled.
+14. **Guest undo/correct:** the guest throws, then clicks **Undo** (removes their last
+    dart) and **Correct** (types e.g. `T20`, replaces their last dart). Both reflect on
+    both boards. Undo/Correct are disabled when the guest hasn't thrown this visit.
+15. **Rematch:** after a game finishes, the guest clicks **Rematch** — a new match starts
+    with the same settings. (The host can also restart via its own Start controls.)
+16. **Reconnect:** briefly drop the guest's network (toggle Wi-Fi a few seconds). The
+    host/guest shows "Reconnecting…"; on recovery the connection re-establishes and the
+    host re-pushes the latest game_state so both boards re-sync. Darts thrown during the
+    outage are lost by design (host is truth — re-throw).
+
+## Still-open (future)
+- 2-player only (host election by peer-id ordering).
+- No replay of darts thrown while disconnected; no formal rematch accept handshake.
+- No broker auto-reconnect (peer ICE-restart only — a broker drop still needs a manual Rejoin).
