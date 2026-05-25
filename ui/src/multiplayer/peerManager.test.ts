@@ -27,6 +27,8 @@ class FakePC {
   connectionState = "connecting";
   signalingState = "stable";
   _channels: FakeDataChannel[] = [];
+  restartIceCalls = 0;
+  restartIce() { this.restartIceCalls++; }
 
   constructor(config: { iceServers: RTCIceServer[] }) {
     this.iceServers = config.iceServers;
@@ -137,5 +139,45 @@ describe("PeerManager (light, fake RTCPeerConnection)", () => {
     const dc = FakePC.instances[0]._channels[0];
     dc.onopen?.();
     expect(opened).toEqual(["aaa"]);
+  });
+});
+
+describe("PeerManager reconnect", () => {
+  it("schedules an ICE restart after disconnect/failed", () => {
+    vi.useFakeTimers();
+    const broker = makeMockBroker() as unknown as BrokerClient;
+    new PeerManager(broker, "zzz", null);
+    (broker as any)._emitPeers([{ peer_id: "aaa", player: { id: "p1", name: "A" } }]);
+    const pc = FakePC.instances[0];
+    pc.connectionState = "failed";
+    pc.onconnectionstatechange?.();
+    vi.advanceTimersByTime(1000);
+    expect(pc.restartIceCalls).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it("emits health: reconnecting then connected", () => {
+    const broker = makeMockBroker() as unknown as BrokerClient;
+    const pm = new PeerManager(broker, "zzz", null);
+    const health: string[] = [];
+    pm.onConnectionHealth = (_id, h) => health.push(h);
+    (broker as any)._emitPeers([{ peer_id: "aaa", player: { id: "p1", name: "A" } }]);
+    const pc = FakePC.instances[0];
+    pc.connectionState = "disconnected"; pc.onconnectionstatechange?.();
+    pc.connectionState = "connected"; pc.onconnectionstatechange?.();
+    expect(health).toEqual(["reconnecting", "connected"]);
+  });
+
+  it("gives up as 'lost' after MAX restarts", () => {
+    vi.useFakeTimers();
+    const broker = makeMockBroker() as unknown as BrokerClient;
+    const pm = new PeerManager(broker, "zzz", null);
+    const health: string[] = [];
+    pm.onConnectionHealth = (_id, h) => health.push(h);
+    (broker as any)._emitPeers([{ peer_id: "aaa", player: { id: "p1", name: "A" } }]);
+    const pc = FakePC.instances[0];
+    for (let i = 0; i < 4; i++) { pc.connectionState = "failed"; pc.onconnectionstatechange?.(); vi.advanceTimersByTime(5000); }
+    expect(health).toContain("lost");
+    vi.useRealTimers();
   });
 });
