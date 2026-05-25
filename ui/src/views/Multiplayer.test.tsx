@@ -202,6 +202,69 @@ describe("OpponentCard wiring smoke", () => {
   });
 });
 
+// ── Task 4.4: MpGameLayout wiring ─────────────────────────────────────────────
+describe("Multiplayer in-game layout (MpGameLayout)", () => {
+  function enterRoomInProgress(selfId: string, peerId: string) {
+    useMpStore.setState({
+      mpStatus: "in_room",
+      room: "r1",
+      selfId,
+      peers: [{ peer_id: peerId, player: { id: "px", name: "Opponent" } }],
+    });
+    useStore.setState({
+      gameState: {
+        mode: "x01", status: "in_progress",
+        players: [{ id: "p1", name: "Alice" }, { id: "p2", name: "Bob" }],
+        active_index: 0, visit: [], legs: {}, sets: {}, winner: null,
+        options: {}, mode_view: {}, stats: {},
+      },
+    });
+  }
+
+  it("uses data-mp-layout when a game is in_progress in the room", () => {
+    enterRoomInProgress("aaa", "zzz");
+    const { container } = render(<Multiplayer />);
+    expect(container.querySelector("[data-mp-layout]")).not.toBeNull();
+  });
+
+  it("renders both video tiles inside the layout when in_progress", () => {
+    enterRoomInProgress("aaa", "zzz");
+    render(<Multiplayer />);
+    // VideoTile renders aria-label "Video stream for ..."
+    const videos = screen.getAllByLabelText(/video stream for/i);
+    expect(videos.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders the board (LiveGame) inside the layout", () => {
+    enterRoomInProgress("aaa", "zzz");
+    render(<Multiplayer />);
+    // LiveGame renders player names Alice/Bob — already asserted by existing test
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
+  });
+
+  it("does NOT show the Start match button when in_progress", () => {
+    enterRoomInProgress("aaa", "zzz");
+    render(<Multiplayer />);
+    expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
+  });
+
+  it("lobby (no in_progress game) keeps the existing video-grid and host Start button", () => {
+    // Lobby = in_room but no in_progress game
+    useMpStore.setState({
+      mpStatus: "in_room",
+      room: "r1",
+      selfId: "aaa",
+      peers: [{ peer_id: "zzz", player: { id: "px", name: "Opponent" } }],
+    });
+    useStore.setState({ gameState: null });
+    const { container } = render(<Multiplayer />);
+    // Should NOT use MpGameLayout
+    expect(container.querySelector("[data-mp-layout]")).toBeNull();
+    // Should show Start match for host
+    expect(screen.getByRole("button", { name: /start match/i })).toBeInTheDocument();
+  });
+});
+
 // append to ui/src/views/Multiplayer.test.tsx (it already renders <Multiplayer/> and mocks media/WebRTC).
 // This test drives the onOpponentCard path indirectly is hard; instead unit-test the resolver helper.
 import { resolveOpponentSummary } from "../stats/statsClient";
