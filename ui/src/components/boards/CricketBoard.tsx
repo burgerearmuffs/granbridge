@@ -41,6 +41,7 @@ export function CricketBoard({ state }: { state: GameState }) {
               <th
                 key={p.id}
                 data-testid="player-header"
+                data-active={i === state.active_index ? "true" : "false"}
                 className={`min-w-[120px] py-3 px-4 text-center rounded-t-xl text-xl font-bold bg-neutral-800/70 ${
                   i === state.active_index
                     ? "ring-4 ring-amber-400"
@@ -87,7 +88,9 @@ export function CricketBoard({ state }: { state: GameState }) {
                   i === state.active_index ? "text-amber-300" : "text-white"
                 }`}
               >
-                {points[p.id] ?? 0}
+                <span key={points[p.id] ?? 0} data-score className="score-pop">
+                  {points[p.id] ?? 0}
+                </span>
               </td>
             ))}
           </tr>

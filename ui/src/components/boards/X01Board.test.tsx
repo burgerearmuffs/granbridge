@@ -8,3 +8,20 @@ it("shows scores and checkout and active highlight", () => {
   expect(screen.getByText("Ann")).toBeInTheDocument();
   expect(screen.getByText(/T20/)).toBeInTheDocument();
 });
+it("active player card carries data-active attribute", () => {
+  const { container } = render(<X01Board state={state} />);
+  const activeCard = container.querySelector("[data-active='true']");
+  expect(activeCard).not.toBeNull();
+});
+it("inactive player card does not carry data-active", () => {
+  const { container } = render(<X01Board state={state} />);
+  const allCards = container.querySelectorAll("[data-active]");
+  // Only 1 card should have data-active=true (the active player)
+  const activeCards = Array.from(allCards).filter(el => el.getAttribute("data-active") === "true");
+  expect(activeCards.length).toBe(1);
+});
+it("score element carries data-score attribute", () => {
+  const { container } = render(<X01Board state={state} />);
+  const scoreEl = container.querySelector("[data-score]");
+  expect(scoreEl).not.toBeNull();
+});
