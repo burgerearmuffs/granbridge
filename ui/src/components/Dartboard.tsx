@@ -70,12 +70,36 @@ function heatFill(intensity: number): { fill: string; opacity: number } {
   return { fill: `rgb(${r},${g},${b})`, opacity };
 }
 
+// Bed string parser: returns the segment index (0-19) for numbered beds,
+// or null for bulls.
+function bedToSegIndex(bed: string): number | null {
+  if (bed === "BULL" || bed === "DBULL") return null;
+  // Strip prefix: S, D, T
+  const match = bed.match(/^[SDT](\d+)$/);
+  if (!match) return null;
+  const num = parseInt(match[1], 10);
+  const idx = NUMBERS.indexOf(num);
+  return idx >= 0 ? idx : null;
+}
+
+// Return (r1+r2)/2 midpoint radius for a bed prefix
+function bedMidRadius(bed: string): number {
+  if (bed === "DBULL") return 0; // center
+  if (bed === "BULL") return (R_SBULL + R_DBULL) / 2;
+  if (bed.startsWith("D")) return (R_DOUBLE_OUTER + R_DOUBLE_INNER) / 2;
+  if (bed.startsWith("T")) return (R_TRIPLE_OUTER + R_TRIPLE_INNER) / 2;
+  // Single — outer single
+  return (R_SINGLE_OUTER + R_SINGLE_OUTER_INNER) / 2;
+}
+
 interface Props {
   highlight?: string;
   heatmap?: Record<string, number>;
+  tilt?: "flat" | "play" | "hero";
+  dart?: string;
 }
 
-export function Dartboard({ highlight, heatmap }: Props) {
+export function Dartboard({ highlight, heatmap, tilt = "flat", dart }: Props) {
   // Pre-compute normalised intensity for each bed when heatmap is provided.
   const heatNorm = React.useMemo<Record<string, number>>(() => {
     if (!heatmap) return {};
@@ -88,7 +112,25 @@ export function Dartboard({ highlight, heatmap }: Props) {
     }
     return result;
   }, [heatmap]);
-  return (
+  // Compute dart marker position
+  const dartMarker = React.useMemo(() => {
+    if (!dart) return null;
+    if (dart === "DBULL") {
+      return { x: CX, y: CY };
+    }
+    if (dart === "BULL") {
+      return { x: CX, y: CY - (R_SBULL + R_DBULL) / 2 };
+    }
+    const segIdx = bedToSegIndex(dart);
+    if (segIdx === null) return null;
+    const [startA, endA] = segAngles(segIdx);
+    const midA = (startA + endA) / 2;
+    const r = bedMidRadius(dart);
+    const [x, y] = polarToXY(CX, CY, r, midA);
+    return { x, y };
+  }, [dart]);
+
+  const svg = (
     <svg
       viewBox="0 0 200 200"
       xmlns="http://www.w3.org/2000/svg"
@@ -223,6 +265,24 @@ export function Dartboard({ highlight, heatmap }: Props) {
           />
         );
       })()}
+
+      {/* Dart landing marker */}
+      {dartMarker && (
+        <g data-dart-marker>
+          <circle cx={dartMarker.x} cy={dartMarker.y} r={4} fill="none" stroke="#ffd54a" strokeWidth="1.5" opacity="0.9" />
+          <circle cx={dartMarker.x} cy={dartMarker.y} r={1.5} fill="#ffd54a" opacity="0.95" />
+        </g>
+      )}
     </svg>
+  );
+
+  if (tilt === "flat") {
+    return svg;
+  }
+
+  return (
+    <div className={`dartboard-3d tilt-${tilt}`}>
+      {svg}
+    </div>
   );
 }
