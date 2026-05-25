@@ -11,6 +11,7 @@ import { Celebration } from "./components/Celebration";
 import { SoundToggle } from "./components/SoundToggle";
 import { CheckoutOverlay } from "./components/CheckoutOverlay";
 import { VideoToggle } from "./components/VideoToggle";
+import { FullscreenToggle } from "./components/FullscreenToggle";
 import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 import { Multiplayer } from "./views/Multiplayer";
@@ -134,6 +135,7 @@ export default function App() {
           <div className="flex items-center gap-4">
             <VideoToggle />
             <SoundToggle />
+            <FullscreenToggle />
             <ConnectionBadge connection={connection} />
           </div>
         </header>
