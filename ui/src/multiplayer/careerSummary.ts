@@ -2,6 +2,7 @@
  * CareerSummary — the small per-player stat card sourced from the bridge's
  * existing /api/history/stats endpoint (rows keyed by display name).
  */
+import { apiBase } from "../apiBase";
 
 export interface CareerSummary {
   threeDartAvg: number;
@@ -19,7 +20,7 @@ interface StatRow {
 }
 
 /** Fetch /api/history/stats and return the summary for `name` (zeros on miss/error). */
-export async function fetchMyCareerSummary(name: string, base = ""): Promise<CareerSummary> {
+export async function fetchMyCareerSummary(name: string, base = apiBase()): Promise<CareerSummary> {
   try {
     const res = await fetch(`${base}/api/history/stats`);
     if (!res.ok) return ZERO;

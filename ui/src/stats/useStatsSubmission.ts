@@ -6,6 +6,7 @@ import { getUploadEnabled } from "./uploadPref";
 import { enqueue } from "./statsQueue";
 import type { GameState } from "../types";
 import type { Identity, MatchRecord } from "./types";
+import { apiBase } from "../apiBase";
 
 /**
  * Watches the game store; when a game transitions to "finished", assembles a
@@ -72,7 +73,7 @@ async function onFinished(state: GameState, startedAtIso: string | null): Promis
     throws: { player: string; bed: string; score: number; ts: string }[];
   };
   try {
-    const res = await fetch("/api/history/export/latest");
+    const res = await fetch(`${apiBase()}/api/history/export/latest`);
     if (!res.ok) return;
     data = await res.json();
   } catch {
