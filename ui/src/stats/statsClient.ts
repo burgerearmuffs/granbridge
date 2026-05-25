@@ -26,6 +26,15 @@ export async function fetchPlayerSummary(id: string, base: string = brokerHttpBa
   return (await res.json()) as PlayerSummary;
 }
 
+/** Prefer the opponent's server career summary; fall back to the data-channel one. */
+export async function resolveOpponentSummary(opponentId: string, fallback: CareerSummary): Promise<CareerSummary> {
+  try {
+    return toCareerSummary(await fetchPlayerSummary(opponentId));
+  } catch {
+    return fallback;
+  }
+}
+
 export async function fetchLeaderboard(
   metric: "avg" | "wins", limit = 20, base: string = brokerHttpBase(),
 ): Promise<{ metric: string; players: LeaderRow[] }> {
