@@ -232,6 +232,40 @@ async def check_ws(ws_url: str) -> tuple[bool | None, str]:
         return False, f"ws connect/join: {exc}"
 
 
+async def check_stats(ws_url: str, http_base: str) -> tuple[bool | None, str]:
+    """Submit a throwaway match over WS, then read it back via GET /stats/player/<id>."""
+    try:
+        import websockets
+    except ImportError:
+        return None, "stats: SKIPPED (install 'websockets' to enable this check)"
+    import uuid as _uuid
+    pid = "smoke-" + _uuid.uuid4().hex[:8]
+    match = {
+        "match_id": "smoke-" + _uuid.uuid4().hex[:8], "mode": "x01",
+        "opponent_id": None, "winner_id": pid, "is_remote": False,
+        "darts": 9, "total_scored": 180,
+        "started_at": "2026-01-01T00:00:00.000Z", "ended_at": "2026-01-01T00:05:00.000Z",
+        "throws": None,
+    }
+    try:
+        async with websockets.connect(ws_url, open_timeout=5) as ws:
+            await ws.send(json.dumps({"type": "stats_submit", "id": pid, "writeToken": "smoke",
+                                      "player": {"id": pid, "name": pid}, "match": match}))
+            ack = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        if ack.get("type") == "error" and ack.get("code") == "unsupported":
+            return None, "stats: SKIPPED (broker has stats disabled)"
+        if ack.get("type") != "stats_ack":
+            return False, f"stats submit: unexpected reply {ack.get('type')}"
+        def _fetch_player():
+            with urllib.request.urlopen(http_base + "/stats/player/" + pid, timeout=5) as resp:
+                return json.loads(resp.read())
+        body = await asyncio.to_thread(_fetch_player)
+        ok = body.get("games_played") == 1
+        return ok, f"stats: submit+read round-trip games_played={body.get('games_played')}"
+    except Exception as exc:
+        return False, f"stats: {exc}"
+
+
 async def run(ws_url: str) -> bool:
     base = _http_base(ws_url)
     host = urlparse(ws_url).hostname or ""
@@ -242,6 +276,7 @@ async def run(ws_url: str) -> bool:
     except Exception as exc:
         results.append((False, f"turn relay: couldn't fetch creds: {exc}"))
     results.append(await check_ws(ws_url))
+    results.append(await check_stats(ws_url, base))
     all_ok = True
     for ok, detail in results:
         if ok is None:

@@ -61,8 +61,11 @@ services:
       TURN_RATE_PER_MIN: "${TURN_RATE_PER_MIN:-30}"
       CONN_RATE_PER_MIN: "${CONN_RATE_PER_MIN:-60}"
       MSG_RATE_PER_SEC: "${MSG_RATE_PER_SEC:-20}"
+      STATS_DB_PATH: "/data/stats.db"
+      STATS_RATE_PER_MIN: "${STATS_RATE_PER_MIN:-30}"
     volumes:
       - secrets:/secrets:ro
+      - data:/data
     networks: [backend]
     # No host port: only Caddy reaches the broker (smaller public surface).
 
@@ -93,3 +96,4 @@ volumes:
   caddy_data:
   caddy_config:
   secrets:
+  data:

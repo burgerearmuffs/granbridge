@@ -29,3 +29,16 @@ def test_from_env_parses_and_defaults():
 def test_from_env_origins_empty_means_permissive():
     cfg = from_env({"TURN_SECRET": "x", "DOMAIN": "d"})
     assert cfg.allowed_origins is None
+
+
+def test_stats_config_defaults_disabled(tmp_path):
+    cfg = from_env({"DOMAIN": "x.test", "TURN_SECRET": "s"})
+    assert cfg.stats_db_path == ""           # empty => stats disabled
+    assert cfg.stats_rate_per_min == 30
+
+
+def test_stats_config_from_env(tmp_path):
+    cfg = from_env({"DOMAIN": "x.test", "TURN_SECRET": "s",
+                    "STATS_DB_PATH": "/data/stats.db", "STATS_RATE_PER_MIN": "5"})
+    assert cfg.stats_db_path == "/data/stats.db"
+    assert cfg.stats_rate_per_min == 5
