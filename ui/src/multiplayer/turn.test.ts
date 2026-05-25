@@ -34,27 +34,27 @@ describe("fetchIceServers", () => {
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8788/turn");
   });
 
-  it("falls back to STUN-only on a non-ok response", async () => {
+  it("returns [] on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })) as unknown as typeof fetch);
     const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([{ urls: STUN }]);
+    expect(servers).toEqual([]);
   });
 
-  it("falls back to STUN-only when fetch throws", async () => {
+  it("returns [] when fetch throws", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network"); }) as unknown as typeof fetch);
     const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([{ urls: STUN }]);
+    expect(servers).toEqual([]);
   });
 
-  it("falls back to STUN-only on a malformed payload", async () => {
+  it("returns [] on a malformed payload", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x" }) })) as unknown as typeof fetch);
     const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([{ urls: STUN }]);
+    expect(servers).toEqual([]);
   });
 
-  it("falls back to STUN-only when uris contains a non-string element", async () => {
+  it("returns [] when uris contains a non-string element", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x", credential: "y", uris: ["turn:d:3478", 42] }) })) as unknown as typeof fetch);
     const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([{ urls: STUN }]);
+    expect(servers).toEqual([]);
   });
 });

@@ -19,6 +19,7 @@ class FakeDataChannel {
 class FakePC {
   static instances: FakePC[] = [];
   iceServers: RTCIceServer[];
+  iceTransportPolicy: string | undefined;
   ontrack: ((ev: any) => void) | null = null;
   ondatachannel: ((ev: any) => void) | null = null;
   onicecandidate: ((ev: any) => void) | null = null;
@@ -30,8 +31,9 @@ class FakePC {
   restartIceCalls = 0;
   restartIce() { this.restartIceCalls++; }
 
-  constructor(config: { iceServers: RTCIceServer[] }) {
+  constructor(config: { iceServers: RTCIceServer[]; iceTransportPolicy?: string }) {
     this.iceServers = config.iceServers;
+    this.iceTransportPolicy = (config as { iceTransportPolicy?: string }).iceTransportPolicy;
     FakePC.instances.push(this);
   }
   addTrack() {}
@@ -139,6 +141,18 @@ describe("PeerManager (light, fake RTCPeerConnection)", () => {
     const dc = FakePC.instances[0]._channels[0];
     dc.onopen?.();
     expect(opened).toEqual(["aaa"]);
+  });
+
+  it("constructs peer connections with relay-only ICE policy", () => {
+    FakePC.instances.length = 0;
+    const broker = makeMockBroker();
+    const pm = new PeerManager(broker as unknown as BrokerClient, "self", null, [
+      { urls: ["turns:d:443?transport=tcp"], username: "u", credential: "c" },
+    ]);
+    (broker as any)._emitPeers([{ peer_id: "zzz" }]);
+    expect(FakePC.instances).toHaveLength(1);
+    expect(FakePC.instances[0].iceTransportPolicy).toBe("relay");
+    pm.closeAll();
   });
 });
 
