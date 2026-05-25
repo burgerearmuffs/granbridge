@@ -62,8 +62,10 @@ export function useFullscreen() {
         }
       }
       // jsdom: neither branch matches → safe no-op
-    } catch {
-      // Ignore permission errors, user-gesture guards, etc.
+    } catch (e) {
+      // Surface the failure (e.g. a denied Tauri capability) instead of swallowing it
+      // silently — a silent catch here hid the missing set-fullscreen permission.
+      console.warn("[useFullscreen] toggle failed:", e);
     }
   }, []);
 
