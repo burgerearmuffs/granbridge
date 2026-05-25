@@ -37,6 +37,7 @@ const STATE: GameState = {
   options: {}, mode_view: {}, stats: {},
 };
 const DART: Event = { type: "dart_hit", bed: "T20", ring: "T", segment: 20, multiplier: 3, score: 60 };
+const VDART = { bed: "S1", ring: "SI", segment: 1, multiplier: 1, score: 1 };
 
 describe("hostRole", () => {
   it("smaller selfId is host", () => {
@@ -193,5 +194,95 @@ describe("RemoteMatch card exchange", () => {
     new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {}, onOpponentCard }).start();
     peer.fireData({ t: "card", profile: {}, summary: {} });
     expect(onOpponentCard).not.toHaveBeenCalled();
+  });
+});
+
+describe("RemoteMatch guest requests (host side)", () => {
+  const hostRM = () => { const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} }); rm.start(); return { peer, bridge, rm }; };
+
+  it("miss on the guest's turn → record_miss", () => {
+    const { peer, bridge } = hostRM();
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, active_index: 1 } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "miss" });
+    expect(bridge.sent).toEqual([{ command: "record_miss" }]);
+  });
+
+  it("miss on the host's turn is ignored", () => {
+    const { peer, bridge } = hostRM();
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, active_index: 0 } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "miss" });
+    expect(bridge.sent).toEqual([]);
+  });
+
+  it("undo ignored when the guest's visit is empty", () => {
+    const { peer, bridge } = hostRM();
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, active_index: 1, visit: [] } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "undo" });
+    expect(bridge.sent).toEqual([]);
+  });
+
+  it("undo on the guest's turn with a thrown dart → undo", () => {
+    const { peer, bridge } = hostRM();
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, active_index: 1, visit: [VDART] } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "undo" });
+    expect(bridge.sent).toEqual([{ command: "undo" }]);
+  });
+
+  it("correct on the guest's turn → correct_last with the bed", () => {
+    const { peer, bridge } = hostRM();
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, active_index: 1, visit: [VDART] } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "correct", bed: "T20" });
+    expect(bridge.sent).toEqual([{ command: "correct_last", bed: "T20" }]);
+  });
+
+  it("rematch after a finished game → start_game with the last settings", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} }); rm.start();
+    rm.startGame("x01", ["H", "G"], { start_score: 501 });
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, status: "finished" } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "rematch" });
+    expect(bridge.sent).toEqual([{ command: "start_game", mode: "x01", players: ["H", "G"], options: { start_score: 501 } }]);
+  });
+
+  it("rematch ignored while a game is in progress", () => {
+    const { peer, bridge, rm } = hostRM();
+    rm.startGame("x01", ["H", "G"], {});
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, status: "in_progress" } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "rematch" });
+    expect(bridge.sent).toEqual([]);
+  });
+
+  it("ignores a malformed req (bad action, or correct without a bed)", () => {
+    const { peer, bridge } = hostRM();
+    bridge.fireEvent({ type: "game_state", state: { ...STATE, active_index: 1, visit: [VDART] } });
+    bridge.sent.length = 0;
+    peer.fireData({ t: "req", action: "explode" });
+    peer.fireData({ t: "req", action: "correct" });
+    expect(bridge.sent).toEqual([]);
+  });
+});
+
+describe("RemoteMatch guest requests (guest side)", () => {
+  it("requestAction sends a req over the data channel", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {} }); rm.start();
+    rm.requestAction("miss");
+    rm.requestAction("correct", "T20");
+    expect(peer.sent).toEqual([{ t: "req", action: "miss" }, { t: "req", action: "correct", bed: "T20" }]);
+  });
+
+  it("host requestAction is a no-op", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} }); rm.start();
+    rm.requestAction("miss");
+    expect(peer.sent).toEqual([]);
   });
 });
