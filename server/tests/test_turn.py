@@ -6,11 +6,15 @@ def test_credentials_match_coturn_rest_contract():
     assert creds["username"] == "1100"            # str(int(now) + ttl)
     assert creds["ttl"] == 100
     assert creds["credential"] == "Vf1suDAWMebQxjdiMxGQT+a1wFM="
-    assert creds["uris"] == [
-        "turn:play.example.com:3478?transport=udp",
-        "turn:play.example.com:3478?transport=tcp",
-        "turns:play.example.com:5349?transport=tcp",
-    ]
+    assert creds["uris"] == ["turns:play.example.com:443?transport=tcp"]
+
+
+def test_public_host_port_and_transport_override():
+    creds = make_turn_credentials(
+        "k", "play.example.com", 60, 1000.0,
+        public_host="turn.example.com", public_port=8443, transport="tcp",
+    )
+    assert creds["uris"] == ["turns:turn.example.com:8443?transport=tcp"]
 
 
 def test_username_advances_with_now():
