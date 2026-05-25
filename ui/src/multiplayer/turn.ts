@@ -23,6 +23,7 @@ export async function fetchIceServers(brokerWsUrl: string): Promise<RTCIceServer
     if (
       !data ||
       !Array.isArray(data.uris) ||
+      data.uris.length === 0 ||
       !data.uris.every((u) => typeof u === "string") ||
       typeof data.username !== "string" ||
       typeof data.credential !== "string"

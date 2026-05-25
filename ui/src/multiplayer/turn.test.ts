@@ -50,4 +50,9 @@ describe("fetchIceServers", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x", credential: "y", uris: ["turns:d:443", 42] }) })) as unknown as typeof fetch);
     expect(await fetchIceServers("wss://d")).toEqual([]);
   });
+
+  it("returns [] when uris is an empty array", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x", credential: "y", uris: [] }) })) as unknown as typeof fetch);
+    expect(await fetchIceServers("wss://d")).toEqual([]);
+  });
 });
