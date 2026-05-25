@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Dartboard } from "../components/Dartboard";
+import { apiBase } from "../apiBase";
 
 interface StatRow {
   player: string;
@@ -55,10 +56,11 @@ export function History() {
 
     async function load() {
       try {
+        const base = apiBase();
         const [statsRes, recentRes, heatRes] = await Promise.all([
-          fetch("/api/history/stats"),
-          fetch("/api/history/recent"),
-          fetch("/api/history/heatmap"),
+          fetch(`${base}/api/history/stats`),
+          fetch(`${base}/api/history/recent`),
+          fetch(`${base}/api/history/heatmap`),
         ]);
 
         if (!statsRes.ok || !recentRes.ok || !heatRes.ok) {

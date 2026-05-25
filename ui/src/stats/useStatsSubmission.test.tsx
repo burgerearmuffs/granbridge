@@ -116,4 +116,16 @@ describe("useStatsSubmission", () => {
     expect(identity.writeToken.length).toBeGreaterThan(0);
     await vi.waitFor(() => expect(useMpStore.getState().remoteMatchId).toBeNull());
   });
+
+  it("LOCAL: fetches export/latest from the absolute bridge base", async () => {
+    const f = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({
+      mode: "x01", players: ["Ann"], winner: "Ann", started_at: "s", ended_at: "e",
+      throws: [{ player: "Ann", bed: "T20", score: 60, ts: "t" }],
+    }) });
+    vi.stubGlobal("fetch", f);
+    render(<Harness />);
+    useStore.getState().applyEvent({ type: "game_state", state: { ...FINISHED("Ann", ["Ann"]), status: "in_progress" } });
+    useStore.getState().applyEvent({ type: "game_state", state: FINISHED("Ann", ["Ann"]) });
+    await vi.waitFor(() => expect(f).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/export/latest"));
+  });
 });

@@ -54,7 +54,9 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
       "/api/history/heatmap": HEATMAP_PAYLOAD,
       ...overrides,
     };
-    const data = responses[url as string];
+    // History fetches the bridge on an absolute base; strip it so the mock matches by path.
+    const path = (url as string).replace(/^https?:\/\/[^/]+/, "");
+    const data = responses[path];
     return Promise.resolve({
       ok: true,
       json: () => Promise.resolve(data),
@@ -185,5 +187,15 @@ describe("History view", () => {
       expect(screen.getByText(/no stats recorded/i)).toBeInTheDocument()
     );
     expect(screen.getByText(/no games recorded/i)).toBeInTheDocument();
+  });
+
+  it("requests history from the absolute bridge base, not a relative path", async () => {
+    const fetchMock = makeFetch();
+    globalThis.fetch = fetchMock;
+    render(<History />);
+    await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/stats");
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/recent");
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/heatmap");
   });
 });

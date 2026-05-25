@@ -34,4 +34,11 @@ describe("fetchMyCareerSummary", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
     expect(await fetchMyCareerSummary("Ada")).toEqual({ threeDartAvg: 0, wins: 0, gamesPlayed: 0 });
   });
+
+  it("defaults to the absolute bridge base so it works in the packaged app", async () => {
+    const f = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+    vi.stubGlobal("fetch", f);
+    await fetchMyCareerSummary("Ada");
+    expect(f).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/stats");
+  });
 });
