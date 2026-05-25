@@ -58,3 +58,4 @@ def test_turn_public_endpoint_overrides():
     })
     assert cfg.turn_public_host == "turn.example.com"
     assert cfg.turn_public_port == 8443
+    assert cfg.turn_transport == "tcp"
