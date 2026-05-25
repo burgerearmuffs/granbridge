@@ -4,15 +4,13 @@ import { fetchIceServers } from "./turn";
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-const STUN = "stun:stun.l.google.com:19302";
-
 describe("fetchIceServers", () => {
-  it("derives the https base and merges the TURN server on success", async () => {
+  it("returns a relay-only TURNS server on success (no STUN)", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
         username: "123", credential: "abc",
-        uris: ["turn:d:3478?transport=udp", "turns:d:5349?transport=tcp"],
+        uris: ["turns:play.example.com:443?transport=tcp"],
       }),
     }));
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
@@ -20,11 +18,10 @@ describe("fetchIceServers", () => {
     const servers = await fetchIceServers("wss://play.example.com");
 
     expect(fetchMock).toHaveBeenCalledWith("https://play.example.com/turn");
-    expect(servers[0]).toEqual({ urls: STUN });
-    expect(servers[1]).toEqual({
-      urls: ["turn:d:3478?transport=udp", "turns:d:5349?transport=tcp"],
+    expect(servers).toEqual([{
+      urls: ["turns:play.example.com:443?transport=tcp"],
       username: "123", credential: "abc",
-    });
+    }]);
   });
 
   it("maps ws:// to http:// for the credential fetch", async () => {
@@ -36,25 +33,21 @@ describe("fetchIceServers", () => {
 
   it("returns [] on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })) as unknown as typeof fetch);
-    const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([]);
+    expect(await fetchIceServers("wss://d")).toEqual([]);
   });
 
   it("returns [] when fetch throws", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network"); }) as unknown as typeof fetch);
-    const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([]);
+    expect(await fetchIceServers("wss://d")).toEqual([]);
   });
 
   it("returns [] on a malformed payload", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x" }) })) as unknown as typeof fetch);
-    const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([]);
+    expect(await fetchIceServers("wss://d")).toEqual([]);
   });
 
   it("returns [] when uris contains a non-string element", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x", credential: "y", uris: ["turn:d:3478", 42] }) })) as unknown as typeof fetch);
-    const servers = await fetchIceServers("wss://d");
-    expect(servers).toEqual([]);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ username: "x", credential: "y", uris: ["turns:d:443", 42] }) })) as unknown as typeof fetch);
+    expect(await fetchIceServers("wss://d")).toEqual([]);
   });
 });
