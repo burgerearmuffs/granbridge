@@ -130,6 +130,8 @@ export function Dartboard({ highlight, heatmap, tilt = "flat", dart }: Props) {
     return { x, y };
   }, [dart]);
 
+  const isTilted = tilt !== "flat";
+
   const svg = (
     <svg
       viewBox="0 0 200 200"
@@ -138,6 +140,44 @@ export function Dartboard({ highlight, heatmap, tilt = "flat", dart }: Props) {
       aria-label="dartboard"
       style={{ width: "100%", maxWidth: 320 }}
     >
+      {/* 3D defs: metallic wire gradient, sheen (only when tilted) */}
+      {isTilted && (
+        <defs>
+          <linearGradient id="gb-metal" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#e8edf2" />
+            <stop offset="50%" stopColor="#9aa3ab" />
+            <stop offset="100%" stopColor="#5b636b" />
+          </linearGradient>
+          <radialGradient id="gb-sheen" cx="38%" cy="32%" r="55%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.10)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+        </defs>
+      )}
+
+      {/* Contact shadow (only when tilted) */}
+      {isTilted && (
+        <ellipse
+          data-contact-shadow
+          cx={CX}
+          cy={CY + R_DOUBLE_OUTER + 4}
+          rx={R_DOUBLE_OUTER * 0.82}
+          ry={6}
+          fill="rgba(0,0,0,0.45)"
+        />
+      )}
+
+      {/* Board thickness disc (only when tilted) */}
+      {isTilted && (
+        <ellipse
+          cx={CX}
+          cy={CY + 2}
+          rx={R_DOUBLE_OUTER + 1}
+          ry={R_DOUBLE_OUTER * 0.18}
+          fill="#0a0a0a"
+        />
+      )}
+
       {/* Outer rim / background */}
       <circle cx={CX} cy={CY} r={R_DOUBLE_OUTER} fill="#111" />
 
@@ -265,6 +305,29 @@ export function Dartboard({ highlight, heatmap, tilt = "flat", dart }: Props) {
           />
         );
       })()}
+
+      {/* Metallic raised rim (only when tilted) */}
+      {isTilted && (
+        <circle
+          cx={CX}
+          cy={CY}
+          r={R_DOUBLE_OUTER}
+          fill="none"
+          stroke="url(#gb-metal)"
+          strokeWidth="2.5"
+        />
+      )}
+
+      {/* Sheen overlay (only when tilted) */}
+      {isTilted && (
+        <circle
+          cx={CX}
+          cy={CY}
+          r={R_DOUBLE_OUTER}
+          fill="url(#gb-sheen)"
+          style={{ pointerEvents: "none" }}
+        />
+      )}
 
       {/* Dart landing marker */}
       {dartMarker && (

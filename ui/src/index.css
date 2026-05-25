@@ -63,6 +63,33 @@ body { margin: 0; }
   animation: bust-shake 0.5s ease-in-out;
 }
 
+/* ── 3D dartboard ── */
+.dartboard-3d {
+  perspective: 1000px;
+}
+
+.dartboard-3d svg {
+  transition: transform 0.4s ease;
+  display: block;
+}
+
+.tilt-play svg {
+  transform: rotateX(17deg);
+  transform-origin: center 58%;
+}
+
+.tilt-hero svg {
+  transform: rotateX(26deg) rotateZ(-3deg);
+  transform-origin: center 58%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dartboard-3d svg {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 /* ── Subtle board polish ── */
 .granbridge-board-container {
   background: var(--color-surface);

@@ -93,6 +93,14 @@ describe("Dartboard", () => {
     });
   });
 
+  describe("3D visual scaffolding", () => {
+    it("includes the metallic wire gradient + contact shadow when tilted", () => {
+      const { container } = render(<Dartboard tilt="play" />);
+      expect(container.querySelector("#gb-metal")).not.toBeNull();        // wire gradient def
+      expect(container.querySelector("[data-contact-shadow]")).not.toBeNull();
+    });
+  });
+
   describe("heatmap prop", () => {
     it("T20 (count=10) has a stronger heat fill than S1 (count=1)", () => {
       const { container } = render(
