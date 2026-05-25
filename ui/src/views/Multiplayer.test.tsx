@@ -201,3 +201,27 @@ describe("OpponentCard wiring smoke", () => {
     expect(screen.getByText("Eve")).toBeInTheDocument();
   });
 });
+
+// append to ui/src/views/Multiplayer.test.tsx (it already renders <Multiplayer/> and mocks media/WebRTC).
+// This test drives the onOpponentCard path indirectly is hard; instead unit-test the resolver helper.
+import { resolveOpponentSummary } from "../stats/statsClient";
+import { describe as d2, it as i2, expect as e2, vi as v2, afterEach as a2 } from "vitest";
+
+a2(() => v2.restoreAllMocks());
+
+d2("resolveOpponentSummary", () => {
+  i2("prefers the server summary when the fetch succeeds", async () => {
+    v2.stubGlobal("fetch", v2.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({
+      three_dart_avg: 70, wins: 9, games_played: 12 }) }));
+    const out = await resolveOpponentSummary("oppId", { threeDartAvg: 1, wins: 1, gamesPlayed: 1 });
+    e2(out).toEqual({ threeDartAvg: 70, wins: 9, gamesPlayed: 12 });
+    v2.unstubAllGlobals();
+  });
+  i2("falls back to the data-channel summary on fetch error", async () => {
+    v2.stubGlobal("fetch", v2.fn().mockResolvedValue({ ok: false, status: 500 }));
+    const fallback = { threeDartAvg: 1, wins: 1, gamesPlayed: 1 };
+    const out = await resolveOpponentSummary("oppId", fallback);
+    e2(out).toBe(fallback);
+    v2.unstubAllGlobals();
+  });
+});

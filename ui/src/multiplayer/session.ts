@@ -11,6 +11,7 @@ import { getLocalStream } from "./media";
 import { fetchIceServers } from "./turn";
 import { fetchMyCareerSummary } from "./careerSummary";
 import { RemoteMatch, hostRole, type GuestAction } from "./remoteMatch";
+import { resolveOpponentSummary } from "../stats/statsClient";
 import { bridgeLink } from "../bridgeLink";
 import { useStore } from "../store";
 import type { Profile } from "./player";
@@ -76,7 +77,11 @@ class MpSession {
       bridge: bridgeLink,
       applyState: (state) => useStore.getState().applyEvent({ type: "game_state", state }),
       selfCard: this.selfCard,
-      onOpponentCard: (profile, summary) => useMpStore.getState().setOpponentCard({ profile, summary }),
+      onOpponentCard: (profile, summary) => {
+        void resolveOpponentSummary(profile.id, summary).then((resolved) =>
+          useMpStore.getState().setOpponentCard({ profile, summary: resolved }),
+        );
+      },
       onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
     });
     rm.start();
