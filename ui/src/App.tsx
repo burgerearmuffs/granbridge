@@ -11,6 +11,7 @@ import { Celebration } from "./components/Celebration";
 import { SoundToggle } from "./components/SoundToggle";
 import { CheckoutOverlay } from "./components/CheckoutOverlay";
 import { VideoToggle } from "./components/VideoToggle";
+import { FullscreenToggle } from "./components/FullscreenToggle";
 import { videoForEvent } from "./video/decide";
 import type { CheckoutTrigger } from "./components/CheckoutOverlay";
 import { Multiplayer } from "./views/Multiplayer";
@@ -134,30 +135,33 @@ export default function App() {
           <div className="flex items-center gap-4">
             <VideoToggle />
             <SoundToggle />
+            <FullscreenToggle />
             <ConnectionBadge connection={connection} />
           </div>
         </header>
       )}
       {!kiosk && <UpdateBanner state={updater} />}
       <Banners banners={banners} />
-      {activeTab === "leaderboard" ? (
-        <Leaderboard />
-      ) : activeTab === "profile" ? (
-        <Profile />
-      ) : activeTab === "multiplayer" ? (
-        <Multiplayer />
-      ) : activeTab === "history" ? (
-        <History />
-      ) : playing ? (
-        <>
-          <LiveGame state={gameState!} />
-          <div className="mt-10">
-            <Controls send={send} />
-          </div>
-        </>
-      ) : (
-        <Setup send={send} />
-      )}
+      <div key={activeTab} className="tab-content">
+        {activeTab === "leaderboard" ? (
+          <Leaderboard />
+        ) : activeTab === "profile" ? (
+          <Profile />
+        ) : activeTab === "multiplayer" ? (
+          <Multiplayer />
+        ) : activeTab === "history" ? (
+          <History />
+        ) : playing ? (
+          <>
+            <LiveGame state={gameState!} />
+            <div className="mt-10">
+              <Controls send={send} />
+            </div>
+          </>
+        ) : (
+          <Setup send={send} />
+        )}
+      </div>
       {/* Confetti fires on leg_won only; CheckoutOverlay owns game_won celebration */}
       <Celebration trigger={legWonCount} />
       <CheckoutOverlay trigger={overlayTrigger} />

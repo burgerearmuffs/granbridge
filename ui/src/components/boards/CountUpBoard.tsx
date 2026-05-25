@@ -19,6 +19,7 @@ export function CountUpBoard({ state }: { state: GameState }) {
             <div
               key={p.id}
               data-player={p.id}
+              data-active={i === state.active_index ? "true" : "false"}
               className={`rounded-2xl px-8 py-6 bg-neutral-800/70 min-w-[180px] text-center ${
                 i === state.active_index ? "ring-4 ring-amber-400" : ""
               }`}
@@ -27,7 +28,13 @@ export function CountUpBoard({ state }: { state: GameState }) {
                 {p.name}
                 {isLeader && <span aria-label="leader" title="Leader">👑</span>}
               </div>
-              <div className="text-7xl font-extrabold text-white tabular-nums">{score}</div>
+              <div
+                key={score}
+                data-score
+                className="text-7xl font-extrabold text-white tabular-nums score-pop"
+              >
+                {score}
+              </div>
             </div>
           );
         })}

@@ -36,6 +36,11 @@ const LABELS: Record<VideoKey, string> = {
   "leg-won":  "LEG!",
 };
 
+const CONTEXT_LABELS: Record<VideoKey, string> = {
+  "game-won": "Game Won",
+  "leg-won":  "Leg Won",
+};
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -137,6 +142,7 @@ function OverlayInner({
   if (!visible || !trigger) return null;
 
   const label = LABELS[trigger.key];
+  const contextLabel = CONTEXT_LABELS[trigger.key];
 
   return (
     <div
@@ -182,6 +188,7 @@ function OverlayInner({
       ) : (
         <ProceduralCelebration
           label={label}
+          contextLabel={contextLabel}
           reducedMotion={settings.reducedMotion}
           videoKey={trigger.key}
         />
@@ -195,11 +202,12 @@ function OverlayInner({
 // ---------------------------------------------------------------------------
 interface ProceduralProps {
   label: string;
+  contextLabel: string;
   reducedMotion: boolean;
   videoKey: VideoKey;
 }
 
-function ProceduralCelebration({ label, reducedMotion, videoKey }: ProceduralProps) {
+function ProceduralCelebration({ label, contextLabel, reducedMotion, videoKey }: ProceduralProps) {
   const accent = videoKey === "game-won" ? "#ffd54a" : "#4ecdc4";
 
   if (reducedMotion) {
@@ -218,6 +226,18 @@ function ProceduralCelebration({ label, reducedMotion, videoKey }: ProceduralPro
         }}
       >
         {label}
+        <div
+          data-testid="context-label"
+          style={{
+            fontSize: "clamp(0.75rem, 2.5vw, 1.25rem)",
+            fontWeight: 600,
+            letterSpacing: "0.1em",
+            opacity: 0.75,
+            marginTop: "0.25em",
+          }}
+        >
+          {contextLabel}
+        </div>
       </div>
     );
   }
@@ -299,7 +319,7 @@ function ProceduralCelebration({ label, reducedMotion, videoKey }: ProceduralPro
         }}
       />
 
-      {/* Main label text */}
+      {/* Main label text + context label */}
       <div
         style={{
           position: "relative",
@@ -314,6 +334,19 @@ function ProceduralCelebration({ label, reducedMotion, videoKey }: ProceduralPro
         }}
       >
         {label}
+        <div
+          data-testid="context-label"
+          style={{
+            fontSize: "clamp(0.75rem, 2.5vw, 1.25rem)",
+            fontWeight: 600,
+            letterSpacing: "0.1em",
+            opacity: 0.75,
+            marginTop: "0.25em",
+            textShadow: "none",
+          }}
+        >
+          {contextLabel}
+        </div>
       </div>
 
       {/* Keyframe styles injected once */}

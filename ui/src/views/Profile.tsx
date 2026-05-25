@@ -6,6 +6,7 @@ import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerS
 import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
 import { exportRecoveryKey } from "../multiplayer/recoveryKey";
 import { getUploadEnabled, setUploadEnabled } from "../stats/uploadPref";
+import { PageHeader } from "../components/Page";
 
 export function Profile() {
   const [profile, setProfile] = useState(() => getOrCreatePlayer());
@@ -63,7 +64,7 @@ export function Profile() {
 
   return (
     <div className="max-w-md mx-auto mt-8 space-y-6">
-      <h2 className="text-2xl font-bold">Profile</h2>
+      <PageHeader title="Profile" />
 
       <div className="flex items-center gap-4">
         <Avatar name={profile.name} color={profile.avatar.color} size={72} />

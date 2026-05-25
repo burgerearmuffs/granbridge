@@ -18,6 +18,7 @@ import { useMpStore } from "../multiplayer/store";
 import { getOrCreatePlayer } from "../multiplayer/player";
 import { VideoTile } from "../components/VideoTile";
 import { MpControls } from "../components/MpControls";
+import { MpGameLayout } from "../components/MpGameLayout";
 import { useStore } from "../store";
 import { LiveGame } from "./LiveGame";
 import { OpponentCard } from "../components/OpponentCard";
@@ -157,16 +158,34 @@ export function Multiplayer() {
     );
   }
 
-  // in_room
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">
-          Room: <span className="text-amber-400">{room}</span>
-        </h2>
-        <span className="text-sm text-neutral-400">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
-      </div>
+  // Shared video tile elements (used in both lobby and in-game layout)
+  const localVideoTile = (
+    <VideoTile
+      stream={localStream}
+      label={`${displayName} (you)`}
+      muted
+      micActive={mic}
+      camActive={cam}
+      avatarName={displayName}
+      avatarColor={identity.avatar.color}
+    />
+  );
 
+  const firstPeer = peers[0];
+  const firstRemoteVideoTile = firstPeer ? (
+    <VideoTile
+      key={firstPeer.peer_id}
+      stream={remoteStreams.get(firstPeer.peer_id) ?? null}
+      label={firstPeer.player.name}
+      muted={false}
+      avatarName={firstPeer.player.name}
+      avatarColor={firstPeer.player.avatar?.color ?? defaultAvatarColor(firstPeer.player.id)}
+    />
+  ) : null;
+
+  // Connection health banners (shown in both lobby and in-game)
+  const healthBanners = (
+    <>
       {connectionHealth === "reconnecting" && (
         <div role="status" className="bg-amber-900/50 border border-amber-700 rounded-lg px-4 py-2 text-sm text-amber-200">
           Reconnecting…
@@ -177,19 +196,63 @@ export function Multiplayer() {
           Connection lost. <button onClick={handleJoin} className="underline">Rejoin</button>
         </div>
       )}
+    </>
+  );
+
+  // ── In-progress: broadcast-rail layout ──────────────────────────────────────
+  if (gameState && gameState.status === "in_progress") {
+    const guestActionControls = role === "guest" ? (
+      <GuestControls
+        state={gameState}
+        guestSlot="p2"
+        onAction={(a, bed) => mpSession.requestAction(a, bed)}
+      />
+    ) : null;
+
+    return (
+      <div className="space-y-2">
+        {/* Slim room header bar */}
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-semibold text-neutral-400">
+            Room: <span className="text-amber-400">{room}</span>
+          </h2>
+          <span className="text-xs text-neutral-500">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
+        </div>
+
+        {healthBanners}
+
+        <MpGameLayout
+          board={<LiveGame state={gameState} />}
+          selfVideo={localVideoTile}
+          oppVideo={firstRemoteVideoTile ?? <div className="w-full h-full bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-xs">No opponent camera</div>}
+          oppCard={opponentCard ? <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} /> : null}
+          controls={
+            <div>
+              {guestActionControls}
+              <MpControls onLeave={handleLeave} />
+            </div>
+          }
+        />
+      </div>
+    );
+  }
+
+  // ── Lobby: pre-game stacked layout ─────────────────────────────────────────
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">
+          Room: <span className="text-amber-400">{room}</span>
+        </h2>
+        <span className="text-sm text-neutral-400">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
+      </div>
+
+      {healthBanners}
 
       {/* Video grid */}
       <div className="grid grid-cols-2 gap-4">
         {/* Local tile — always muted */}
-        <VideoTile
-          stream={localStream}
-          label={`${displayName} (you)`}
-          muted
-          micActive={mic}
-          camActive={cam}
-          avatarName={displayName}
-          avatarColor={identity.avatar.color}
-        />
+        {localVideoTile}
         {/* Remote tiles */}
         {peers.map((p) => (
           <VideoTile
@@ -212,14 +275,9 @@ export function Multiplayer() {
         <p className="text-neutral-500 text-sm">Waiting for opponent to join…</p>
       )}
 
-      {/* Shared match */}
+      {/* Shared match — lobby controls */}
       <div className="border-t border-neutral-800 pt-4">
-        {gameState && gameState.status === "in_progress" ? (
-          <>
-            <LiveGame state={gameState} />
-            {role === "guest" && <GuestControls state={gameState} guestSlot="p2" onAction={(a, bed) => mpSession.requestAction(a, bed)} />}
-          </>
-        ) : role === "host" ? (
+        {role === "host" ? (
           <div className="flex items-center gap-3">
             <label className="text-sm text-neutral-300">
               Mode

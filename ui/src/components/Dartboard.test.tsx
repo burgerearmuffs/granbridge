@@ -78,6 +78,29 @@ describe("Dartboard", () => {
     expect(highlighted.length).toBe(0);
   });
 
+  describe("tilt + dart props", () => {
+    it("defaults to flat (no perspective wrapper) so History is unaffected", () => {
+      const { container } = render(<Dartboard />);
+      expect(container.querySelector(".dartboard-3d")).toBeNull();
+    });
+    it("applies the play-tilt wrapper class when tilt='play'", () => {
+      const { container } = render(<Dartboard tilt="play" />);
+      expect(container.querySelector(".dartboard-3d.tilt-play")).not.toBeNull();
+    });
+    it("renders a dart-landing marker when a dart bed is given", () => {
+      const { container } = render(<Dartboard tilt="play" dart="T20" />);
+      expect(container.querySelector("[data-dart-marker]")).not.toBeNull();
+    });
+  });
+
+  describe("3D visual scaffolding", () => {
+    it("includes the metallic wire gradient + contact shadow when tilted", () => {
+      const { container } = render(<Dartboard tilt="play" />);
+      expect(container.querySelector("#gb-metal")).not.toBeNull();        // wire gradient def
+      expect(container.querySelector("[data-contact-shadow]")).not.toBeNull();
+    });
+  });
+
   describe("heatmap prop", () => {
     it("T20 (count=10) has a stronger heat fill than S1 (count=1)", () => {
       const { container } = render(

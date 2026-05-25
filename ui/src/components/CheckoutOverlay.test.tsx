@@ -169,3 +169,26 @@ describe("overlay wrapper", () => {
     expect(overlay.style.position).toBe("fixed");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Context label — shows event type beneath the main celebration label
+// ---------------------------------------------------------------------------
+describe("context label", () => {
+  it("shows a context label element for game-won in reduced-motion mode", () => {
+    setSettings({ enabled: true, reducedMotion: true });
+    render(<CheckoutOverlay trigger={{ key: "game-won", n: 1 }} />);
+    expect(screen.getByTestId("context-label")).toBeTruthy();
+  });
+
+  it("context label reads 'Game Won' for game-won trigger", () => {
+    setSettings({ enabled: true, reducedMotion: true });
+    render(<CheckoutOverlay trigger={{ key: "game-won", n: 1 }} />);
+    expect(screen.getByTestId("context-label").textContent).toBe("Game Won");
+  });
+
+  it("context label reads 'Leg Won' for leg-won trigger", () => {
+    setSettings({ enabled: true, reducedMotion: true });
+    render(<CheckoutOverlay trigger={{ key: "leg-won", n: 1 }} />);
+    expect(screen.getByTestId("context-label").textContent).toBe("Leg Won");
+  });
+});

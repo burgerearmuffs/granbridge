@@ -70,12 +70,36 @@ function heatFill(intensity: number): { fill: string; opacity: number } {
   return { fill: `rgb(${r},${g},${b})`, opacity };
 }
 
+// Bed string parser: returns the segment index (0-19) for numbered beds,
+// or null for bulls.
+function bedToSegIndex(bed: string): number | null {
+  if (bed === "BULL" || bed === "DBULL") return null;
+  // Strip prefix: S, D, T
+  const match = bed.match(/^[SDT](\d+)$/);
+  if (!match) return null;
+  const num = parseInt(match[1], 10);
+  const idx = NUMBERS.indexOf(num);
+  return idx >= 0 ? idx : null;
+}
+
+// Return (r1+r2)/2 midpoint radius for a bed prefix
+function bedMidRadius(bed: string): number {
+  if (bed === "DBULL") return 0; // center
+  if (bed === "BULL") return (R_SBULL + R_DBULL) / 2;
+  if (bed.startsWith("D")) return (R_DOUBLE_OUTER + R_DOUBLE_INNER) / 2;
+  if (bed.startsWith("T")) return (R_TRIPLE_OUTER + R_TRIPLE_INNER) / 2;
+  // Single — outer single
+  return (R_SINGLE_OUTER + R_SINGLE_OUTER_INNER) / 2;
+}
+
 interface Props {
   highlight?: string;
   heatmap?: Record<string, number>;
+  tilt?: "flat" | "play" | "hero";
+  dart?: string;
 }
 
-export function Dartboard({ highlight, heatmap }: Props) {
+export function Dartboard({ highlight, heatmap, tilt = "flat", dart }: Props) {
   // Pre-compute normalised intensity for each bed when heatmap is provided.
   const heatNorm = React.useMemo<Record<string, number>>(() => {
     if (!heatmap) return {};
@@ -88,7 +112,27 @@ export function Dartboard({ highlight, heatmap }: Props) {
     }
     return result;
   }, [heatmap]);
-  return (
+  // Compute dart marker position
+  const dartMarker = React.useMemo(() => {
+    if (!dart) return null;
+    if (dart === "DBULL") {
+      return { x: CX, y: CY };
+    }
+    if (dart === "BULL") {
+      return { x: CX, y: CY - (R_SBULL + R_DBULL) / 2 };
+    }
+    const segIdx = bedToSegIndex(dart);
+    if (segIdx === null) return null;
+    const [startA, endA] = segAngles(segIdx);
+    const midA = (startA + endA) / 2;
+    const r = bedMidRadius(dart);
+    const [x, y] = polarToXY(CX, CY, r, midA);
+    return { x, y };
+  }, [dart]);
+
+  const isTilted = tilt !== "flat";
+
+  const svg = (
     <svg
       viewBox="0 0 200 200"
       xmlns="http://www.w3.org/2000/svg"
@@ -96,6 +140,44 @@ export function Dartboard({ highlight, heatmap }: Props) {
       aria-label="dartboard"
       style={{ width: "100%", maxWidth: 320 }}
     >
+      {/* 3D defs: metallic wire gradient, sheen (only when tilted) */}
+      {isTilted && (
+        <defs>
+          <linearGradient id="gb-metal" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#e8edf2" />
+            <stop offset="50%" stopColor="#9aa3ab" />
+            <stop offset="100%" stopColor="#5b636b" />
+          </linearGradient>
+          <radialGradient id="gb-sheen" cx="38%" cy="32%" r="55%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.10)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+        </defs>
+      )}
+
+      {/* Contact shadow (only when tilted) */}
+      {isTilted && (
+        <ellipse
+          data-contact-shadow
+          cx={CX}
+          cy={CY + R_DOUBLE_OUTER + 4}
+          rx={R_DOUBLE_OUTER * 0.82}
+          ry={6}
+          fill="rgba(0,0,0,0.45)"
+        />
+      )}
+
+      {/* Board thickness disc (only when tilted) */}
+      {isTilted && (
+        <ellipse
+          cx={CX}
+          cy={CY + 2}
+          rx={R_DOUBLE_OUTER + 1}
+          ry={R_DOUBLE_OUTER * 0.18}
+          fill="#0a0a0a"
+        />
+      )}
+
       {/* Outer rim / background */}
       <circle cx={CX} cy={CY} r={R_DOUBLE_OUTER} fill="#111" />
 
@@ -223,6 +305,47 @@ export function Dartboard({ highlight, heatmap }: Props) {
           />
         );
       })()}
+
+      {/* Metallic raised rim (only when tilted) */}
+      {isTilted && (
+        <circle
+          cx={CX}
+          cy={CY}
+          r={R_DOUBLE_OUTER}
+          fill="none"
+          stroke="url(#gb-metal)"
+          strokeWidth="2.5"
+        />
+      )}
+
+      {/* Sheen overlay (only when tilted) */}
+      {isTilted && (
+        <circle
+          cx={CX}
+          cy={CY}
+          r={R_DOUBLE_OUTER}
+          fill="url(#gb-sheen)"
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* Dart landing marker */}
+      {dartMarker && (
+        <g data-dart-marker>
+          <circle cx={dartMarker.x} cy={dartMarker.y} r={4} fill="none" stroke="#ffd54a" strokeWidth="1.5" opacity="0.9" />
+          <circle cx={dartMarker.x} cy={dartMarker.y} r={1.5} fill="#ffd54a" opacity="0.95" />
+        </g>
+      )}
     </svg>
+  );
+
+  if (tilt === "flat") {
+    return svg;
+  }
+
+  return (
+    <div className={`dartboard-3d tilt-${tilt}`}>
+      {svg}
+    </div>
   );
 }
