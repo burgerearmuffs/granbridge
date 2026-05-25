@@ -1,0 +1,10 @@
+# Caddy with the layer4 (L4) app so one 443 listener can ALPN-demux between the
+# web broker (WSS) and coturn (TURNS).
+# NOTE: caddy-l4 >= v0.1.0 requires Go >= 1.25. Only the latest `caddy:builder`
+# (Caddy 2.11.x, Go 1.26+) satisfies this — caddy:2.8-builder / 2.9-builder ship
+# Go 1.23 and FAIL with "requires go >= 1.25.0". Runtime base bumped to 2.11 to match.
+FROM caddy:builder AS build
+RUN xcaddy build --with github.com/mholt/caddy-l4
+
+FROM caddy:2.11
+COPY --from=build /usr/bin/caddy /usr/bin/caddy

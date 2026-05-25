@@ -42,3 +42,20 @@ def test_stats_config_from_env(tmp_path):
                     "STATS_DB_PATH": "/data/stats.db", "STATS_RATE_PER_MIN": "5"})
     assert cfg.stats_db_path == "/data/stats.db"
     assert cfg.stats_rate_per_min == 5
+
+
+def test_turn_public_endpoint_defaults_to_443_tcp():
+    cfg = from_env({"DOMAIN": "play.example.com", "TURN_SECRET": "x"})
+    assert cfg.turn_public_host == "play.example.com"
+    assert cfg.turn_public_port == 443
+    assert cfg.turn_transport == "tcp"
+
+
+def test_turn_public_endpoint_overrides():
+    cfg = from_env({
+        "DOMAIN": "play.example.com", "TURN_SECRET": "x",
+        "TURN_PUBLIC_HOST": "turn.example.com", "TURN_PUBLIC_PORT": "8443", "TURN_TRANSPORT": "tcp",
+    })
+    assert cfg.turn_public_host == "turn.example.com"
+    assert cfg.turn_public_port == 8443
+    assert cfg.turn_transport == "tcp"

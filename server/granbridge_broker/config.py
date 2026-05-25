@@ -24,6 +24,9 @@ class BrokerConfig:
     turn_secret: str
     turn_domain: str
     turn_ttl: int
+    turn_public_host: str
+    turn_public_port: int
+    turn_transport: str
     turn_rate_per_min: int
     conn_rate_per_min: int
     msg_rate_per_sec: int
@@ -56,6 +59,9 @@ def from_env(env=None) -> BrokerConfig:
         turn_secret=secret,
         turn_domain=domain,
         turn_ttl=int(env.get("TURN_TTL", "86400")),
+        turn_public_host=env.get("TURN_PUBLIC_HOST") or domain,
+        turn_public_port=int(env.get("TURN_PUBLIC_PORT", "443")),
+        turn_transport=env.get("TURN_TRANSPORT", "tcp"),
         turn_rate_per_min=int(env.get("TURN_RATE_PER_MIN", "30")),
         conn_rate_per_min=int(env.get("CONN_RATE_PER_MIN", "60")),
         msg_rate_per_sec=int(env.get("MSG_RATE_PER_SEC", "20")),

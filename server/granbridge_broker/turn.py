@@ -7,6 +7,8 @@ The static secret never leaves the server; clients receive only short-lived cred
 
 The returned dict uses the key ``uris`` (matching the broker's wire format); the
 WebRTC client maps this to the ``RTCIceServer.urls`` field on the receiving end.
+
+URI shape: a single ``turns:HOST:PORT?transport=tcp`` — relay-only over TLS/TCP.
 """
 from __future__ import annotations
 
@@ -15,13 +17,19 @@ import hashlib
 import hmac
 
 
-def make_turn_credentials(secret: str, domain: str, ttl: int, now: float) -> dict:
+def make_turn_credentials(
+    secret: str,
+    domain: str,
+    ttl: int,
+    now: float,
+    *,
+    public_host: str | None = None,
+    public_port: int = 443,
+    transport: str = "tcp",
+) -> dict:
     username = str(int(now) + ttl)
     digest = hmac.new(secret.encode(), username.encode(), hashlib.sha1).digest()
     credential = base64.b64encode(digest).decode()
-    uris = [
-        f"turn:{domain}:3478?transport=udp",
-        f"turn:{domain}:3478?transport=tcp",
-        f"turns:{domain}:5349?transport=tcp",
-    ]
+    host = public_host or domain
+    uris = [f"turns:{host}:{public_port}?transport={transport}"]
     return {"username": username, "credential": credential, "ttl": ttl, "uris": uris}

@@ -46,3 +46,36 @@ async def test_ws_check_skips_without_websockets(monkeypatch):
     monkeypatch.setitem(sys.modules, "websockets", None)  # forces ImportError on `import websockets`
     ok, detail = await smoke.check_ws("ws://127.0.0.1:8798")
     assert ok is None and "SKIP" in detail
+
+
+from smoke import turns_endpoint, recv_stun_message
+
+
+def test_turns_endpoint_parses_host_and_port():
+    uris = ["turns:play.example.com:443?transport=tcp"]
+    assert turns_endpoint(uris) == ("play.example.com", 443)
+
+
+def test_turns_endpoint_returns_none_for_non_turns():
+    assert turns_endpoint(["turn:play.example.com:3478?transport=udp"]) is None
+    assert turns_endpoint([]) is None
+
+
+class _FakeSock:
+    """Feeds a fixed byte buffer to recv() in small chunks."""
+    def __init__(self, data: bytes):
+        self._buf = data
+    def recv(self, n: int) -> bytes:
+        chunk, self._buf = self._buf[:n], self._buf[n:]
+        return chunk
+
+
+def test_recv_stun_message_reads_header_plus_body():
+    import struct, os
+    body = b"\x00\x19\x00\x04\x11\x00\x00\x00"  # one 8-byte attribute
+    txn = os.urandom(12)
+    msg = struct.pack(">HHI", 0x0103, len(body), 0x2112A442) + txn + body
+    # extra trailing bytes must NOT be consumed
+    sock = _FakeSock(msg + b"TRAILING")
+    out = recv_stun_message(sock)
+    assert out == msg

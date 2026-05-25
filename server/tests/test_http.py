@@ -35,6 +35,6 @@ def test_broker_http_route_healthz_and_turn():
     assert turn.status_code == 200
     tbody = json.loads(turn.body)
     assert tbody["username"] and tbody["credential"]
-    assert tbody["uris"][0] == "turn:play.example.com:3478?transport=udp"
+    assert tbody["uris"] == ["turns:play.example.com:443?transport=tcp"]
 
     assert s._http_route("/anything-else") is None

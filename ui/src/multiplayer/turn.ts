@@ -1,10 +1,9 @@
 /**
  * fetchIceServers — fetch short-lived TURN credentials from the broker's /turn
- * endpoint and build the RTCIceServer list. Falls back to STUN-only on any
- * failure so multiplayer still works (just without relay) if /turn is down.
+ * endpoint and build a relay-only RTCIceServer list (a single TURNS server).
+ * Returns [] on any failure: relay-only multiplayer needs the broker's TURNS
+ * server, so there is no useful STUN fallback.
  */
-import { DEFAULT_ICE_SERVERS } from "./peerManager";
-
 interface TurnPayload {
   username?: unknown;
   credential?: unknown;
@@ -19,22 +18,20 @@ function httpBase(brokerWsUrl: string): string {
 export async function fetchIceServers(brokerWsUrl: string): Promise<RTCIceServer[]> {
   try {
     const res = await fetch(httpBase(brokerWsUrl) + "/turn");
-    if (!res.ok) return DEFAULT_ICE_SERVERS;
+    if (!res.ok) return [];
     const data = (await res.json()) as TurnPayload;
     if (
       !data ||
       !Array.isArray(data.uris) ||
+      data.uris.length === 0 ||
       !data.uris.every((u) => typeof u === "string") ||
       typeof data.username !== "string" ||
       typeof data.credential !== "string"
     ) {
-      return DEFAULT_ICE_SERVERS;
+      return [];
     }
-    return [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: data.uris as string[], username: data.username, credential: data.credential },
-    ];
+    return [{ urls: data.uris as string[], username: data.username, credential: data.credential }];
   } catch {
-    return DEFAULT_ICE_SERVERS;
+    return [];
   }
 }

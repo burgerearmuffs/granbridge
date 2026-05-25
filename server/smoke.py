@@ -2,16 +2,18 @@
 
 Usage:
     python smoke.py wss://play.example.com
-    python smoke.py ws://127.0.0.1:8788
+    python smoke.py ws://127.0.0.1:8788 [--legacy-udp]
 
 Checks (no WebRTC/browser needed):
-  * GET /healthz            — broker up, returns status ok
-  * GET /turn               — credential endpoint returns a well-formed payload
-  * STUN  (UDP 3478)        — coturn reachable; returns the server-reflexive address
-  * TURN relay (UDP 3478)   — authenticated Allocate: coturn accepts the broker's
-                              /turn credentials and allocates a relay
-  * wss:// connect + join   — WebSocket reachable, room join works (skipped if the
-                              'websockets' package isn't installed)
+  * GET /healthz                  — broker up, returns status ok
+  * GET /turn                     — credential endpoint returns a well-formed payload
+  * TURNS relay (TLS/TCP 443)     — authenticated TURN Allocate over TLS/TCP; proves
+                                    the 443 ALPN-demux path reaches coturn and coturn
+                                    accepts the broker credentials (PRIMARY check)
+  * UDP 3478 checks               — SKIPPED in 443-only mode; pass --legacy-udp to
+                                    run STUN + relay checks against UDP 3478
+  * wss:// connect + join         — WebSocket reachable, room join works (skipped if
+                                    the 'websockets' package isn't installed)
 
 Expects the full stack (broker + coturn). The TURN relay check verifies the
 credential + allocation flow in-process; a real two-player A/V session (media
@@ -25,6 +27,7 @@ import hmac
 import json
 import os
 import socket
+import ssl as _ssl
 import struct
 import sys
 import urllib.request
@@ -175,6 +178,84 @@ def check_turn_relay(host: str, port: int, username: str, credential: str,
         sock.close()
 
 
+def turns_endpoint(uris) -> "tuple[str, int] | None":
+    """Extract (host, port) from the first turns: URI in a /turn payload, else None."""
+    for uri in uris or []:
+        if isinstance(uri, str) and uri.startswith("turns:"):
+            rest = uri[len("turns:"):].split("?", 1)[0]   # host:port
+            if ":" in rest:
+                host, port = rest.rsplit(":", 1)
+                try:
+                    return host, int(port)
+                except ValueError:
+                    return None
+    return None
+
+
+def recv_stun_message(sock) -> bytes:
+    """Read exactly one STUN message (20-byte header + declared body) from a stream."""
+    header = b""
+    while len(header) < 20:
+        chunk = sock.recv(20 - len(header))
+        if not chunk:
+            raise ConnectionError("closed before STUN header")
+        header += chunk
+    _mtype, mlen, magic = struct.unpack(">HHI", header[:8])
+    if magic != _STUN_MAGIC:
+        raise ValueError("not a STUN message (bad magic cookie)")
+    if mlen > 4096:  # real STUN/TURN messages are tiny; guards a misrouted non-STUN endpoint
+        raise ValueError(f"implausible STUN length {mlen}")
+    body = b""
+    while len(body) < mlen:
+        chunk = sock.recv(mlen - len(body))
+        if not chunk:
+            raise ConnectionError("closed before STUN body")
+        body += chunk
+    return header + body
+
+
+def check_turns_tcp_relay(host: str, port: int, username: str, credential: str,
+                          timeout: float = 8.0, ssl_context=None) -> tuple[bool, str]:
+    """Authenticated TURN Allocate over TLS/TCP (turns://). Proves the 443 path:
+    a non-HTTP ALPN handshake reaches coturn, which accepts broker creds and
+    allocates a relay. This is the primary 443-only validation. Pass an explicit
+    ssl_context (e.g. unverified) to test against a self-signed cert."""
+    if not host:
+        return False, "turns relay: no host"
+    ctx = ssl_context or _ssl.create_default_context()
+    raw = socket.create_connection((host, port), timeout=timeout)
+    try:
+        sock = ctx.wrap_socket(raw, server_hostname=host)
+        sock.settimeout(timeout)
+        txn1 = os.urandom(12)
+        sock.sendall(_build_initial_allocate(txn1))
+        challenge = recv_stun_message(sock)
+        if challenge[8:20] != txn1:
+            return False, "turns relay: unexpected/stale challenge"
+        realm = _get_attr(challenge, 0x0014)
+        nonce = _get_attr(challenge, 0x0015)
+        if realm is None or nonce is None:
+            return False, "turns relay: no realm/nonce in challenge"
+        key = _long_term_key(username, realm.decode("utf-8", "replace"), credential)
+        txn2 = os.urandom(12)
+        sock.sendall(_build_authed_allocate(txn2, username, realm, nonce, key))
+        reply = recv_stun_message(sock)
+        if reply[8:20] != txn2:
+            return False, "turns relay: unexpected/stale reply"
+        mtype = struct.unpack(">H", reply[:2])[0]
+        if mtype == 0x0103:
+            relayed = parse_xor_mapped_address(reply, 0x0016)
+            loc = f" {relayed[0]}:{relayed[1]}" if relayed else ""
+            return True, f"turns relay (TCP {port}): coturn accepted creds, relay allocated{loc}"
+        if mtype == 0x0113:
+            return False, f"turns relay (TCP {port}): coturn rejected the credentials"
+        return False, f"turns relay (TCP {port}): unexpected response type {hex(mtype)}"
+    except Exception as exc:
+        return False, f"turns relay {host}:{port}/tcp: {exc}"
+    finally:
+        raw.close()
+
+
 def _http_base(ws_url: str) -> str:
     if "://" not in ws_url:
         raise ValueError(f"URL missing scheme (expected ws:// or wss://): {ws_url!r}")
@@ -266,25 +347,35 @@ async def check_stats(ws_url: str, http_base: str) -> tuple[bool | None, str]:
         return False, f"stats: {exc}"
 
 
-async def run(ws_url: str) -> bool:
+async def run(ws_url: str, legacy_udp: bool = False) -> bool:
     base = _http_base(ws_url)
     host = urlparse(ws_url).hostname or ""
-    results = [check_health(base), check_turn(base), check_stun(host, 3478)]
+    results = [check_health(base), check_turn(base)]
     try:
         creds = _fetch_turn(base)
-        results.append(check_turn_relay(host, 3478, creds["username"], creds["credential"]))
+        endpoint = turns_endpoint(creds.get("uris"))
+        if endpoint:
+            results.append(check_turns_tcp_relay(endpoint[0] or host, endpoint[1],
+                                                 creds["username"], creds["credential"]))
+        else:
+            results.append((False, "turns relay: /turn advertised no turns: URI"))
     except Exception as exc:
-        results.append((False, f"turn relay: couldn't fetch creds: {exc}"))
+        results.append((False, f"turns relay: couldn't fetch creds: {exc}"))
+    if legacy_udp:
+        results.append(check_stun(host, 3478))
+        try:
+            creds = _fetch_turn(base)
+            results.append(check_turn_relay(host, 3478, creds["username"], creds["credential"]))
+        except Exception as exc:
+            results.append((False, f"turn relay (udp): couldn't fetch creds: {exc}"))
+    else:
+        results.append((None, "udp 3478 checks: SKIPPED (443-only mode; pass --legacy-udp to test 3478)"))
     results.append(await check_ws(ws_url))
     results.append(await check_stats(ws_url, base))
     all_ok = True
     for ok, detail in results:
-        if ok is None:
-            label = "SKIP  "
-        elif ok:
-            label = "PASS  "
-        else:
-            label = "FAIL  "
+        label = "SKIP  " if ok is None else ("PASS  " if ok else "FAIL  ")
+        if ok is False:
             all_ok = False
         print(label + detail)
     return all_ok
@@ -292,11 +383,13 @@ async def run(ws_url: str) -> bool:
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    if not argv:
-        print("usage: python smoke.py <ws://host:port | wss://domain>")
+    legacy_udp = "--legacy-udp" in argv
+    positional = [a for a in argv if not a.startswith("--")]
+    if not positional:
+        print("usage: python smoke.py <ws://host:port | wss://domain> [--legacy-udp]")
         return 2
     try:
-        ok = asyncio.run(run(argv[0]))
+        ok = asyncio.run(run(positional[0], legacy_udp=legacy_udp))
     except ValueError as exc:
         print(f"error: {exc}")
         return 2

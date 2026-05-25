@@ -19,7 +19,9 @@ services:
       - secrets:/secrets
 
   caddy:
-    image: caddy:2.8
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
     restart: unless-stopped
     depends_on:
       init:
@@ -34,7 +36,7 @@ services:
     command:
       - |
         if [ -n "$$ACME_EMAIL" ]; then
-          { printf '{\n\temail %s\n}\n\n' "$$ACME_EMAIL"; cat /etc/caddy/Caddyfile; } > /tmp/Caddyfile
+          awk -v e="$$ACME_EMAIL" '{print} (ins==0 && $$0=="{"){print "\temail " e; ins=1}' /etc/caddy/Caddyfile > /tmp/Caddyfile
           exec caddy run --config /tmp/Caddyfile --adapter caddyfile
         fi
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
@@ -72,7 +74,6 @@ services:
   coturn:
     image: coturn/coturn:4.6.2
     restart: unless-stopped
-    network_mode: host          # needs the relay port range + 3478/5349 on the host
     depends_on:
       init:
         condition: service_completed_successfully
@@ -88,6 +89,7 @@ services:
       - secrets:/secrets:ro
       - ./coturn/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks: [backend]
 
 networks:
   backend:

@@ -83,6 +83,9 @@ class BrokerServer:
         turn_secret: str = "",
         turn_domain: str = "granbridge.local",
         turn_ttl: int = 86400,
+        turn_public_host: str = "",
+        turn_public_port: int = 443,
+        turn_transport: str = "tcp",
         turn_rate_per_min: int = 0,
         conn_rate_per_min: int = 0,
         msg_rate_per_sec: int = 0,
@@ -99,6 +102,9 @@ class BrokerServer:
         self._turn_secret = turn_secret
         self._turn_domain = turn_domain
         self._turn_ttl = turn_ttl
+        self._turn_public_host = turn_public_host
+        self._turn_public_port = turn_public_port
+        self._turn_transport = turn_transport
         self._log = logging.getLogger("granbridge.broker")
         # room_name -> _Room
         self._rooms: dict[str, _Room] = {}
@@ -148,7 +154,10 @@ class BrokerServer:
             return json_response(
                 200,
                 make_turn_credentials(
-                    self._turn_secret, self._turn_domain, self._turn_ttl, self._clock()
+                    self._turn_secret, self._turn_domain, self._turn_ttl, self._clock(),
+                    public_host=self._turn_public_host or self._turn_domain,
+                    public_port=self._turn_public_port,
+                    transport=self._turn_transport,
                 ),
             )
         return None

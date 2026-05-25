@@ -1,8 +1,38 @@
-# Caddy auto-provisions + renews a Let's Encrypt cert for $DOMAIN and reverse-proxies
-# WebSocket (wss:// play) + the plain-HTTP /turn and /healthz endpoints to the broker.
-# X-Real-IP gives the broker the true client IP (set here, so it can't be spoofed) for
-# rate limiting.
-# ACME email: set ACME_EMAIL in .env; the caddy service injects the email global block at startup.
+# 443 is demuxed by ALPN: web TLS (h2/http1.1/acme-tls1) terminates in Caddy and
+# reverse-proxies to the broker; everything else is raw-proxied to coturn's TLS
+# port. Caddy's own HTTPS handler moves to :8443 (https_port) so it doesn't fight
+# layer4 for :443. The layer4 proxy sends PROXY protocol so the broker still sees
+# the real client IP (for rate limiting). ACME stays HTTP-01 on :80; acme-tls/1 is
+# routed to the web side so TLS-ALPN-01 renewal also works.
+{
+	https_port 8443
+
+	servers :8443 {
+		listener_wrappers {
+			proxy_protocol {
+				allow 127.0.0.1/32
+			}
+			tls
+		}
+	}
+
+	layer4 {
+		:443 {
+			@web tls alpn h2 http/1.1 acme-tls/1
+			route @web {
+				proxy {
+					proxy_protocol v2
+					upstream 127.0.0.1:8443
+				}
+			}
+			route {
+				proxy {
+					upstream coturn:5349
+				}
+			}
+		}
+	}
+}
 
 {$DOMAIN} {
 	reverse_proxy broker:8788 {

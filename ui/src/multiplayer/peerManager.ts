@@ -10,9 +10,10 @@
  * On offer collision the polite peer rolls back; the impolite peer ignores.
  *
  * Ice / TURN configuration:
- *   Default: STUN only (stun.l.google.com).
- *   TURN slot: add { urls: "turn:<TOWER-ip>:3478", username: "...", credential: "..." }
- *   to the iceServers array (configured via the multiplayer store / env).
+ *   Relay-only: iceTransportPolicy "relay" forces every candidate through the
+ *   broker-provided TURNS server (turns:DOMAIN:443?transport=tcp). Both peers
+ *   relay, so coturn routes media between the two TLS/443 connections internally
+ *   and no UDP relay range needs to be reachable. iceServers come from /turn.
  *
  * Data channel (label "granbridge"):
  *   Created by the impolite peer; negotiated automatically.
@@ -21,11 +22,7 @@
 
 import type { BrokerClient, PeerInfo } from "./brokerClient";
 
-export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  // TURN slot — uncomment and fill in for production (through-NAT):
-  // { urls: "turn:<TOWER-ip>:3478", username: "<user>", credential: "<secret>" },
-];
+export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [];
 
 export type PeerState = "connecting" | "connected" | "disconnected" | "failed";
 
@@ -110,7 +107,7 @@ export class PeerManager {
   // ── internal ──────────────────────────────────────────────────────────────
 
   private _createPeerConnection(peerId: string) {
-    const pc = new RTCPeerConnection({ iceServers: this._iceServers });
+    const pc = new RTCPeerConnection({ iceServers: this._iceServers, iceTransportPolicy: "relay" });
     const isPolite = this._selfPeerId < peerId;
 
     const entry: PeerEntry = { peerId, pc, dc: null, makingOffer: false, ignoreOffer: false };
