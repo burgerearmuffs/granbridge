@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Command } from "../types";
+import { PageHeader } from "../components/Page";
 
 interface Props {
   send: (c: Command) => void;
@@ -43,7 +44,7 @@ export function Setup({ send }: Props) {
         onSubmit={handleSubmit}
         className="bg-neutral-900 rounded-2xl p-8 w-full max-w-md space-y-6 shadow-xl"
       >
-        <h2 className="text-2xl font-black text-white tracking-tight">New Game</h2>
+        <PageHeader title="New Game" />
 
         {/* Mode */}
         <div>

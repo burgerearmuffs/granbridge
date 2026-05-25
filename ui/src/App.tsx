@@ -140,24 +140,26 @@ export default function App() {
       )}
       {!kiosk && <UpdateBanner state={updater} />}
       <Banners banners={banners} />
-      {activeTab === "leaderboard" ? (
-        <Leaderboard />
-      ) : activeTab === "profile" ? (
-        <Profile />
-      ) : activeTab === "multiplayer" ? (
-        <Multiplayer />
-      ) : activeTab === "history" ? (
-        <History />
-      ) : playing ? (
-        <>
-          <LiveGame state={gameState!} />
-          <div className="mt-10">
-            <Controls send={send} />
-          </div>
-        </>
-      ) : (
-        <Setup send={send} />
-      )}
+      <div key={activeTab} className="tab-content">
+        {activeTab === "leaderboard" ? (
+          <Leaderboard />
+        ) : activeTab === "profile" ? (
+          <Profile />
+        ) : activeTab === "multiplayer" ? (
+          <Multiplayer />
+        ) : activeTab === "history" ? (
+          <History />
+        ) : playing ? (
+          <>
+            <LiveGame state={gameState!} />
+            <div className="mt-10">
+              <Controls send={send} />
+            </div>
+          </>
+        ) : (
+          <Setup send={send} />
+        )}
+      </div>
       {/* Confetti fires on leg_won only; CheckoutOverlay owns game_won celebration */}
       <Celebration trigger={legWonCount} />
       <CheckoutOverlay trigger={overlayTrigger} />

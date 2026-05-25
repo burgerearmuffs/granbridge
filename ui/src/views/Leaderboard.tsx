@@ -3,6 +3,7 @@ import { Avatar } from "../components/Avatar";
 import { fetchLeaderboard } from "../stats/statsClient";
 import { defaultAvatarColor } from "../multiplayer/avatar";
 import type { LeaderRow } from "../stats/types";
+import { PageHeader, EmptyState } from "../components/Page";
 
 type Metric = "avg" | "wins";
 
@@ -30,7 +31,7 @@ export function Leaderboard() {
   return (
     <div className="max-w-2xl mx-auto mt-8 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Leaderboard</h2>
+        <PageHeader title="Leaderboard" />
         <div className="flex gap-1" role="group" aria-label="metric">
           <button aria-pressed={metric === "avg"} onClick={() => setMetric("avg")} className={tabClass(metric === "avg")}>
             3-Dart Avg
@@ -47,7 +48,7 @@ export function Leaderboard() {
       ) : rows === null ? (
         <p className="text-neutral-400 animate-pulse">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-neutral-500 text-sm">No verified matches yet.</p>
+        <EmptyState message="No verified matches yet." />
       ) : (
         <ol className="space-y-2">
           {rows.map((r, i) => (

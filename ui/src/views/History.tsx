@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dartboard } from "../components/Dartboard";
 import { apiBase } from "../apiBase";
+import { Section, EmptyState } from "../components/Page";
 
 interface StatRow {
   player: string;
@@ -110,12 +111,9 @@ export function History() {
   return (
     <div className="space-y-10">
       {/* Player Stats Table */}
-      <section>
-        <h2 className="text-xl font-bold mb-4 text-amber-300 tracking-wide uppercase">
-          Player Stats
-        </h2>
+      <Section heading="Player Stats">
         {stats.length === 0 ? (
-          <p className="text-neutral-500">No stats recorded yet.</p>
+          <EmptyState message="No stats recorded yet." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -149,15 +147,12 @@ export function History() {
             </table>
           </div>
         )}
-      </section>
+      </Section>
 
       {/* Recent Games */}
-      <section>
-        <h2 className="text-xl font-bold mb-4 text-amber-300 tracking-wide uppercase">
-          Recent Games
-        </h2>
+      <Section heading="Recent Games">
         {games.length === 0 ? (
-          <p className="text-neutral-500">No games recorded yet.</p>
+          <EmptyState message="No games recorded yet." />
         ) : (
           <ul className="space-y-2">
             {games.map((game) => {
@@ -186,20 +181,17 @@ export function History() {
             })}
           </ul>
         )}
-      </section>
+      </Section>
 
       {/* Heatmap Dartboard */}
-      <section>
-        <h2 className="text-xl font-bold mb-4 text-amber-300 tracking-wide uppercase">
-          Hit Heatmap
-        </h2>
+      <Section heading="Hit Heatmap">
         <p className="text-neutral-500 text-sm mb-4">
           Aggregate dart landing distribution across all recorded games.
         </p>
         <div className="flex justify-center">
           <Dartboard heatmap={heatmap} />
         </div>
-      </section>
+      </Section>
     </div>
   );
 }
