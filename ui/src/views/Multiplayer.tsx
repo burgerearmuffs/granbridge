@@ -24,6 +24,7 @@ import { OpponentCard } from "../components/OpponentCard";
 import { defaultAvatarColor } from "../multiplayer/avatar";
 import { mpSession } from "../multiplayer/session";
 import { hostRole } from "../multiplayer/remoteMatch";
+import { GuestControls } from "../components/GuestControls";
 
 export function Multiplayer() {
   const mpStatus = useMpStore((s) => s.mpStatus);
@@ -214,7 +215,10 @@ export function Multiplayer() {
       {/* Shared match */}
       <div className="border-t border-neutral-800 pt-4">
         {gameState && gameState.status === "in_progress" ? (
-          <LiveGame state={gameState} />
+          <>
+            <LiveGame state={gameState} />
+            {role === "guest" && <GuestControls state={gameState} guestSlot="p2" onAction={(a, bed) => mpSession.requestAction(a, bed)} />}
+          </>
         ) : role === "host" ? (
           <div className="flex items-center gap-3">
             <label className="text-sm text-neutral-300">
@@ -241,6 +245,8 @@ export function Multiplayer() {
               Start match
             </button>
           </div>
+        ) : role === "guest" && gameState ? (
+          <GuestControls state={gameState} guestSlot="p2" onAction={(a, bed) => mpSession.requestAction(a, bed)} />
         ) : (
           <p className="text-neutral-500 text-sm">Waiting for the host to start the match…</p>
         )}
