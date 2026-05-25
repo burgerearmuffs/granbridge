@@ -45,8 +45,18 @@ Add the matching `proxy_protocol` / `set_real_ip_from` config on SWAG's `4443` s
 ## 3. coturn
 
 Run only the `coturn` service from `docker-compose.yml` (plus `init`), publishing its TLS port to
-`127.0.0.1:5349` so the `stream` upstream can reach it. coturn still reuses the cert SWAG manages
-(point its cert volume/path at SWAG's cert for `$DOMAIN`).
+`127.0.0.1:5349` so the `stream` upstream can reach it. The shipped compose publishes **no** coturn host
+ports (bridge-net only), so add a small override file to expose it to localhost:
+
+```yaml
+# docker-compose.swag.yml  — docker compose -f docker-compose.yml -f docker-compose.swag.yml up -d init coturn
+services:
+  coturn:
+    ports:
+      - "127.0.0.1:5349:5349"
+```
+
+coturn still reuses the cert SWAG manages (point its cert volume/path at SWAG's cert for `$DOMAIN`).
 
 > This variant is provided for your environment and is **validated by you on TOWER** — it is not
 > exercised by the repo's automated tests.
