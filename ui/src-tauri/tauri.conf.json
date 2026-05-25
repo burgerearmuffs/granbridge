@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GRANBRIDGE",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.granbridge.app",
   "build": {
     "frontendDist": "../dist",
@@ -21,9 +21,21 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4MjA1OEQ5QUU5M0ZFMzEKUldReC9wT3UyVmdnK0grRUh2SHlkRUtvUmhIczZWSW81M2JkZ0lIRGpNT1lZdFJwMFBpbDhudFQK",
+      "endpoints": [
+        "https://github.com/burgerearmuffs/granbridge/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
+    "createUpdaterArtifacts": true,
     "externalBin": ["binaries/granbridge"],
     "icon": ["icons/icon.ico", "icons/32x32.png", "icons/128x128.png"]
   }

@@ -6,6 +6,8 @@ use tauri_plugin_shell::process::CommandEvent;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             // Spawn the sidecar bridge: `granbridge serve` (no --open; Tauri shows the window)
