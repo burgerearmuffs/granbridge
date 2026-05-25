@@ -58,7 +58,7 @@ export function LiveGame({ state }: Props) {
 
         {/* Dartboard panel */}
         <div className="flex flex-col items-center gap-3 lg:w-64 xl:w-72">
-          <Dartboard highlight={lastHit?.bed} />
+          <Dartboard highlight={lastHit?.bed} tilt="play" dart={lastHit?.bed} />
           {lastHit && (
             <div className="text-center">
               <span className="text-amber-300 font-bold text-lg score-pop">
