@@ -64,3 +64,26 @@ Open follow-ups:
 - [ ] **raw-frame log sink** (`logs/raw_packets/`) — BLE-adjacent; skipped to respect the "don't touch BLE during calibration" guardrail. Wire after hardware validation.
 - [ ] **`overrides_path`→AppData** — skipped during run 2 because it's where live `calibrate` writes; move it after calibration is settled.
 - [ ] **L2/L3** — `cli` private `_flush`/import hygiene; `checkout._search` memoization.
+
+## QA — bugs found testing v0.1.3 (2026-05-25)
+Reported by the user during v0.1.3 release testing; not yet fixed (noted for a later pass).
+
+- [ ] **Local mode: manual scoring buttons do nothing.** The on-screen scoring controls
+  (`ui/src/components/Controls.tsx`) have no effect in Local mode. Needs repro; suspects: the
+  engine remote-role gate may still be armed (MP-3 deliberately keeps it armed on transient unmount
+  via `RemoteMatch.stop(false)`) and filtering local input, or the manual-score command isn't wired
+  when no board is connected. Check that `set_remote_role` is null while in Local mode.
+- [ ] **Leaderboard can't connect to the stats server.** `Leaderboard.tsx` → `fetchLeaderboard`
+  → `brokerHttpBase(readBrokerUrl())`. Two compounding causes: (a) the broker URL defaults to
+  `ws://127.0.0.1:8788`, where no stats server is listening (see the default-URL item below); and
+  (b) server-side stats isn't deployed/enabled on the live broker yet (the darts.aventador.io deploy
+  + `data` volume is still pending). Likely resolved by the default-URL fix **plus** enabling stats
+  on the broker.
+- [ ] **History errors in the installable package** (works in dev). The DB path is fine
+  (`%LOCALAPPDATA%\granbridge\history.db`, `config.py:28`, writable), so suspect a frozen-path
+  resource resolution (`static_dirs()`) or an unhandled error in a `/api/history/*` route under
+  PyInstaller. Needs the actual error text from the packaged build to pin it down.
+- [ ] **Multiplayer broker field should default to `wss://darts.aventador.io/` in all builds.**
+  `ui/src/multiplayer/store.ts:33` `readBrokerUrl()` falls back to `ws://127.0.0.1:8788`
+  (or `VITE_BROKER_URL`). Change the hardcoded fallback (and/or bake `VITE_BROKER_URL` at build time)
+  to `wss://darts.aventador.io/`. One-liner; also fixes half of the leaderboard issue above.
