@@ -66,24 +66,30 @@ Open follow-ups:
 - [ ] **L2/L3** — `cli` private `_flush`/import hygiene; `checkout._search` memoization.
 
 ## QA — bugs found testing v0.1.3 (2026-05-25)
-Reported by the user during v0.1.3 release testing; not yet fixed (noted for a later pass).
+Reported by the user during v0.1.3 release testing. Updated 2026-05-25 after investigation.
 
-- [ ] **Local mode: manual scoring buttons do nothing.** The on-screen scoring controls
-  (`ui/src/components/Controls.tsx`) have no effect in Local mode. Needs repro; suspects: the
-  engine remote-role gate may still be armed (MP-3 deliberately keeps it armed on transient unmount
-  via `RemoteMatch.stop(false)`) and filtering local input, or the manual-score command isn't wired
-  when no board is connected. Check that `set_remote_role` is null while in Local mode.
-- [ ] **Leaderboard can't connect to the stats server.** `Leaderboard.tsx` → `fetchLeaderboard`
-  → `brokerHttpBase(readBrokerUrl())`. Two compounding causes: (a) the broker URL defaults to
-  `ws://127.0.0.1:8788`, where no stats server is listening (see the default-URL item below); and
-  (b) server-side stats isn't deployed/enabled on the live broker yet (the darts.aventador.io deploy
-  + `data` volume is still pending). Likely resolved by the default-URL fix **plus** enabling stats
-  on the broker.
-- [ ] **History errors in the installable package** (works in dev). The DB path is fine
-  (`%LOCALAPPDATA%\granbridge\history.db`, `config.py:28`, writable), so suspect a frozen-path
-  resource resolution (`static_dirs()`) or an unhandled error in a `/api/history/*` route under
-  PyInstaller. Needs the actual error text from the packaged build to pin it down.
-- [ ] **Multiplayer broker field should default to `wss://darts.aventador.io/` in all builds.**
-  `ui/src/multiplayer/store.ts:33` `readBrokerUrl()` falls back to `ws://127.0.0.1:8788`
-  (or `VITE_BROKER_URL`). Change the hardcoded fallback (and/or bake `VITE_BROKER_URL` at build time)
-  to `wss://darts.aventador.io/`. One-liner; also fixes half of the leaderboard issue above.
+- [x] **Multiplayer broker field defaults to `wss://darts.aventador.io/` in all builds.** Fixed:
+  `readBrokerUrl()` fallback in `ui/src/multiplayer/store.ts` changed from `ws://127.0.0.1:8788` to
+  `wss://darts.aventador.io/` (the `VITE_BROKER_URL` env override is preserved for dev; no build sets
+  it). A `statsQueue` test that implicitly relied on the localhost default failing fast was made
+  hermetic (mocks `submitMatch` so it never hits the network).
+- [ ] **Local mode: manual scoring buttons do nothing.** STILL OPEN — needs a live repro.
+  Investigated the obvious suspects and **ruled them out**: (1) the engine remote-role gate does NOT
+  filter manual input — `record_miss`/`next_player` call `on_dart` with `source_player_id=None`, and
+  the gate at `engine.py:131` only filters when `source_player_id is not None` (remote darts); (2) the
+  command path is sound — `Controls` only renders while a game is `IN_PROGRESS` (so `_guard` passes),
+  and it shares the open WS that's already delivering `game_state` events. Most likely environmental:
+  the UI talking to a **stale/orphaned bridge** from a prior run (the sidecar-orphan bug, fixed in
+  `7cfe585`). To repro: note the connection badge state, whether *any* command works, and console/WS
+  errors; check there isn't a second `granbridge.exe serve` holding `:8787`.
+- [ ] **Leaderboard can't connect to the stats server.** Client half addressed by the default-URL
+  fix above (it now points at the public broker instead of localhost). REMAINING: **server-side stats
+  is not yet deployed/enabled on the live broker** — `darts.aventador.io` runs the broker, but the
+  stats backend (`STATS_DB_PATH` + `data` volume, the `/stats/*` routes) needs to be deployed/enabled
+  there. Until then `/stats/leaderboard` 404s/refuses. Deploy stats on the broker to close this.
+- [ ] **History errors in the installable package** (works in dev). STILL OPEN — needs the actual
+  error text from the packaged build. **Ruled out** the two leading hypotheses: `HistoryStore.__init__`
+  already creates the DB dir (`mkdir(parents=True, exist_ok=True)`) and tables (`CREATE TABLE IF NOT
+  EXISTS`), and `static_dirs()` already handles the frozen `sys._MEIPASS` path (`resources.py:13`). So
+  it's neither a missing-dir/table nor a static-path issue. Capture the History view's error / the
+  bridge log line from a fresh install to pin it down.

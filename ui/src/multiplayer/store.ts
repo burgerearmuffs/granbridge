@@ -11,7 +11,7 @@
  *   error     — last error message (if any)
  *
  * Persisted to localStorage:
- *   brokerUrl — ws://127.0.0.1:8788 by default
+ *   brokerUrl — wss://darts.aventador.io/ by default (override via VITE_BROKER_URL or the UI)
  *   mic, cam  — user preferences
  */
 
@@ -30,7 +30,7 @@ export function readBrokerUrl(): string {
   // vi.stubEnv sets process.env (accessed via globalThis to avoid @types/node).
   const metaEnv = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
   const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
-  const fallback = metaEnv["VITE_BROKER_URL"] ?? nodeEnv["VITE_BROKER_URL"] ?? "ws://127.0.0.1:8788";
+  const fallback = metaEnv["VITE_BROKER_URL"] ?? nodeEnv["VITE_BROKER_URL"] ?? "wss://darts.aventador.io/";
   try {
     return localStorage.getItem(LS_BROKER_URL) ?? fallback;
   } catch {

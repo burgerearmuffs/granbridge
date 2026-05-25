@@ -89,9 +89,9 @@ describe("readBrokerUrl default", () => {
     expect(readBrokerUrl()).toBe("wss://play.example.com");
   });
 
-  it("falls back to localhost when neither is set", () => {
+  it("falls back to the public broker when neither is set", () => {
     localStorage.removeItem("granbridge.mp.brokerUrl");
-    expect(readBrokerUrl()).toBe("ws://127.0.0.1:8788");
+    expect(readBrokerUrl()).toBe("wss://darts.aventador.io/");
   });
 });
 

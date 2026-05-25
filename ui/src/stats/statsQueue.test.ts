@@ -3,6 +3,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { enqueue, flush, pendingCount } from "./statsQueue";
 import type { QueueEntry } from "./types";
 
+// enqueue() kicks a background flush() that uses the real submitMatch (which opens
+// a WebSocket to the default broker). Mock it so these tests never touch the network
+// — a transient rejection keeps the entry without draining; the explicit flush(submit)
+// calls below pass their own mock for the actual assertions.
+vi.mock("./statsClient", () => ({
+  submitMatch: vi.fn().mockRejectedValue(new Error("ws_error")),
+}));
+
 const entry = (match_id: string): QueueEntry => ({
   record: { match_id, mode: "x01", opponent_id: null, winner_id: "P1", is_remote: false,
             darts: 9, total_scored: 180, started_at: "s", ended_at: "e" },
