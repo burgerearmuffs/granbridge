@@ -3,7 +3,7 @@
  *
  * Broker protocol (MP-1, already built):
  *   client → { type:"join", room, password, player:{id,name,avatar?} }
- *   server → { type:"joined", self, peers:[{peer_id, player}] }
+ *   server → { type:"joined", self:"<peer_id>", peers:[{peer_id, player}] }
  *   server → { type:"peers",  peers:[{peer_id, player}] }
  *   server → { type:"signal", from, data }
  *   server → { type:"msg",    from, payload }
@@ -24,7 +24,7 @@ export interface PeerInfo {
 }
 
 export type BrokerCallbacks = {
-  onJoined?: (self: PeerInfo, peers: PeerInfo[]) => void;
+  onJoined?: (self: string, peers: PeerInfo[]) => void;
   onPeers?: (peers: PeerInfo[]) => void;
   onSignal?: (from: string, data: unknown) => void;
   onMsg?: (from: string, payload: unknown) => void;
@@ -33,7 +33,7 @@ export type BrokerCallbacks = {
 };
 
 type BrokerMsg =
-  | { type: "joined"; self: PeerInfo; peers: PeerInfo[] }
+  | { type: "joined"; self: string; peers: PeerInfo[] }
   | { type: "peers"; peers: PeerInfo[] }
   | { type: "signal"; from: string; data: unknown }
   | { type: "msg"; from: string; payload: unknown }

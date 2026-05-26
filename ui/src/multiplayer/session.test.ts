@@ -41,17 +41,18 @@ describe("mpSession", () => {
 
   it("onJoined with a peer sets in_room and starts a RemoteMatch", async () => {
     await mpSession.join(JOIN);
-    onJoinedCbs[0]({ peer_id: "aaa", player: { id: "p", name: "n" } },
-                   [{ peer_id: "zzz", player: { id: "p2", name: "G" } }]);
+    onJoinedCbs[0]("aaa", [{ peer_id: "zzz", player: { id: "p2", name: "G" } }]);
     expect(useMpStore.getState().mpStatus).toBe("in_room");
+    expect(useMpStore.getState().selfId).toBe("aaa");
     expect(rmStart).toHaveBeenCalled();
   });
 
   it("host-first: onJoined with empty peers, then a 'peers' event starts the match", async () => {
     await mpSession.join(JOIN);
     // Host opens the room first → joined arrives with NO peers yet.
-    onJoinedCbs[0]({ peer_id: "host", player: { id: "p", name: "n" } }, []);
+    onJoinedCbs[0]("host", []);
     expect(useMpStore.getState().mpStatus).toBe("in_room");
+    expect(useMpStore.getState().selfId).toBe("host");
     expect(useMpStore.getState().peers.length).toBe(0);
     expect(rmStart).not.toHaveBeenCalled();
 
@@ -71,7 +72,7 @@ describe("mpSession", () => {
 
   it("leave stops the match and resets the store", async () => {
     await mpSession.join(JOIN);
-    onJoinedCbs[0]({ peer_id: "aaa", player: { id: "p", name: "n" } }, [{ peer_id: "zzz", player: { id: "p2", name: "G" } }]);
+    onJoinedCbs[0]("aaa", [{ peer_id: "zzz", player: { id: "p2", name: "G" } }]);
     mpSession.leave();
     expect(rmStop).toHaveBeenCalled();
     expect(useMpStore.getState().mpStatus).toBe("idle");

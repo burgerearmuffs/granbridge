@@ -101,7 +101,7 @@ describe("BrokerClient — receiving", () => {
     bc.connect();
     MockWS.last.open();
 
-    const self = { peer_id: "s1", player: { id: "p1", name: "Alice" } };
+    const self = "s1";
     const peers = [{ peer_id: "s2", player: { id: "p2", name: "Bob" } }];
     MockWS.last.receive({ type: "joined", self, peers });
 
