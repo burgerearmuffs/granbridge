@@ -47,13 +47,13 @@ class MpSession {
     const bc = new BrokerClient(url);
     this.broker = bc;
 
-    bc.onJoined((self: PeerInfo, initialPeers: PeerInfo[]) => {
+    bc.onJoined((self: string, initialPeers: PeerInfo[]) => {
       const s = useMpStore.getState();
-      s.setSelfId(self.peer_id);
+      s.setSelfId(self);
       s.setPeers(initialPeers);
       s.setMpStatus("in_room");
 
-      const pm = new PeerManager(bc, self.peer_id, stream, iceServers);
+      const pm = new PeerManager(bc, self, stream, iceServers);
       this.pm = pm;
       pm.onRemoteStream = (peerId, rs) => useMpStore.getState().setRemoteStream(peerId, rs);
       pm.onConnectionHealth = (_peerId, health) => useMpStore.getState().setConnectionHealth(health);
