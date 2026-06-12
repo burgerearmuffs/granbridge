@@ -1,0 +1,434 @@
+# Instincts generated from https://github.com/burgerearmuffs/granbridge
+# Generated: 2026-06-12T23:45:10.622Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: granbridge-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Commit Length
+
+## Action
+
+Write moderate-length commit messages (~69 characters)
+
+## Evidence
+
+- Average commit message length: 69 chars
+- Based on 1 commits
+
+---
+id: granbridge-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: granbridge-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: granbridge-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: granbridge-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: granbridge-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Test Framework
+
+## Action
+
+Use vitest as the test framework
+
+## Evidence
+
+- Test framework detected: vitest
+- File pattern: *.test.ts
+
+---
+id: granbridge-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: granbridge-test-mocking
+trigger: "when mocking dependencies in tests"
+confidence: 0.75
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/burgerearmuffs/granbridge
+---
+
+# Granbridge Test Mocking
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Mocking pattern detected: vi.mock
+- Consistent across test files
+
+---
+id: granbridge-instinct-file-naming
+trigger: "When creating a new file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern: namingConventions.files = camelCase
+
+---
+id: granbridge-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern: namingConventions.functions = camelCase
+
+---
+id: granbridge-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern: namingConventions.classes = PascalCase
+
+---
+id: granbridge-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern: namingConventions.constants = SCREAMING_SNAKE_CASE
+
+---
+id: granbridge-instinct-import-style
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern: importStyle = relative
+
+---
+id: granbridge-instinct-export-style
+trigger: "When exporting from a module"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern: exportStyle = named
+
+---
+id: granbridge-instinct-test-file-naming
+trigger: "When creating a test file"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Test File Naming
+
+## Action
+
+Name the file with the pattern *.test.ts
+
+## Evidence
+
+- Pattern: test filePattern = *.test.ts
+
+---
+id: granbridge-instinct-test-framework
+trigger: "When writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Test Framework
+
+## Action
+
+Use the vitest framework
+
+## Evidence
+
+- Pattern: testing.framework = vitest
+
+---
+id: granbridge-instinct-test-type
+trigger: "When writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Test Type
+
+## Action
+
+Write unit tests
+
+## Evidence
+
+- Pattern: testTypes includes unit
+
+---
+id: granbridge-instinct-mocking
+trigger: "When mocking modules in tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Mocking
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Pattern: mockingStyle = vi.mock
+
+---
+id: granbridge-instinct-commit-prefix
+trigger: "When making a commit that hardens or improves robustness"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Commit Prefix
+
+## Action
+
+Prefix the commit message with 'harden:'
+
+## Evidence
+
+- Pattern: commit prefixes includes 'harden'
+- Example: 'harden: reconnect backoff, media-failure notice, checkout memoization'
+
+---
+id: granbridge-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Commit Length
+
+## Action
+
+Keep the commit message concise, around 69 characters on average
+
+## Evidence
+
+- Pattern: average commit length = 69
+
+---
+id: granbridge-instinct-commit-format-freeform
+trigger: "When writing a commit message"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Commit Format Freeform
+
+## Action
+
+Use a freeform message style, optionally with a prefix
+
+## Evidence
+
+- Pattern: commit type = freeform
+- Examples show freeform messages with/without prefix
+
+---
+id: granbridge-instinct-error-handling
+trigger: "When handling errors in code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: burgerearmuffs/granbridge
+---
+
+# Granbridge Instinct Error Handling
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern: errorHandling.style = try-catch
+
