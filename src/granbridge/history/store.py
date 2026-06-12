@@ -79,6 +79,16 @@ class HistoryStore:
             )
             conn.commit()
 
+    def clear_all(self) -> dict:
+        """Delete all recorded games and throws. Returns counts for the API response."""
+        with _connect(self.db_path) as conn:
+            games = conn.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+            throws = conn.execute("SELECT COUNT(*) FROM throws").fetchone()[0]
+            conn.execute("DELETE FROM throws")
+            conn.execute("DELETE FROM games")
+            conn.commit()
+            return {"cleared_games": games, "cleared_throws": throws}
+
     def recent_games(self, limit: int = 20) -> list[dict]:
         """Return the most recent games, newest first."""
         with _connect(self.db_path) as conn:

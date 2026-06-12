@@ -10,6 +10,23 @@ export interface MediaConstraints {
   audio?: boolean | MediaTrackConstraints;
 }
 
+/**
+ * Build getUserMedia constraints honouring the user's preferred devices.
+ * Device ids use `ideal` so an unplugged device falls back to the default
+ * instead of failing the whole acquisition with OverconstrainedError.
+ */
+export function buildConstraints(
+  cam: boolean,
+  mic: boolean,
+  camDeviceId: string | null = null,
+  micDeviceId: string | null = null,
+): MediaConstraints {
+  return {
+    video: cam ? (camDeviceId ? { deviceId: { ideal: camDeviceId } } : true) : false,
+    audio: mic ? (micDeviceId ? { deviceId: { ideal: micDeviceId } } : true) : false,
+  };
+}
+
 /** Why media acquisition produced no stream (null = success or nothing requested). */
 export type MediaFailure = "unsupported" | "denied" | "failed" | null;
 

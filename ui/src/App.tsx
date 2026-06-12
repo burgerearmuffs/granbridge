@@ -19,10 +19,20 @@ import { Profile } from "./views/Profile";
 import { useUpdater } from "./useUpdater";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Leaderboard } from "./views/Leaderboard";
+import { Settings } from "./views/Settings";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
-type NavTab = "live" | "history" | "multiplayer" | "profile" | "leaderboard";
+type NavTab = "live" | "history" | "multiplayer" | "profile" | "leaderboard" | "settings";
+
+const NAV_TABS: Array<{ id: NavTab; label: string }> = [
+  { id: "live", label: "Live" },
+  { id: "history", label: "History" },
+  { id: "multiplayer", label: "Multiplayer" },
+  { id: "profile", label: "Profile" },
+  { id: "leaderboard", label: "Leaderboard" },
+  { id: "settings", label: "Settings" },
+];
 
 export default function App() {
   const { send } = useGranbridgeSocket();
@@ -69,67 +79,21 @@ export default function App() {
           <div className="flex items-center gap-6">
             <h1 className="text-3xl font-black tracking-tight">GRANBRIDGE</h1>
             <nav className="flex gap-1" aria-label="main navigation">
-              <button
-                onClick={() => setActiveTab("live")}
-                aria-pressed={activeTab === "live"}
-                className={[
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                  activeTab === "live"
-                    ? "bg-amber-400 text-neutral-900"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
-                ].join(" ")}
-              >
-                Live
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                aria-pressed={activeTab === "history"}
-                className={[
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                  activeTab === "history"
-                    ? "bg-amber-400 text-neutral-900"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
-                ].join(" ")}
-              >
-                History
-              </button>
-              {/* Multiplayer tab — hidden in kiosk mode */}
-              <button
-                onClick={() => setActiveTab("multiplayer")}
-                aria-pressed={activeTab === "multiplayer"}
-                className={[
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                  activeTab === "multiplayer"
-                    ? "bg-amber-400 text-neutral-900"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
-                ].join(" ")}
-              >
-                Multiplayer
-              </button>
-              <button
-                onClick={() => setActiveTab("profile")}
-                aria-pressed={activeTab === "profile"}
-                className={[
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                  activeTab === "profile"
-                    ? "bg-amber-400 text-neutral-900"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
-                ].join(" ")}
-              >
-                Profile
-              </button>
-              <button
-                onClick={() => setActiveTab("leaderboard")}
-                aria-pressed={activeTab === "leaderboard"}
-                className={[
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
-                  activeTab === "leaderboard"
-                    ? "bg-amber-400 text-neutral-900"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800",
-                ].join(" ")}
-              >
-                Leaderboard
-              </button>
+              {NAV_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  aria-pressed={activeTab === tab.id}
+                  className={[
+                    "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                    activeTab === tab.id
+                      ? "bg-amber-400 text-neutral-900"
+                      : "text-neutral-400 hover:text-white hover:bg-neutral-800",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -143,7 +107,9 @@ export default function App() {
       {!kiosk && <UpdateBanner state={updater} />}
       <Banners banners={banners} />
       <div key={activeTab} className="tab-content">
-        {activeTab === "leaderboard" ? (
+        {activeTab === "settings" ? (
+          <Settings />
+        ) : activeTab === "leaderboard" ? (
           <Leaderboard />
         ) : activeTab === "profile" ? (
           <Profile />

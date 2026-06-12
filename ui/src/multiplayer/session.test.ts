@@ -23,6 +23,7 @@ vi.mock("./remoteMatch", async (orig) => {
 vi.mock("./media", () => ({
   getLocalStream: vi.fn(async () => null),
   acquireLocalMedia: vi.fn(async () => ({ stream: null, failure: null })),
+  buildConstraints: vi.fn(() => ({ video: true, audio: true })),
 }));
 vi.mock("./turn", () => ({ fetchIceServers: vi.fn(async () => []) }));
 vi.mock("./careerSummary", () => ({ fetchMyCareerSummary: vi.fn(async () => ({ threeDartAvg: 0, wins: 0, gamesPlayed: 0 })) }));

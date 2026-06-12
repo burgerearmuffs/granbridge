@@ -114,3 +114,16 @@ def test_player_stats_no_throws(tmp_path: Path) -> None:
     # No games recorded; should return empty list
     stats = store.player_stats()
     assert stats == []
+
+
+def test_clear_all_deletes_games_and_throws(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "h.db")
+    gid = store.start_game("x01", ["A", "B"], {})
+    store.record_throw(gid, "A", "T20", 60)
+    store.end_game(gid, "A")
+    result = store.clear_all()
+    assert result == {"cleared_games": 1, "cleared_throws": 1}
+    assert store.recent_games() == []
+    assert store.hit_counts() == {}
+    # idempotent on an empty DB
+    assert store.clear_all() == {"cleared_games": 0, "cleared_throws": 0}

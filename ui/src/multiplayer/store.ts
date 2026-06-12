@@ -24,13 +24,25 @@ export type ConnectionHealth = "connected" | "reconnecting" | "lost";
 const LS_BROKER_URL = "granbridge.mp.brokerUrl";
 const LS_MIC = "granbridge.mp.mic";
 const LS_CAM = "granbridge.mp.cam";
+const LS_CAM_DEVICE = "granbridge.mp.camDeviceId";
+const LS_MIC_DEVICE = "granbridge.mp.micDeviceId";
+
+export const DEFAULT_BROKER_URL = "wss://darts.aventador.io/";
+
+function readString(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
 
 export function readBrokerUrl(): string {
   // In a Vite browser build import.meta.env is statically injected; in vitest
   // vi.stubEnv sets process.env (accessed via globalThis to avoid @types/node).
   const metaEnv = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
   const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
-  const fallback = metaEnv["VITE_BROKER_URL"] ?? nodeEnv["VITE_BROKER_URL"] ?? "wss://darts.aventador.io/";
+  const fallback = metaEnv["VITE_BROKER_URL"] ?? nodeEnv["VITE_BROKER_URL"] ?? DEFAULT_BROKER_URL;
   try {
     return localStorage.getItem(LS_BROKER_URL) ?? fallback;
   } catch {
@@ -54,6 +66,9 @@ interface MpState {
   peers: PeerInfo[];
   mic: boolean;
   cam: boolean;
+  /** Preferred capture devices (set in Settings); null = browser default. Persisted. */
+  camDeviceId: string | null;
+  micDeviceId: string | null;
   error: string | undefined;
   /** User-visible note when joining without camera/mic (permission denied etc.). */
   mediaNotice: string | undefined;
@@ -71,6 +86,8 @@ interface MpState {
   setPeers: (peers: PeerInfo[]) => void;
   setMic: (v: boolean) => void;
   setCam: (v: boolean) => void;
+  setCamDeviceId: (id: string | null) => void;
+  setMicDeviceId: (id: string | null) => void;
   setError: (msg: string | undefined) => void;
   setMediaNotice: (msg: string | undefined) => void;
   setBrokerUrl: (url: string) => void;
@@ -89,6 +106,8 @@ export const useMpStore = create<MpState>((set) => ({
   peers: [],
   mic: readBool(LS_MIC, true),
   cam: readBool(LS_CAM, true),
+  camDeviceId: readString(LS_CAM_DEVICE),
+  micDeviceId: readString(LS_MIC_DEVICE),
   error: undefined,
   mediaNotice: undefined,
   brokerUrl: readBrokerUrl(),
@@ -109,6 +128,20 @@ export const useMpStore = create<MpState>((set) => ({
   setCam: (v) => {
     try { localStorage.setItem(LS_CAM, String(v)); } catch { /* ignore */ }
     set({ cam: v });
+  },
+  setCamDeviceId: (id) => {
+    try {
+      if (id) localStorage.setItem(LS_CAM_DEVICE, id);
+      else localStorage.removeItem(LS_CAM_DEVICE);
+    } catch { /* ignore */ }
+    set({ camDeviceId: id });
+  },
+  setMicDeviceId: (id) => {
+    try {
+      if (id) localStorage.setItem(LS_MIC_DEVICE, id);
+      else localStorage.removeItem(LS_MIC_DEVICE);
+    } catch { /* ignore */ }
+    set({ micDeviceId: id });
   },
   setError: (msg) => set({ error: msg }),
   setMediaNotice: (msg) => set({ mediaNotice: msg }),

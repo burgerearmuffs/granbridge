@@ -7,7 +7,7 @@ import { useMpStore } from "./store";
 import { getOrCreatePlayer, setPlayerName } from "./player";
 import { BrokerClient, type PeerInfo } from "./brokerClient";
 import { PeerManager } from "./peerManager";
-import { acquireLocalMedia, type MediaFailure } from "./media";
+import { acquireLocalMedia, buildConstraints, type MediaFailure } from "./media";
 import { fetchIceServers } from "./turn";
 import { fetchMyCareerSummary } from "./careerSummary";
 import { RemoteMatch, hostRole, type GuestAction } from "./remoteMatch";
@@ -48,11 +48,13 @@ class MpSession {
     store.setMpStatus("connecting");
     store.setRoom(opts.room);
 
-    const { mic, cam } = useMpStore.getState();
+    const { mic, cam, camDeviceId, micDeviceId } = useMpStore.getState();
     const player = setPlayerName(opts.displayName.trim() || getOrCreatePlayer().name);
     if (opts.brokerUrl.trim()) store.setBrokerUrl(opts.brokerUrl.trim());
 
-    const { stream, failure } = await acquireLocalMedia({ video: cam, audio: mic });
+    const { stream, failure } = await acquireLocalMedia(
+      buildConstraints(cam, mic, camDeviceId, micDeviceId),
+    );
     useMpStore.getState().setLocalStream(stream);
     useMpStore.getState().setMediaNotice(mediaNoticeFor(failure));
 

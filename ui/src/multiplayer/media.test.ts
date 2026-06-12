@@ -3,7 +3,7 @@
  * so every branch is driven through stubs).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { acquireLocalMedia, getLocalStream } from "./media";
+import { acquireLocalMedia, buildConstraints, getLocalStream } from "./media";
 import { mediaNoticeFor } from "./session";
 
 const realMediaDevices = navigator.mediaDevices;
@@ -62,6 +62,23 @@ describe("acquireLocalMedia", () => {
     expect(await getLocalStream()).toBe(fake);
     Object.defineProperty(navigator, "mediaDevices", { value: undefined, configurable: true });
     expect(await getLocalStream()).toBeNull();
+  });
+});
+
+describe("buildConstraints", () => {
+  it("disables a side when its toggle is off", () => {
+    expect(buildConstraints(false, false)).toEqual({ video: false, audio: false });
+  });
+
+  it("uses plain true when no device preference is set", () => {
+    expect(buildConstraints(true, true)).toEqual({ video: true, audio: true });
+  });
+
+  it("targets preferred devices with ideal (not exact) so fallback still works", () => {
+    expect(buildConstraints(true, true, "cam-9", "mic-7")).toEqual({
+      video: { deviceId: { ideal: "cam-9" } },
+      audio: { deviceId: { ideal: "mic-7" } },
+    });
   });
 });
 
