@@ -26,6 +26,8 @@ import { defaultAvatarColor } from "../multiplayer/avatar";
 import { mpSession } from "../multiplayer/session";
 import { hostRole } from "../multiplayer/remoteMatch";
 import { GuestControls } from "../components/GuestControls";
+import { ChatPanel } from "../components/ChatPanel";
+import { TurnClock } from "../components/TurnClock";
 
 export function Multiplayer() {
   const mpStatus = useMpStore((s) => s.mpStatus);
@@ -41,6 +43,7 @@ export function Multiplayer() {
   const remoteStreams = useMpStore((s) => s.remoteStreams);
   const connectionHealth = useMpStore((s) => s.connectionHealth);
   const opponentCard = useMpStore((s) => s.opponentCard);
+  const turnClockSecs = useMpStore((s) => s.turnClockSecs);
   const gameState = useStore((s) => s.gameState);
 
   const identity = getOrCreatePlayer();
@@ -229,7 +232,14 @@ export function Multiplayer() {
           <h2 className="text-sm font-semibold text-neutral-400">
             Room: <span className="text-amber-400">{room}</span>
           </h2>
-          <span className="text-xs text-neutral-500">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
+          <div className="flex items-center gap-3">
+            <TurnClock
+              seconds={turnClockSecs}
+              resetKey={`${gameState.active_index}:${JSON.stringify(gameState.legs ?? {})}`}
+              running={gameState.status === "in_progress"}
+            />
+            <span className="text-xs text-neutral-500">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
+          </div>
         </div>
 
         {healthBanners}
@@ -240,7 +250,8 @@ export function Multiplayer() {
           oppVideo={firstRemoteVideoTile ?? <div className="w-full h-full bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-xs">No opponent camera</div>}
           oppCard={opponentCard ? <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} /> : null}
           controls={
-            <div>
+            <div className="space-y-2">
+              <ChatPanel />
               {guestActionControls}
               <MpControls onLeave={handleLeave} />
             </div>
@@ -288,10 +299,13 @@ export function Multiplayer() {
         <p className="text-neutral-500 text-sm">Waiting for opponent to join…</p>
       )}
 
+      {/* In-room chat — available as soon as you're connected */}
+      <ChatPanel startOpen />
+
       {/* Shared match — lobby controls */}
       <div className="border-t border-neutral-800 pt-4">
         {role === "host" ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-neutral-300">
               Mode
               <select
@@ -305,6 +319,20 @@ export function Multiplayer() {
                 <option value="around_the_clock">Around the Clock</option>
                 <option value="count_up">Count-Up</option>
                 <option value="medley">Medley</option>
+              </select>
+            </label>
+            <label className="text-sm text-neutral-300">
+              Turn clock
+              <select
+                value={String(turnClockSecs)}
+                onChange={(e) => mpSession.setTurnClock(Number(e.target.value))}
+                aria-label="Turn clock"
+                className="ml-2 bg-neutral-800 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="0">Off</option>
+                <option value="30">30s</option>
+                <option value="45">45s</option>
+                <option value="60">60s</option>
               </select>
             </label>
             <button

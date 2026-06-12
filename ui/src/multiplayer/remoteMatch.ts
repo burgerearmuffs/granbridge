@@ -42,12 +42,17 @@ export interface PeerCard {
   summary: CareerSummary;
 }
 
+/** Hard cap on a single chat message; longer payloads are truncated on send and rejected on receive. */
+export const CHAT_MAX_LEN = 500;
+
 export type SyncMsg =
   | { t: "state"; state: GameState }
   | { t: "dart"; bed: string }
   | { t: "card"; profile: Profile; summary: CareerSummary }
   | { t: "matchid"; id: string }
-  | { t: "req"; action: GuestAction; bed?: string };
+  | { t: "req"; action: GuestAction; bed?: string }
+  | { t: "chat"; text: string; name: string; ts: number }
+  | { t: "clock"; seconds: number };
 
 export interface RemoteMatchOptions {
   role: RemoteRole;
@@ -65,6 +70,10 @@ export interface RemoteMatchOptions {
   onOpponentCard?: (profile: Profile, summary: CareerSummary) => void;
   /** Called with the shared remote match id (host on mint, guest on receive). */
   onMatchId?: (id: string) => void;
+  /** Called when a peer chat message arrives (already validated + length-capped). */
+  onChat?: (text: string, name: string, ts: number) => void;
+  /** Called when the host announces the turn-clock setting (seconds; 0 = off). */
+  onTurnClock?: (seconds: number) => void;
 }
 
 /**
@@ -96,6 +105,18 @@ function isSyncMsg(o: unknown): o is SyncMsg {
     );
   }
   if (t === "matchid") return typeof (o as { id?: unknown }).id === "string";
+  if (t === "chat") {
+    const m = o as { text?: unknown; name?: unknown; ts?: unknown };
+    return (
+      typeof m.text === "string" && m.text.length > 0 && m.text.length <= CHAT_MAX_LEN &&
+      typeof m.name === "string" && m.name.length <= 80 &&
+      typeof m.ts === "number"
+    );
+  }
+  if (t === "clock") {
+    const s = (o as { seconds?: unknown }).seconds;
+    return typeof s === "number" && Number.isFinite(s) && s >= 0 && s <= 600;
+  }
   if (t === "req") {
     const action = (o as { action?: unknown }).action;
     if (action !== "miss" && action !== "undo" && action !== "correct" && action !== "rematch") return false;
@@ -112,9 +133,14 @@ export class RemoteMatch {
   private _started = false;
   private _matchId: string | null = null;
   private _lastStart: { mode: string; players: string[]; options: Record<string, unknown> } | null = null;
+  private _turnClockSecs = 0;
 
   constructor(opts: RemoteMatchOptions) {
-    this._opts = { hostSlot: "p1", guestSlot: "p2", selfCard: null, onOpponentCard: () => {}, onMatchId: () => {}, ...opts };
+    this._opts = {
+      hostSlot: "p1", guestSlot: "p2", selfCard: null,
+      onOpponentCard: () => {}, onMatchId: () => {}, onChat: () => {}, onTurnClock: () => {},
+      ...opts,
+    };
   }
 
   /** Wire peer + bridge callbacks. Idempotent. */
@@ -137,6 +163,7 @@ export class RemoteMatch {
       peer.onChannelOpen = () => {
         if (this._matchId) peer.sendData({ t: "matchid", id: this._matchId });
         if (this._lastState) peer.sendData({ t: "state", state: this._lastState });
+        if (this._turnClockSecs > 0) peer.sendData({ t: "clock", seconds: this._turnClockSecs });
         sendCard();
       };
       this._unsub = bridge.onEvent((e) => {
@@ -170,6 +197,20 @@ export class RemoteMatch {
   requestAction(action: GuestAction, bed?: string): void {
     if (this._opts.role !== "guest") return;
     this._opts.peer.sendData(bed === undefined ? { t: "req", action } : { t: "req", action, bed });
+  }
+
+  /** Either role: send a chat line to the peer. Empty/whitespace lines are dropped. */
+  sendChat(text: string, name: string): void {
+    const trimmed = text.trim().slice(0, CHAT_MAX_LEN);
+    if (!trimmed) return;
+    this._opts.peer.sendData({ t: "chat", text: trimmed, name: name.slice(0, 80), ts: Date.now() });
+  }
+
+  /** Host only: announce the turn-clock setting (0 = off). Re-sent on channel (re)open. */
+  setTurnClock(seconds: number): void {
+    if (this._opts.role !== "host") return;
+    this._turnClockSecs = seconds;
+    this._opts.peer.sendData({ t: "clock", seconds });
   }
 
   /**
@@ -215,6 +256,15 @@ export class RemoteMatch {
     if (msg.t === "matchid") {
       this._matchId = msg.id;
       onMatchId(msg.id);
+      return;
+    }
+    if (msg.t === "chat") {
+      this._opts.onChat(msg.text, msg.name, msg.ts);
+      return;
+    }
+    if (msg.t === "clock") {
+      // Only the host sets the clock; guests apply what the host announces.
+      if (role === "guest") this._opts.onTurnClock(msg.seconds);
       return;
     }
     if (role === "host") {
