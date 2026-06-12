@@ -83,6 +83,9 @@ def serve(
                 "/api/history/heatmap": store.hit_counts,
                 "/api/history/export/latest": store.export_latest_match,
             },
+            post_routes={
+                "/api/history/clear": store.clear_all,
+            },
         )
         static.start()
         typer.echo(f"UI at http://{settings.ws_host}:{settings.http_port}  |  WS ws://{settings.ws_host}:{settings.ws_port}")

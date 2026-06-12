@@ -14,6 +14,22 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
     ui_dir: Path
     overlay_dir: Path
     routes: Optional[dict[str, Callable[[], object]]] = None
+    post_routes: Optional[dict[str, Callable[[], object]]] = None
+
+    def _serve_route(self, handler: Callable[[], object]) -> None:
+        try:
+            data = handler()
+            status = 200
+        except Exception as exc:
+            data = {"error": str(exc)}
+            status = 500
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_GET(self) -> None:  # type: ignore[override]
         # Check custom API routes first
@@ -21,27 +37,19 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
             # Strip query string and fragment for route matching
             path_only = self.path.split("?", 1)[0].split("#", 1)[0]
             if path_only in self.routes:
-                try:
-                    data = self.routes[path_only]()
-                    body = json.dumps(data).encode("utf-8")
-                except Exception as exc:
-                    body = json.dumps({"error": str(exc)}).encode("utf-8")
-                    self.send_response(500)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
-                    return
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                self._serve_route(self.routes[path_only])
                 return
         # Fall through to default static file serving
         super().do_GET()
+
+    def do_POST(self) -> None:
+        path_only = self.path.split("?", 1)[0].split("#", 1)[0]
+        if self.post_routes is not None and path_only in self.post_routes:
+            self._serve_route(self.post_routes[path_only])
+            return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def translate_path(self, path: str) -> str:
         # Strip query string and fragment
@@ -81,11 +89,13 @@ class StaticServer:
         host: str = "127.0.0.1",
         port: int = 8080,
         routes: Optional[dict[str, Callable[[], object]]] = None,
+        post_routes: Optional[dict[str, Callable[[], object]]] = None,
     ) -> None:
         handler = type(
             "Bound_Handler",
             (_Handler,),
-            {"ui_dir": ui_dir, "overlay_dir": overlay_dir, "routes": routes},
+            {"ui_dir": ui_dir, "overlay_dir": overlay_dir, "routes": routes,
+             "post_routes": post_routes},
         )
         self._httpd = http.server.ThreadingHTTPServer((host, port), handler)
         self._thread: Optional[threading.Thread] = None

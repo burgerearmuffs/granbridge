@@ -121,3 +121,55 @@ def test_api_route_sends_cors_header(tmp_path: Path) -> None:
         assert resp.headers.get("Access-Control-Allow-Origin") == "*"
     finally:
         s.stop()
+
+
+def test_post_route_invokes_handler(tmp_path: Path) -> None:
+    """POST routes run their handler and return JSON; GET on the same path 404s."""
+    ui = tmp_path / "ui"
+    ui.mkdir()
+    (ui / "index.html").write_text("<h1>UI</h1>")
+    ov = tmp_path / "ov"
+    ov.mkdir()
+
+    calls: list[int] = []
+
+    def clear() -> dict:
+        calls.append(1)
+        return {"cleared_games": 2}
+
+    s = StaticServer(
+        ui,
+        ov,
+        "127.0.0.1",
+        8775,
+        post_routes={"/api/history/clear": clear},
+    )
+    s.start()
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8775/api/history/clear", method="POST")
+        resp = urllib.request.urlopen(req)
+        assert resp.status == 200
+        assert json.loads(resp.read().decode()) == {"cleared_games": 2}
+        assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+        assert calls == [1]
+    finally:
+        s.stop()
+
+
+def test_post_to_unknown_path_returns_404(tmp_path: Path) -> None:
+    ui = tmp_path / "ui"
+    ui.mkdir()
+    ov = tmp_path / "ov"
+    ov.mkdir()
+
+    s = StaticServer(ui, ov, "127.0.0.1", 8776, post_routes={"/api/x": lambda: {}})
+    s.start()
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8776/api/other", method="POST")
+        try:
+            urllib.request.urlopen(req)
+            raise AssertionError("expected 404")
+        except urllib.error.HTTPError as e:
+            assert e.code == 404
+    finally:
+        s.stop()

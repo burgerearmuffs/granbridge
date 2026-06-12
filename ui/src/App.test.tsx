@@ -17,4 +17,13 @@ describe("App with stats submission mounted", () => {
     render(<App />);
     expect(screen.getByRole("button", { name: /leaderboard/i })).toBeInTheDocument();
   });
+
+  it("has a Settings nav tab that opens the Settings view", async () => {
+    const { fireEvent, waitFor } = await import("@testing-library/react");
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /settings/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /^settings$/i })).toBeInTheDocument(),
+    );
+  });
 });
