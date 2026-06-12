@@ -1,4 +1,4 @@
-from granbridge.game.checkout import suggest
+from granbridge.game.checkout import _search, suggest
 
 def test_known_checkouts():
     assert suggest(170, 3, True) == ["T20", "T20", "BULL"]
@@ -18,3 +18,19 @@ def test_respects_darts_left():
 
 def test_double_out_disabled_allows_single_finish():
     assert suggest(20, 1, False) == ["S20"]
+
+
+def test_search_is_memoized():
+    _search.cache_clear()
+    before = _search.cache_info().hits
+    a = suggest(123, 3, True)  # not in _PREFERRED → exercises _search
+    b = suggest(123, 3, True)
+    assert a == b and a is not None
+    assert _search.cache_info().hits > before
+
+
+def test_suggest_returns_fresh_lists_not_cached_aliases():
+    first = suggest(123, 3, True)
+    assert first is not None
+    first.append("MUTATED")
+    assert suggest(123, 3, True)[-1] != "MUTATED"

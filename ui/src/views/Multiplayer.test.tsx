@@ -121,6 +121,23 @@ describe("Multiplayer join form", () => {
   });
 });
 
+describe("Multiplayer media notice", () => {
+  it("shows the camera/mic notice in the lobby and can be dismissed", () => {
+    useMpStore.setState({
+      mpStatus: "in_room",
+      room: "r1",
+      selfId: "aaa",
+      peers: [],
+      mediaNotice: "Camera/mic permission denied — you're in the room without audio or video.",
+    });
+    render(<Multiplayer />);
+    expect(screen.getByRole("status")).toHaveTextContent(/permission denied/i);
+    fireEvent.click(screen.getByRole("button", { name: /dismiss camera notice/i }));
+    expect(useMpStore.getState().mediaNotice).toBeUndefined();
+    expect(screen.queryByText(/permission denied/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("Multiplayer in-room match panel", () => {
   function enterRoomAs(selfId: string, peerId: string) {
     useMpStore.setState({

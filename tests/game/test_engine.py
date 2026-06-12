@@ -65,3 +65,19 @@ def test_game_won_emitted_on_finish():
     eng.on_dart(Dart.from_bed("D20"))
     assert eng.state.status.value == "finished" and eng.state.winner == "p1"
     assert any(e.type == "game_won" for e in eng._pending)
+
+def test_public_flush_publishes_pending_events():
+    import asyncio
+
+    async def _run():
+        bus = EventBus()
+        eng = GameEngine(bus)
+        with bus.subscribe() as sub:
+            _start(eng, start_score=501)
+            assert eng._pending  # queued, not yet published
+            await eng.flush()
+            assert eng._pending == []
+            ev = await asyncio.wait_for(sub.get(), timeout=1)
+            assert ev is not None
+
+    asyncio.run(_run())

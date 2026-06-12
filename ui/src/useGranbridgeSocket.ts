@@ -11,11 +11,12 @@ export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
 
   useEffect(() => {
     let closed = false;
+    let attempts = 0;
     let retry: ReturnType<typeof setTimeout>;
     const connect = () => {
       const sock = new WebSocket(url);
       ws.current = sock;
-      sock.onopen = () => setConnection("connected");
+      sock.onopen = () => { attempts = 0; setConnection("connected"); };
       sock.onmessage = (m: MessageEvent) => {
         try {
           const event = JSON.parse(m.data) as Event;
@@ -26,7 +27,8 @@ export function useGranbridgeSocket(url = `ws://127.0.0.1:8787`) {
       };
       sock.onclose = () => {
         setConnection("disconnected");
-        if (!closed) retry = setTimeout(connect, 1000);
+        // Exponential backoff (0.5s → 8s cap) so a dead bridge isn't hammered.
+        if (!closed) retry = setTimeout(connect, Math.min(8000, 500 * 2 ** attempts++));
       };
     };
     connect();

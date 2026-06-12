@@ -30,3 +30,4 @@ ui/src-tauri/gen/
 
 # pytest repo-local scratch (system temp has broken ACLs in this env)
 .pytest_tmp/
+.superpowers/

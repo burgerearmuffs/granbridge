@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Optional
 
 # Preferred routes for common finishes (double-out). Values are dart beds.
@@ -28,10 +29,20 @@ def suggest(remaining: int, darts_left: int, double_out: bool) -> Optional[list[
     route = _PREFERRED.get(remaining)
     if route is not None:
         return route if len(route) <= darts_left else None
-    return _search(remaining, darts_left)
+    found = _search(remaining, darts_left)
+    return list(found) if found is not None else None
 
 
-def _search(remaining: int, darts_left: int) -> Optional[list[str]]:
+# Memoized: mode_view rebuilds checkout suggestions on every state emit, and the
+# 3-dart search is ~33k combos. Domain is tiny (169 scores x 3 darts) so cache all.
+# Returns a tuple so cached values can't be mutated by callers.
+@lru_cache(maxsize=None)
+def _search(remaining: int, darts_left: int) -> Optional[tuple[str, ...]]:
+    found = _search_routes(remaining, darts_left)
+    return tuple(found) if found is not None else None
+
+
+def _search_routes(remaining: int, darts_left: int) -> Optional[list[str]]:
     setups = {**_TREBLES, **_SINGLES, **{f"D{n}": 2 * n for n in range(1, 21)}}
     for bed, val in _FINISHERS.items():            # 1 dart
         if val == remaining:

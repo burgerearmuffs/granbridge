@@ -50,7 +50,7 @@ export function Leaderboard() {
       ) : rows.length === 0 ? (
         <EmptyState message="No verified matches yet." />
       ) : (
-        <ol className="space-y-2">
+        <ol aria-label="Leaderboard rankings" className="space-y-2">
           {rows.map((r, i) => (
             <li key={r.id} className="flex items-center gap-3 bg-neutral-900 rounded-lg px-4 py-2">
               <span className="w-6 text-neutral-500 tabular-nums">{i + 1}</span>

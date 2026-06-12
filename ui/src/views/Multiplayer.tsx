@@ -32,6 +32,7 @@ export function Multiplayer() {
   const room = useMpStore((s) => s.room);
   const peers = useMpStore((s) => s.peers);
   const error = useMpStore((s) => s.error);
+  const mediaNotice = useMpStore((s) => s.mediaNotice);
   const mic = useMpStore((s) => s.mic);
   const cam = useMpStore((s) => s.cam);
   const brokerUrl = useMpStore((s) => s.brokerUrl);
@@ -186,6 +187,18 @@ export function Multiplayer() {
   // Connection health banners (shown in both lobby and in-game)
   const healthBanners = (
     <>
+      {mediaNotice && (
+        <div role="status" className="flex items-start gap-2 bg-amber-900/50 border border-amber-700 rounded-lg px-4 py-2 text-sm text-amber-200">
+          <span className="flex-1">{mediaNotice}</span>
+          <button
+            onClick={() => useMpStore.getState().setMediaNotice(undefined)}
+            aria-label="Dismiss camera notice"
+            className="text-amber-300 hover:text-amber-100 font-bold"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {connectionHealth === "reconnecting" && (
         <div role="status" className="bg-amber-900/50 border border-amber-700 rounded-lg px-4 py-2 text-sm text-amber-200">
           Reconnecting…
