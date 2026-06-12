@@ -54,6 +54,10 @@ class GameEngine:
                     )
                     await self._flush()
 
+    async def flush(self) -> None:
+        """Publish all pending events to the bus (public seam for command handlers)."""
+        await self._flush()
+
     async def _flush(self) -> None:
         for ev in self._pending:
             await self._bus.publish(ev)

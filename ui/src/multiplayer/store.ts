@@ -55,6 +55,8 @@ interface MpState {
   mic: boolean;
   cam: boolean;
   error: string | undefined;
+  /** User-visible note when joining without camera/mic (permission denied etc.). */
+  mediaNotice: string | undefined;
   brokerUrl: string;
   remoteMatchId: string | null;
   localStream: MediaStream | null;
@@ -70,6 +72,7 @@ interface MpState {
   setMic: (v: boolean) => void;
   setCam: (v: boolean) => void;
   setError: (msg: string | undefined) => void;
+  setMediaNotice: (msg: string | undefined) => void;
   setBrokerUrl: (url: string) => void;
   setRemoteMatchId: (id: string | null) => void;
   setLocalStream: (s: MediaStream | null) => void;
@@ -87,6 +90,7 @@ export const useMpStore = create<MpState>((set) => ({
   mic: readBool(LS_MIC, true),
   cam: readBool(LS_CAM, true),
   error: undefined,
+  mediaNotice: undefined,
   brokerUrl: readBrokerUrl(),
   remoteMatchId: null,
   localStream: null,
@@ -107,6 +111,7 @@ export const useMpStore = create<MpState>((set) => ({
     set({ cam: v });
   },
   setError: (msg) => set({ error: msg }),
+  setMediaNotice: (msg) => set({ mediaNotice: msg }),
   setBrokerUrl: (url) => {
     try { localStorage.setItem(LS_BROKER_URL, url); } catch { /* ignore */ }
     set({ brokerUrl: url });
@@ -123,6 +128,7 @@ export const useMpStore = create<MpState>((set) => ({
       selfId: "",
       peers: [],
       error: undefined,
+      mediaNotice: undefined,
       remoteMatchId: null,
       localStream: null,
       remoteStreams: new Map(),

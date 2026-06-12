@@ -10,6 +10,37 @@ export interface MediaConstraints {
   audio?: boolean | MediaTrackConstraints;
 }
 
+/** Why media acquisition produced no stream (null = success or nothing requested). */
+export type MediaFailure = "unsupported" | "denied" | "failed" | null;
+
+export interface MediaAcquisition {
+  stream: MediaStream | null;
+  failure: MediaFailure;
+}
+
+/**
+ * Request camera+mic access, reporting why it failed so the UI can tell the user.
+ * - both constraints false → no request, no failure (user opted out)
+ * - no `navigator.mediaDevices` → "unsupported" (tests / SSR / very old WebView)
+ * - permission rejected → "denied"; anything else → "failed"
+ */
+export async function acquireLocalMedia(
+  constraints: MediaConstraints = { video: true, audio: true },
+): Promise<MediaAcquisition> {
+  if (!constraints.video && !constraints.audio) return { stream: null, failure: null };
+  if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+    return { stream: null, failure: "unsupported" };
+  }
+  try {
+    return { stream: await navigator.mediaDevices.getUserMedia(constraints), failure: null };
+  } catch (err) {
+    console.warn("[media] getUserMedia failed:", err);
+    const name = err instanceof DOMException ? err.name : "";
+    const denied = name === "NotAllowedError" || name === "SecurityError";
+    return { stream: null, failure: denied ? "denied" : "failed" };
+  }
+}
+
 /**
  * Request camera+mic access.
  * Returns null when `navigator.mediaDevices` is unavailable (tests / SSR).
@@ -17,13 +48,7 @@ export interface MediaConstraints {
 export async function getLocalStream(
   constraints: MediaConstraints = { video: true, audio: true },
 ): Promise<MediaStream | null> {
-  if (typeof navigator === "undefined" || !navigator.mediaDevices) return null;
-  try {
-    return await navigator.mediaDevices.getUserMedia(constraints);
-  } catch (err) {
-    console.warn("[media] getUserMedia failed:", err);
-    return null;
-  }
+  return (await acquireLocalMedia(constraints)).stream;
 }
 
 /** List video input devices; returns [] when unavailable. */

@@ -20,7 +20,10 @@ vi.mock("./remoteMatch", async (orig) => {
   const actual = await orig<any>();
   return { ...actual, RemoteMatch: class { start = rmStart; stop = rmStop; startGame = rmStartGame; } };
 });
-vi.mock("./media", () => ({ getLocalStream: vi.fn(async () => null) }));
+vi.mock("./media", () => ({
+  getLocalStream: vi.fn(async () => null),
+  acquireLocalMedia: vi.fn(async () => ({ stream: null, failure: null })),
+}));
 vi.mock("./turn", () => ({ fetchIceServers: vi.fn(async () => []) }));
 vi.mock("./careerSummary", () => ({ fetchMyCareerSummary: vi.fn(async () => ({ threeDartAvg: 0, wins: 0, gamesPlayed: 0 })) }));
 

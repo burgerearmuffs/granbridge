@@ -12,6 +12,7 @@ from granbridge.ble.connection import ConnectionManager
 from granbridge.ble.transport import ReplayTransport
 from granbridge.config import Settings
 from granbridge.core.bus import EventBus
+from granbridge.game.commands import parse_command
 from granbridge.game.engine import GameEngine
 from granbridge.logging_setup import configure_logging
 from granbridge.protocol.segment_map import SegmentMap
@@ -50,12 +51,11 @@ def serve(
         engine = GameEngine(bus)
 
         def command_handler(payload: dict) -> None:
-            from granbridge.game.commands import parse_command
             try:
                 engine.handle_command(parse_command(payload))
             except Exception:
                 pass
-            asyncio.create_task(engine._flush())
+            asyncio.create_task(engine.flush())
 
         mgr = ConnectionManager(
             transport=BleakTransport(), bus=bus,

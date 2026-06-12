@@ -7,7 +7,7 @@ import { useMpStore } from "./store";
 import { getOrCreatePlayer, setPlayerName } from "./player";
 import { BrokerClient, type PeerInfo } from "./brokerClient";
 import { PeerManager } from "./peerManager";
-import { getLocalStream } from "./media";
+import { acquireLocalMedia, type MediaFailure } from "./media";
 import { fetchIceServers } from "./turn";
 import { fetchMyCareerSummary } from "./careerSummary";
 import { RemoteMatch, hostRole, type GuestAction } from "./remoteMatch";
@@ -18,6 +18,22 @@ import type { Profile } from "./player";
 import type { CareerSummary } from "./careerSummary";
 
 export interface JoinOpts { room: string; password: string; displayName: string; brokerUrl: string; }
+
+/** Human message for a media acquisition failure (null = no notice). */
+export function mediaNoticeFor(failure: MediaFailure): string | undefined {
+  switch (failure) {
+    case "denied":
+      return "Camera/mic permission denied — you're in the room without audio or video. " +
+        "Allow camera & microphone access in Windows privacy settings, then rejoin.";
+    case "unsupported":
+      return "Camera/mic isn't available in this environment — joined without audio or video.";
+    case "failed":
+      return "Couldn't start the camera/mic — joined without audio or video. " +
+        "Another app may be using the device.";
+    default:
+      return undefined;
+  }
+}
 
 class MpSession {
   private broker: BrokerClient | null = null;
@@ -36,8 +52,9 @@ class MpSession {
     const player = setPlayerName(opts.displayName.trim() || getOrCreatePlayer().name);
     if (opts.brokerUrl.trim()) store.setBrokerUrl(opts.brokerUrl.trim());
 
-    const stream = await getLocalStream({ video: cam, audio: mic });
+    const { stream, failure } = await acquireLocalMedia({ video: cam, audio: mic });
     useMpStore.getState().setLocalStream(stream);
+    useMpStore.getState().setMediaNotice(mediaNoticeFor(failure));
 
     this.selfCard = { profile: player, summary: await fetchMyCareerSummary(player.name) };
 
