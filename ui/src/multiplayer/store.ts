@@ -21,11 +21,27 @@ import type { PeerInfo } from "./brokerClient";
 export type MpStatus = "idle" | "connecting" | "in_room" | "error";
 export type ConnectionHealth = "connected" | "reconnecting" | "lost";
 
+export interface ChatMsg {
+  self: boolean;
+  name: string;
+  text: string;
+  ts: number;
+}
+
+/** Keep at most this many chat lines in memory. */
+const CHAT_HISTORY_CAP = 200;
+
+function readTurnClockPref(): number {
+  const v = Number(readString(LS_TURN_CLOCK) ?? "0");
+  return Number.isFinite(v) && v >= 0 && v <= 600 ? v : 0;
+}
+
 const LS_BROKER_URL = "granbridge.mp.brokerUrl";
 const LS_MIC = "granbridge.mp.mic";
 const LS_CAM = "granbridge.mp.cam";
 const LS_CAM_DEVICE = "granbridge.mp.camDeviceId";
 const LS_MIC_DEVICE = "granbridge.mp.micDeviceId";
+const LS_TURN_CLOCK = "granbridge.mp.turnClockSecs";
 
 export const DEFAULT_BROKER_URL = "wss://darts.aventador.io/";
 
@@ -78,6 +94,12 @@ interface MpState {
   remoteStreams: Map<string, MediaStream>;
   connectionHealth: ConnectionHealth;
   opponentCard: { profile: import("./player").Profile; summary: import("./careerSummary").CareerSummary } | null;
+  /** In-room text chat (capped at CHAT_HISTORY_CAP lines). */
+  chatMessages: ChatMsg[];
+  /** Lines received while the chat panel is closed. */
+  chatUnread: number;
+  /** Per-turn clock in seconds; 0 = off. Host preference (persisted), synced to the guest. */
+  turnClockSecs: number;
 
   // Actions
   setMpStatus: (s: MpStatus) => void;
@@ -96,6 +118,12 @@ interface MpState {
   setRemoteStream: (peerId: string, s: MediaStream) => void;
   setConnectionHealth: (h: ConnectionHealth) => void;
   setOpponentCard: (c: MpState["opponentCard"]) => void;
+  addChatMessage: (m: ChatMsg, opts?: { unread?: boolean }) => void;
+  clearChatUnread: () => void;
+  /** Host changes the preference (persisted); */
+  setTurnClockPref: (seconds: number) => void;
+  /** Guest applies the host's announced value (not persisted). */
+  applyTurnClock: (seconds: number) => void;
   resetMp: () => void;
 }
 
@@ -116,6 +144,9 @@ export const useMpStore = create<MpState>((set) => ({
   remoteStreams: new Map(),
   connectionHealth: "connected",
   opponentCard: null,
+  chatMessages: [],
+  chatUnread: 0,
+  turnClockSecs: readTurnClockPref(),
 
   setMpStatus: (s) => set({ mpStatus: s }),
   setRoom: (r) => set({ room: r }),
@@ -154,6 +185,17 @@ export const useMpStore = create<MpState>((set) => ({
   setRemoteStream: (peerId, s) => set((st) => ({ remoteStreams: new Map(st.remoteStreams).set(peerId, s) })),
   setConnectionHealth: (h) => set({ connectionHealth: h }),
   setOpponentCard: (c) => set({ opponentCard: c }),
+  addChatMessage: (m, opts) =>
+    set((st) => ({
+      chatMessages: [...st.chatMessages, m].slice(-CHAT_HISTORY_CAP),
+      chatUnread: opts?.unread ? st.chatUnread + 1 : st.chatUnread,
+    })),
+  clearChatUnread: () => set({ chatUnread: 0 }),
+  setTurnClockPref: (seconds) => {
+    try { localStorage.setItem(LS_TURN_CLOCK, String(seconds)); } catch { /* ignore */ }
+    set({ turnClockSecs: seconds });
+  },
+  applyTurnClock: (seconds) => set({ turnClockSecs: seconds }),
   resetMp: () =>
     set({
       mpStatus: "idle",
@@ -167,5 +209,9 @@ export const useMpStore = create<MpState>((set) => ({
       remoteStreams: new Map(),
       connectionHealth: "connected",
       opponentCard: null,
+      chatMessages: [],
+      chatUnread: 0,
+      // Restore the local preference — a guest may have had the host's value applied.
+      turnClockSecs: readTurnClockPref(),
     }),
 }));

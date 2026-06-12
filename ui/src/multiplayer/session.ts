@@ -10,7 +10,7 @@ import { PeerManager } from "./peerManager";
 import { acquireLocalMedia, buildConstraints, type MediaFailure } from "./media";
 import { fetchIceServers } from "./turn";
 import { fetchMyCareerSummary } from "./careerSummary";
-import { RemoteMatch, hostRole, type GuestAction } from "./remoteMatch";
+import { RemoteMatch, hostRole, CHAT_MAX_LEN, type GuestAction } from "./remoteMatch";
 import { resolveOpponentSummary } from "../stats/statsClient";
 import { bridgeLink } from "../bridgeLink";
 import { useStore } from "../store";
@@ -102,9 +102,17 @@ class MpSession {
         );
       },
       onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
+      onChat: (text, name, ts) =>
+        useMpStore.getState().addChatMessage({ self: false, name, text, ts }, { unread: true }),
+      onTurnClock: (seconds) => useMpStore.getState().applyTurnClock(seconds),
     });
     rm.start();
     this.rm = rm;
+    // Host announces its persisted turn-clock preference as soon as the match link exists.
+    if (hostRole(selfId, peers) === "host") {
+      const secs = useMpStore.getState().turnClockSecs;
+      if (secs > 0) rm.setTurnClock(secs);
+    }
   }
 
   startMatch(mode: string, options: Record<string, unknown>): void {
@@ -115,6 +123,21 @@ class MpSession {
   }
 
   requestAction(action: GuestAction, bed?: string): void { this.rm?.requestAction(action, bed); }
+
+  /** Send a chat line to the peer and echo it into our own transcript. */
+  sendChat(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed || !this.rm) return;
+    const me = getOrCreatePlayer();
+    this.rm.sendChat(trimmed, me.name);
+    useMpStore.getState().addChatMessage({ self: true, name: me.name, text: trimmed.slice(0, CHAT_MAX_LEN), ts: Date.now() });
+  }
+
+  /** Host: change the turn clock for this room (also persists the preference). */
+  setTurnClock(seconds: number): void {
+    useMpStore.getState().setTurnClockPref(seconds);
+    this.rm?.setTurnClock(seconds);
+  }
 
   leave(): void {
     this.broker?.leave(); this.broker?.close(); this.broker = null;

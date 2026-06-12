@@ -288,3 +288,109 @@ describe("RemoteMatch guest requests (guest side)", () => {
     expect(peer.sent).toEqual([]);
   });
 });
+
+describe("RemoteMatch chat", () => {
+  it("sendChat trims, caps length, and puts the line on the wire", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} });
+    rm.start();
+    rm.sendChat("  good darts!  ", "Ann");
+    expect(peer.sent).toHaveLength(1);
+    const msg = peer.sent[0] as { t: string; text: string; name: string; ts: number };
+    expect(msg.t).toBe("chat");
+    expect(msg.text).toBe("good darts!");
+    expect(msg.name).toBe("Ann");
+    expect(typeof msg.ts).toBe("number");
+  });
+
+  it("sendChat drops empty/whitespace lines", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "guest", peer, bridge, applyState: () => {} });
+    rm.start();
+    rm.sendChat("   ", "Ann");
+    expect(peer.sent).toEqual([]);
+  });
+
+  it("delivers valid incoming chat to onChat for either role", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const got: Array<[string, string, number]> = [];
+    const rm = new RemoteMatch({
+      role: "guest", peer, bridge, applyState: () => {},
+      onChat: (text, name, ts) => got.push([text, name, ts]),
+    });
+    rm.start();
+    peer.fireData({ t: "chat", text: "hi", name: "Bo", ts: 123 });
+    expect(got).toEqual([["hi", "Bo", 123]]);
+  });
+
+  it("rejects malformed chat (empty text, oversized text, missing ts)", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const got: string[] = [];
+    const rm = new RemoteMatch({
+      role: "host", peer, bridge, applyState: () => {},
+      onChat: (text) => got.push(text),
+    });
+    rm.start();
+    peer.fireData({ t: "chat", text: "", name: "Bo", ts: 1 });
+    peer.fireData({ t: "chat", text: "x".repeat(501), name: "Bo", ts: 1 });
+    peer.fireData({ t: "chat", text: "ok", name: "Bo" });
+    expect(got).toEqual([]);
+  });
+});
+
+describe("RemoteMatch turn clock", () => {
+  it("host setTurnClock announces to the peer and re-announces on channel open", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const rm = new RemoteMatch({ role: "host", peer, bridge, applyState: () => {} });
+    rm.start();
+    rm.setTurnClock(45);
+    expect(peer.sent).toContainEqual({ t: "clock", seconds: 45 });
+    peer.sent.length = 0;
+    peer.fireOpen(); // reconnect → guest needs the setting again
+    expect(peer.sent).toContainEqual({ t: "clock", seconds: 45 });
+  });
+
+  it("guest applies an announced clock via onTurnClock", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const got: number[] = [];
+    const rm = new RemoteMatch({
+      role: "guest", peer, bridge, applyState: () => {},
+      onTurnClock: (s) => got.push(s),
+    });
+    rm.start();
+    peer.fireData({ t: "clock", seconds: 30 });
+    expect(got).toEqual([30]);
+  });
+
+  it("guest setTurnClock is a no-op and a host ignores inbound clock msgs", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const got: number[] = [];
+    const rm = new RemoteMatch({
+      role: "host", peer, bridge, applyState: () => {},
+      onTurnClock: (s) => got.push(s),
+    });
+    rm.start();
+    peer.fireData({ t: "clock", seconds: 30 }); // host ignores
+    expect(got).toEqual([]);
+
+    const peer2 = fakePeer();
+    const rm2 = new RemoteMatch({ role: "guest", peer: peer2, bridge: fakeBridge(), applyState: () => {} });
+    rm2.start();
+    rm2.setTurnClock(60); // guest can't set
+    expect(peer2.sent).toEqual([]);
+  });
+
+  it("rejects out-of-range clock values", () => {
+    const peer = fakePeer(); const bridge = fakeBridge();
+    const got: number[] = [];
+    const rm = new RemoteMatch({
+      role: "guest", peer, bridge, applyState: () => {},
+      onTurnClock: (s) => got.push(s),
+    });
+    rm.start();
+    peer.fireData({ t: "clock", seconds: -1 });
+    peer.fireData({ t: "clock", seconds: 9999 });
+    peer.fireData({ t: "clock", seconds: "30" });
+    expect(got).toEqual([]);
+  });
+});
