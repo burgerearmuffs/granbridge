@@ -1,14 +1,32 @@
 # GRANBRIDGE
 
-Modern, Windows-first BLE bridge for GRANBOARD 3s dartboards. Receives live dart
-hits over Bluetooth LE and exposes them as structured JSON over WebSocket, with a
-transparent OBS overlay. The bridge runs headless and is usable without any UI.
+Modern, Windows-first darts platform for GRANBOARD 3s dartboards: a BLE bridge +
+game engine (Python, headless-capable) and a polished desktop app (React +
+Tauri) for local play, internet multiplayer with live video, and streaming.
 
-## Milestone 1 — what works
-- Connects to a GRANBOARD over BLE on Windows 11 (auto-reconnect, watchdog).
-- Decodes dart hits into structured JSON events.
-- Streams events over a local WebSocket (`ws://127.0.0.1:8787`).
-- A browser overlay updates live (usable as an OBS Browser Source).
+> **Just want to play?** Grab the installer from the
+> [latest release](https://github.com/burgerearmuffs/granbridge/releases/latest)
+> and read [`QUICKSTART.md`](QUICKSTART.md). The rest of this README is for
+> developers and self-hosters.
+
+## What it does
+- **Board → engine:** connects to a GRANBOARD over BLE (auto-reconnect),
+  decodes hits into structured JSON events, and drives a full game engine —
+  X01 (legs + sets, double-out, checkout hints), Cricket, Around the Clock,
+  Count-Up, Free Play, Medley.
+- **Desktop app:** live scoreboard with a 3D dartboard, match history +
+  heatmap, profiles with server-backed career stats and a verified
+  leaderboard, a Settings tab (A/V devices, broker, local data), first-run
+  onboarding, offline commentary captions, shareable result cards, and
+  auto-updates.
+- **Internet multiplayer:** room + password matches with two-way camera/mic
+  over WebRTC (relay-only TURNS over 443), host-authoritative game sync, text
+  chat, an optional turn clock, guest controls + rematch — and **spectators**
+  who can watch any room live.
+- **Tournament night:** local single-elimination brackets for 2–8 players on
+  one board.
+- **Streaming:** OBS browser-source overlays (scoreboard, checkout, throw,
+  stats, lower-third, broadcast composite) + a kiosk mode.
 - Fully testable without hardware via a fake/replay transport.
 
 ## Quickstart (Windows 11)
@@ -98,10 +116,12 @@ GRANBRIDGE_PLUGINS__RELAY__ROOM=mygame
 
 ### AI commentary plugin
 
-The `commentary` plugin listens to bus events and publishes `commentary` events with human-readable call-outs (e.g. "Treble twenty!", "One hundred and eighty!", "Game shot!"). A `TemplateCommentator` covers key moments offline. An `LLMCommentator` seam is ready for injection of any LLM provider callable.
+The `commentary` plugin listens to bus events and publishes `commentary` events with human-readable call-outs (e.g. "Treble twenty!", "One hundred and eighty!", "Game shot!"). A `TemplateCommentator` covers key moments offline; the desktop UI renders the lines as a broadcast-style caption. An `LLMCommentator` seam is ready for injection of any LLM provider callable.
+
+**Enabled by default** since v0.1.6. Disable (or change the plugin set) with:
 
 ```
-GRANBRIDGE_PLUGINS_ENABLED=["commentary"]
+GRANBRIDGE_PLUGINS_ENABLED=[]
 ```
 
 **Flag:** For richer LLM-generated commentary an API key and a `generate` callable backed by an LLM provider must be injected into `LLMCommentator`. Text-to-speech output requires an additional TTS integration (not included).
@@ -186,8 +206,8 @@ npm install
 npx tauri build
 ```
 Output installers under `ui/src-tauri/target/release/bundle/`:
-- `msi/GRANBRIDGE_0.1.0_x64_en-US.msi`
-- `nsis/GRANBRIDGE_0.1.0_x64-setup.exe`
+- `msi/GRANBRIDGE_<ver>_x64_en-US.msi`
+- `nsis/GRANBRIDGE_<ver>_x64-setup.exe`
 
 **How it works:** The native app bundles `granbridge.exe` (a PyInstaller onefile sidecar) and
 spawns it as `granbridge serve` on startup via `tauri-plugin-shell`. Tauri shows the React UI
@@ -204,67 +224,48 @@ Then re-run `npx tauri build` from `ui/`.
 (`dist\granbridge\granbridge.exe calibrate`) to map your board. Calibration data is stored
 in your user profile and survives app reinstalls.
 
-## Multiplayer (beta)
+## Multiplayer
 
-Two players join a shared room over WebRTC (camera + mic) via the Granbridge WebSocket broker.
-The broker handles signaling; all A/V travels peer-to-peer. Game-sync (dart events over the data channel) is MP-3.
+Two players, each on their own board, play one shared match with two-way
+camera/mic. The broker (`server/`) handles rooms, presence, WebRTC signaling
+and short-lived TURN credentials; media and game sync travel peer-to-peer
+(relayed through coturn over TLS/443 when NATs demand it).
 
 ### How to use
 
-1. **Run the broker** — on the local machine or on TOWER:
+1. Both players open the **Multiplayer** tab and enter a display name, the same
+   **Room ID** + **Password**, and the **Broker URL** (defaults to the hosted
+   broker, `wss://darts.aventador.io/`; persists to localStorage and is also
+   editable in **Settings**). For LAN/dev, run the broker locally
+   (`.venv\Scripts\python -m granbridge_broker`) and use `ws://127.0.0.1:8788`.
+2. Click **Join** — camera/mic permission is requested once (pick devices in
+   **Settings**, with a live test preview). If access is denied you still join,
+   with a notice explaining how to fix it.
+3. The **host** (elected automatically) picks the mode, start score
+   (301/501/701), best-of-legs, and an optional **turn clock** (30/45/60s) and
+   clicks **Start match**. Both boards feed the one shared game — the host's
+   engine is authoritative; the guest gets miss/undo/correct/rematch request
+   controls.
+4. **Chat** any time via the in-room text chat (collapsible in-game, unread
+   badge).
+5. **Spectators:** anyone with the room + password can tick **Watch only** —
+   no camera needed; they see the live board, score, and the players' chat
+   (read-only). Players see a "👁 N watching" count.
 
-   ```
-   # Local (dev)
-   .venv\Scripts\python -m granbridge_broker
+### Architecture notes
 
-   # Or on TOWER (accessible on your LAN):
-   .venv\Scripts\granbridge_broker --host 0.0.0.0 --port 8788
-   ```
-
-2. **Open the UI** → click the **Multiplayer** tab.
-
-3. Both players enter:
-   - A display name
-   - The same **Room ID** (e.g. `friday-night`)
-   - The same **Password**
-   - The **Broker URL** (`ws://127.0.0.1:8788` for local; `wss://tower.local:8788` over TLS for LAN/WAN)
-
-4. Click **Join**. The browser requests camera+mic permission (once). Two-way A/V begins.
-
-### Broker URL
-
-| Scenario | Broker URL |
-|----------|------------|
-| Both players on same machine | `ws://127.0.0.1:8788` |
-| LAN play (TOWER as broker) | `ws://<TOWER-ip>:8788` |
-| Internet / through NAT (TLS) | `wss://<TOWER-domain>:8788` |
-
-Set the URL in the Multiplayer join form — it persists to localStorage.
-
-### Through-NAT A/V (TURN server)
-
-If both players are behind different NATs, pure STUN may not establish a direct
-peer-to-peer connection. Add a TURN server to `DEFAULT_ICE_SERVERS` in
-`ui/src/multiplayer/peerManager.ts`:
-
-```ts
-{ urls: "turn:<TOWER-ip>:3478", username: "<user>", credential: "<secret>" }
-```
-
-TOWER runs coturn; credentials are stored in `turnserver.conf` (not committed).
-
-### Controls
-
-| Button | Action |
-|--------|--------|
-| Mic on/off | Mutes your microphone; preference persists |
-| Cam on/off | Disables your video; preference persists |
-| Leave room | Closes the WebRTC connection and returns to the join form |
-
-### Architecture note
-
-- **Identity:** each browser generates a UUID on first use (`granbridge.player` in localStorage).
-- **Signaling:** SDP offers/answers and ICE candidates are relayed through the broker over the existing WebSocket.
-- **Perfect-negotiation:** polite/impolite by comparing peer IDs (lexicographic); handles offer collisions cleanly.
-- **Data channel** (`granbridge`): open on every connection — ready for game-sync events in MP-3.
-- **Game-sync (MP-3):** dart events will be broadcast over the data channel in a future milestone. Multiplayer A/V is self-contained in MP-2.
+- **Identity:** anonymous UUID profile (`granbridge.player` in localStorage) +
+  a private write-token whose base64 export is the **recovery key** for
+  server-side career stats (TOFU auth; export it from Profile).
+- **TURN is automatic:** the client fetches short-lived TURNS credentials from
+  the broker's `/turn` endpoint at join and forces relay-only ICE, so matches
+  work through NATs with only TCP 443 open server-side. If `/turn` is
+  unreachable the join fails with a clear error instead of hanging.
+- **Perfect negotiation** (polite/impolite by lexicographic peer id) over the
+  broker's signal relay; **data channel** `granbridge` carries game sync
+  (`state`/`dart`), profile cards, chat, the turn clock, and guest requests.
+- **Spectator relay:** while spectators are present, the host mirrors
+  authoritative `game_state` (and chat) to the room as broker `msg` broadcasts;
+  spectators are invisible to host election and read-only at the server.
+- Self-hosting the broker (Docker, 443-only, coturn): see [`server/`](server)
+  and `server/CHANGELOG.md`.

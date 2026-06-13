@@ -29,11 +29,25 @@ export interface JoinOpts {
 /** Broker-relayed state for spectators (host → room when spectators are present). */
 export interface SpectateStateMsg { t: "spectate_state"; state: import("../types").GameState }
 
+/** Broker-relayed chat line for spectators (host mirrors both players' chat). */
+export interface SpectateChatMsg { t: "spectate_chat"; name: string; text: string; ts: number }
+
 function isSpectateState(o: unknown): o is SpectateStateMsg {
   return (
     typeof o === "object" && o !== null &&
     (o as { t?: unknown }).t === "spectate_state" &&
     typeof (o as { state?: unknown }).state === "object" && (o as { state?: unknown }).state !== null
+  );
+}
+
+function isSpectateChat(o: unknown): o is SpectateChatMsg {
+  if (typeof o !== "object" || o === null) return false;
+  const m = o as { t?: unknown; name?: unknown; text?: unknown; ts?: unknown };
+  return (
+    m.t === "spectate_chat" &&
+    typeof m.name === "string" && m.name.length <= 80 &&
+    typeof m.text === "string" && m.text.length > 0 && m.text.length <= CHAT_MAX_LEN &&
+    typeof m.ts === "number"
   );
 }
 
@@ -156,6 +170,10 @@ class MpSession {
     bc.onMsg((_from, payload) => {
       if (isSpectateState(payload)) {
         useStore.getState().applyEvent({ type: "game_state", state: payload.state });
+      } else if (isSpectateChat(payload)) {
+        useMpStore.getState().addChatMessage(
+          { self: false, name: payload.name, text: payload.text, ts: payload.ts },
+        );
       }
     });
     bc.onError((code, message) => { const s = useMpStore.getState(); s.setError(`${code}: ${message}`); s.setMpStatus("error"); });
@@ -184,6 +202,14 @@ class MpSession {
     if (state) bc.sendMsg({ t: "spectate_state", state });
   }
 
+  /** Host-side: mirror a chat line (either player's) to watching spectators. */
+  private _relayChatToSpectators(name: string, text: string, ts: number): void {
+    const { selfId, peers, spectatorCount } = useMpStore.getState();
+    if (!this.broker || spectatorCount === 0) return;
+    if (!selfId || hostRole(selfId, peers) !== "host") return;
+    this.broker.sendMsg({ t: "spectate_chat", name, text, ts });
+  }
+
   private ensureRemoteMatch(): void {
     const { peers, selfId } = useMpStore.getState();
     if (this.rm || !this.pm || !selfId || peers.length === 0) return;
@@ -199,8 +225,10 @@ class MpSession {
         );
       },
       onMatchId: (id) => useMpStore.getState().setRemoteMatchId(id),
-      onChat: (text, name, ts) =>
-        useMpStore.getState().addChatMessage({ self: false, name, text, ts }, { unread: true }),
+      onChat: (text, name, ts) => {
+        useMpStore.getState().addChatMessage({ self: false, name, text, ts }, { unread: true });
+        this._relayChatToSpectators(name, text, ts);
+      },
       onTurnClock: (seconds) => useMpStore.getState().applyTurnClock(seconds),
     });
     rm.start();
@@ -227,7 +255,10 @@ class MpSession {
     if (!trimmed || !this.rm) return;
     const me = getOrCreatePlayer();
     this.rm.sendChat(trimmed, me.name);
-    useMpStore.getState().addChatMessage({ self: true, name: me.name, text: trimmed.slice(0, CHAT_MAX_LEN), ts: Date.now() });
+    const ts = Date.now();
+    const capped = trimmed.slice(0, CHAT_MAX_LEN);
+    useMpStore.getState().addChatMessage({ self: true, name: me.name, text: capped, ts });
+    this._relayChatToSpectators(me.name, capped, ts);
   }
 
   /** Host: change the turn clock for this room (also persists the preference). */

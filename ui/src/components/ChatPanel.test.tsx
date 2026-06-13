@@ -91,3 +91,15 @@ describe("chat store", () => {
     expect(useMpStore.getState().chatUnread).toBe(1);
   });
 });
+
+describe("ChatPanel readOnly (spectator)", () => {
+  it("shows the transcript but no input or send button", () => {
+    useMpStore.setState({
+      chatMessages: [{ self: false, name: "Ann", text: "watch this", ts: 1 }],
+    });
+    render(<ChatPanel startOpen readOnly />);
+    expect(screen.getByRole("log")).toHaveTextContent("Ann: watch this");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send chat message/i })).not.toBeInTheDocument();
+  });
+});
