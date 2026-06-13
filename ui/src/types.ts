@@ -17,6 +17,7 @@ export type Event =
   | { type: "bust"; player: string; score_attempted: number; reason: string }
   | { type: "leg_won"; player: string; legs: number; sets: number }
   | { type: "game_won"; player: string }
+  | { type: "commentary"; text: string; tone?: string }
   | { type: "error"; category: string; message: string };
 export type Command =
   | { command: "start_game"; mode: string; players: string[]; options: Record<string, unknown> }

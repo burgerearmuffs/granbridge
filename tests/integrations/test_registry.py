@@ -14,3 +14,12 @@ def test_build_enabled_instantiates_named_plugins():
 def test_unknown_plugin_skipped():
     s = Settings(plugins_enabled=["nope"])
     assert build_enabled(s) == []
+
+
+def test_commentary_enabled_by_default():
+    from granbridge.commentary.plugin import CommentaryPlugin
+
+    s = Settings()
+    assert s.plugins_enabled == ["commentary"]
+    plugins = build_enabled(s)
+    assert [type(p) for p in plugins] == [CommentaryPlugin]
