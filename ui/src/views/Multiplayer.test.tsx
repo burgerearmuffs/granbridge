@@ -155,6 +155,31 @@ describe("Multiplayer in-room match panel", () => {
     expect(screen.getByRole("combobox", { name: /match mode/i })).toBeInTheDocument();
   });
 
+  it("host can pick score + legs; startMatch gets the chosen options", () => {
+    enterRoomAs("aaa", "zzz");
+    render(<Multiplayer />);
+    fireEvent.change(screen.getByRole("combobox", { name: /start score/i }), { target: { value: "301" } });
+    fireEvent.change(screen.getByRole("combobox", { name: /best of legs/i }), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: /start match/i }));
+    expect(mockMpSession.startMatch).toHaveBeenCalledWith("x01", {
+      start_score: 301, double_out: true, best_of_legs: 3,
+    });
+  });
+
+  it("single-leg default omits best_of_legs; non-x01 modes omit score options", () => {
+    enterRoomAs("aaa", "zzz");
+    render(<Multiplayer />);
+    fireEvent.click(screen.getByRole("button", { name: /start match/i }));
+    expect(mockMpSession.startMatch).toHaveBeenCalledWith("x01", {
+      start_score: 501, double_out: true,
+    });
+
+    fireEvent.change(screen.getByRole("combobox", { name: /match mode/i }), { target: { value: "count_up" } });
+    expect(screen.queryByRole("combobox", { name: /start score/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /start match/i }));
+    expect(mockMpSession.startMatch).toHaveBeenLastCalledWith("count_up", {});
+  });
+
   it("guest (larger peer id) sees a waiting message, no Start button", () => {
     enterRoomAs("zzz", "aaa");
     render(<Multiplayer />);

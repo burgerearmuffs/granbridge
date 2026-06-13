@@ -1,0 +1,11 @@
+{
+  "version": "0.1.5",
+  "notes": "Spectator mode, in-match text chat, turn clock, local tournaments, Settings tab (device pickers), first-run onboarding, plus reliability fixes.",
+  "pub_date": "2026-06-13T00:29:48.692Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReC9wT3UyVmdnK0NXRGh3aTJDUGRmcHBtQ0lXMFZUSytxNTZwemMra25Mbkp0U1N0ODlEek5vbTNVSmZEcGk4VWZoMzE3RmJZU21TZDFkVU1EM3FlYUtBYzEyS2Q1S2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzEwNTYyCWZpbGU6R1JBTkJSSURHRV8wLjEuNV94NjQtc2V0dXAuZXhlCmNNczVodnRyblBzRjdxR1hkNm05MTRMNkZFMVhrOE1CNXQxT2VScTNZVE90a21yaEVnV25nREk1WkdWQm5kU0t5MHV1S3hqbW9Hc053QjhVSzNRRUJnPT0K",
+      "url": "https://github.com/burgerearmuffs/granbridge/releases/download/v0.1.5/GRANBRIDGE_0.1.5_x64-setup.exe"
+    }
+  }
+}

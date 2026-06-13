@@ -54,6 +54,8 @@ export function Multiplayer() {
   const [passwordInput, setPasswordInput] = useState("");
   const [brokerInput, setBrokerInput] = useState(brokerUrl);
   const [mpMode, setMpMode] = useState("x01");
+  const [mpScore, setMpScore] = useState(501);
+  const [mpLegs, setMpLegs] = useState(1);
   const [spectateInput, setSpectateInput] = useState(false);
 
   // Update local tracks when mic/cam toggles change
@@ -73,9 +75,16 @@ export function Multiplayer() {
   const handleLeave = useCallback(() => mpSession.leave(), []);
 
   const handleStartMatch = useCallback(() => {
-    const options = mpMode === "x01" ? { start_score: 501, double_out: true } : {};
+    const options: Record<string, unknown> = {};
+    if (mpMode === "x01") {
+      options.start_score = mpScore;
+      options.double_out = true;
+    }
+    if ((mpMode === "x01" || mpMode === "cricket") && mpLegs > 1) {
+      options.best_of_legs = mpLegs;
+    }
     mpSession.startMatch(mpMode, options);
-  }, [mpMode]);
+  }, [mpMode, mpScore, mpLegs]);
 
   // Role is derived deterministically from peer ids (host = smaller id)
   const role = selfId && peers.length ? hostRole(selfId, peers) : null;
@@ -378,13 +387,43 @@ export function Multiplayer() {
                 aria-label="Match mode"
                 className="ml-2 bg-neutral-800 rounded-lg px-3 py-2 text-sm"
               >
-                <option value="x01">X01 (501)</option>
+                <option value="x01">X01</option>
                 <option value="cricket">Cricket</option>
                 <option value="around_the_clock">Around the Clock</option>
                 <option value="count_up">Count-Up</option>
                 <option value="medley">Medley</option>
               </select>
             </label>
+            {mpMode === "x01" && (
+              <label className="text-sm text-neutral-300">
+                Score
+                <select
+                  value={String(mpScore)}
+                  onChange={(e) => setMpScore(Number(e.target.value))}
+                  aria-label="Start score"
+                  className="ml-2 bg-neutral-800 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="301">301</option>
+                  <option value="501">501</option>
+                  <option value="701">701</option>
+                </select>
+              </label>
+            )}
+            {(mpMode === "x01" || mpMode === "cricket") && (
+              <label className="text-sm text-neutral-300">
+                Legs
+                <select
+                  value={String(mpLegs)}
+                  onChange={(e) => setMpLegs(Number(e.target.value))}
+                  aria-label="Best of legs"
+                  className="ml-2 bg-neutral-800 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="1">Single leg</option>
+                  <option value="3">Best of 3</option>
+                  <option value="5">Best of 5</option>
+                </select>
+              </label>
+            )}
             <label className="text-sm text-neutral-300">
               Turn clock
               <select

@@ -8,6 +8,8 @@ import { FreePlayBoard } from "../components/boards/FreePlayBoard";
 import { CountUpBoard } from "../components/boards/CountUpBoard";
 import { MedleyBoard } from "../components/boards/MedleyBoard";
 import { Dartboard } from "../components/Dartboard";
+import { CommentaryTicker } from "../components/CommentaryTicker";
+import { ShareResult } from "../components/ShareResult";
 
 const HERO_DURATION_MS = 2500;
 
@@ -81,7 +83,7 @@ export function LiveGame({ state }: Props) {
 
   return (
     <div className="space-y-8">
-      {activePlayer && (
+      {activePlayer && state.status === "in_progress" && (
         <div className="text-center">
           <span className="text-lg text-amber-300 font-semibold uppercase tracking-widest">
             {activePlayer.name}
@@ -89,6 +91,10 @@ export function LiveGame({ state }: Props) {
           <span className="text-neutral-500 text-sm ml-2">throwing</span>
         </div>
       )}
+
+      <CommentaryTicker />
+
+      {state.status === "finished" && <ShareResult state={state} />}
 
       <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
         {/* Mode-specific scoreboard */}

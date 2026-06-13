@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     log_dir: Path = Path(os.environ.get("LOCALAPPDATA", ".")) / "granbridge" / "logs"
     overrides_path: Path = Path(os.environ.get("LOCALAPPDATA", ".")) / "granbridge" / "segment_map.overrides.json"
     http_port: int = 8080
-    plugins_enabled: list[str] = []
+    # Offline template commentary is on by default (publishes `commentary` bus
+    # events the UI ticker renders). Disable with GRANBRIDGE_PLUGINS_ENABLED=[].
+    plugins_enabled: list[str] = ["commentary"]
     plugins: dict[str, dict] = {}
     history_db: Path = Path(os.environ.get("LOCALAPPDATA", ".")) / "granbridge" / "history.db"
