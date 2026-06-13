@@ -44,6 +44,8 @@ export function Multiplayer() {
   const connectionHealth = useMpStore((s) => s.connectionHealth);
   const opponentCard = useMpStore((s) => s.opponentCard);
   const turnClockSecs = useMpStore((s) => s.turnClockSecs);
+  const spectate = useMpStore((s) => s.spectate);
+  const spectatorCount = useMpStore((s) => s.spectatorCount);
   const gameState = useStore((s) => s.gameState);
 
   const identity = getOrCreatePlayer();
@@ -52,6 +54,7 @@ export function Multiplayer() {
   const [passwordInput, setPasswordInput] = useState("");
   const [brokerInput, setBrokerInput] = useState(brokerUrl);
   const [mpMode, setMpMode] = useState("x01");
+  const [spectateInput, setSpectateInput] = useState(false);
 
   // Update local tracks when mic/cam toggles change
   useEffect(() => {
@@ -63,8 +66,9 @@ export function Multiplayer() {
   const handleJoin = useCallback(() => {
     if (!roomInput.trim() || !passwordInput.trim()) return;
     void mpSession.join({ room: roomInput.trim(), password: passwordInput.trim(),
-      displayName: displayName.trim() || identity.name, brokerUrl: brokerInput.trim() });
-  }, [roomInput, passwordInput, displayName, brokerInput, identity.name]);
+      displayName: displayName.trim() || identity.name, brokerUrl: brokerInput.trim(),
+      spectate: spectateInput });
+  }, [roomInput, passwordInput, displayName, brokerInput, identity.name, spectateInput]);
 
   const handleLeave = useCallback(() => mpSession.leave(), []);
 
@@ -141,13 +145,24 @@ export function Multiplayer() {
             />
           </label>
 
+          <label className="flex items-center gap-2 text-sm text-neutral-300">
+            <input
+              type="checkbox"
+              checked={spectateInput}
+              onChange={(e) => setSpectateInput(e.target.checked)}
+              aria-label="Join as spectator"
+              className="accent-amber-400"
+            />
+            Watch only (spectator — no camera or mic)
+          </label>
+
           <button
             onClick={handleJoin}
             disabled={!roomInput.trim() || !passwordInput.trim()}
             className="w-full py-2.5 rounded-lg bg-amber-400 text-neutral-900 font-bold text-sm hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Join room"
           >
-            {mpStatus === "error" ? "Retry" : "Join"}
+            {mpStatus === "error" ? "Retry" : spectateInput ? "Watch" : "Join"}
           </button>
         </div>
       </div>
@@ -158,6 +173,43 @@ export function Multiplayer() {
     return (
       <div className="max-w-md mx-auto mt-8 text-center">
         <p className="text-neutral-400 animate-pulse">Connecting to {room}…</p>
+      </div>
+    );
+  }
+
+  // ── Spectator: watch-only view ──────────────────────────────────────────────
+  if (spectate) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">
+            <span aria-hidden>👁</span> Watching: <span className="text-amber-400">{room}</span>
+          </h2>
+          <div className="flex items-center gap-3">
+            {spectatorCount > 1 && (
+              <span className="text-sm text-neutral-400">{spectatorCount} watching</span>
+            )}
+            <button
+              onClick={handleLeave}
+              aria-label="Stop watching"
+              className="px-4 py-2 rounded-lg bg-neutral-800 text-sm text-neutral-300 hover:bg-neutral-700"
+            >
+              Stop watching
+            </button>
+          </div>
+        </div>
+
+        <p className="text-sm text-neutral-400">
+          {peers.length > 0
+            ? `Players: ${peers.map((p) => p.player.name).join(" vs ")}`
+            : "Waiting for players to join…"}
+        </p>
+
+        {gameState && gameState.status !== "waiting" ? (
+          <LiveGame state={gameState} />
+        ) : (
+          <p className="text-neutral-500 animate-pulse">Waiting for the match to start…</p>
+        )}
       </div>
     );
   }
@@ -238,6 +290,11 @@ export function Multiplayer() {
               resetKey={`${gameState.active_index}:${JSON.stringify(gameState.legs ?? {})}`}
               running={gameState.status === "in_progress"}
             />
+            {spectatorCount > 0 && (
+              <span className="text-xs text-neutral-400" aria-label={`${spectatorCount} spectators watching`}>
+                👁 {spectatorCount} watching
+              </span>
+            )}
             <span className="text-xs text-neutral-500">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
           </div>
         </div>
@@ -268,7 +325,14 @@ export function Multiplayer() {
         <h2 className="text-xl font-bold">
           Room: <span className="text-amber-400">{room}</span>
         </h2>
-        <span className="text-sm text-neutral-400">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
+        <div className="flex items-center gap-3">
+          {spectatorCount > 0 && (
+            <span className="text-sm text-neutral-400" aria-label={`${spectatorCount} spectators watching`}>
+              👁 {spectatorCount} watching
+            </span>
+          )}
+          <span className="text-sm text-neutral-400">{peers.length + 1} player{peers.length !== 0 ? "s" : ""}</span>
+        </div>
       </div>
 
       {healthBanners}

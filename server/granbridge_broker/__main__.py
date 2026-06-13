@@ -24,6 +24,7 @@ async def _main() -> None:
         cfg.host,
         cfg.port,
         cfg.room_size_cap,
+        spectator_cap=cfg.spectator_cap,
         max_rooms=cfg.max_rooms,
         max_size=cfg.max_size,
         allowed_origins=cfg.allowed_origins,

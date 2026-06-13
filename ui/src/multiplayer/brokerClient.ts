@@ -24,8 +24,8 @@ export interface PeerInfo {
 }
 
 export type BrokerCallbacks = {
-  onJoined?: (self: string, peers: PeerInfo[]) => void;
-  onPeers?: (peers: PeerInfo[]) => void;
+  onJoined?: (self: string, peers: PeerInfo[], spectators?: number) => void;
+  onPeers?: (peers: PeerInfo[], spectators?: number) => void;
   onSignal?: (from: string, data: unknown) => void;
   onMsg?: (from: string, payload: unknown) => void;
   onError?: (code: string, message: string) => void;
@@ -33,8 +33,8 @@ export type BrokerCallbacks = {
 };
 
 type BrokerMsg =
-  | { type: "joined"; self: string; peers: PeerInfo[] }
-  | { type: "peers"; peers: PeerInfo[] }
+  | { type: "joined"; self: string; peers: PeerInfo[]; spectators?: number }
+  | { type: "peers"; peers: PeerInfo[]; spectators?: number }
   | { type: "signal"; from: string; data: unknown }
   | { type: "msg"; from: string; payload: unknown }
   | { type: "error"; code: string; message: string };
@@ -47,8 +47,8 @@ export class BrokerClient {
   private _ws: WebSocket | null = null;
   private _callbacks: BrokerCallbacks = {};
   /** `peers` is multi-subscriber: both mpSession and PeerManager register. */
-  private _peersSubs: Array<(peers: PeerInfo[]) => void> = [];
-  private _pendingJoin: { room: string; password: string; player: { id: string; name: string; avatar?: AvatarSpec } } | null = null;
+  private _peersSubs: Array<(peers: PeerInfo[], spectators?: number) => void> = [];
+  private _pendingJoin: { room: string; password: string; player: { id: string; name: string; avatar?: AvatarSpec }; spectator?: boolean } | null = null;
   private _closed = false;
   private _retryCount = 0;
   private _retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,7 +73,8 @@ export class BrokerClient {
     ws.onopen = () => {
       this._retryCount = 0;
       if (this._pendingJoin) {
-        this._send({ type: "join", ...this._pendingJoin });
+        const { spectator, ...rest } = this._pendingJoin;
+        this._send({ type: "join", ...rest, spectator: !!spectator });
       }
     };
 
@@ -95,10 +96,14 @@ export class BrokerClient {
     };
   }
 
-  join(room: string, password: string, player: { id: string; name: string; avatar?: AvatarSpec }): void {
-    this._pendingJoin = { room, password, player };
+  join(
+    room: string, password: string,
+    player: { id: string; name: string; avatar?: AvatarSpec },
+    opts?: { spectator?: boolean },
+  ): void {
+    this._pendingJoin = { room, password, player, spectator: opts?.spectator };
     if (this._ws && this._ws.readyState === 1 /* OPEN */) {
-      this._send({ type: "join", room, password, player });
+      this._send({ type: "join", room, password, player, spectator: !!opts?.spectator });
     }
     // If socket isn't open yet, will be sent in onopen.
   }
@@ -134,10 +139,10 @@ export class BrokerClient {
   private _dispatch(msg: BrokerMsg) {
     switch (msg.type) {
       case "joined":
-        this._callbacks.onJoined?.(msg.self, msg.peers);
+        this._callbacks.onJoined?.(msg.self, msg.peers, msg.spectators);
         break;
       case "peers":
-        for (const cb of this._peersSubs) cb(msg.peers);
+        for (const cb of this._peersSubs) cb(msg.peers, msg.spectators);
         break;
       case "signal":
         this._callbacks.onSignal?.(msg.from, msg.data);

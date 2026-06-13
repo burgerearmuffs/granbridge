@@ -194,6 +194,56 @@ describe("Multiplayer in-room match panel", () => {
 
 import { OpponentCard } from "../components/OpponentCard";
 
+describe("Multiplayer spectator", () => {
+  it("checkbox sends spectate: true on join and relabels the button", async () => {
+    render(<Multiplayer />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /join as spectator/i }));
+    expect(screen.getByRole("button", { name: /join room/i })).toHaveTextContent("Watch");
+    await act(async () => { fillAndJoin("r1", "pw"); });
+    expect(mockMpSession.join).toHaveBeenCalledWith(
+      expect.objectContaining({ room: "r1", spectate: true }),
+    );
+  });
+
+  it("renders the watch-only view with players and no controls", () => {
+    useMpStore.setState({
+      mpStatus: "in_room",
+      spectate: true,
+      room: "r9",
+      selfId: "spec",
+      spectatorCount: 2,
+      peers: [
+        { peer_id: "a", player: { id: "p1", name: "Ann" } },
+        { peer_id: "b", player: { id: "p2", name: "Bo" } },
+      ],
+    });
+    render(<Multiplayer />);
+    expect(screen.getByText(/watching:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ann vs Bo/)).toBeInTheDocument();
+    expect(screen.getByText(/2 watching/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /stop watching/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
+    // No game yet → waiting indicator
+    expect(screen.getByText(/waiting for the match to start/i)).toBeInTheDocument();
+  });
+
+  it("stop watching leaves the session", () => {
+    useMpStore.setState({ mpStatus: "in_room", spectate: true, room: "r9", selfId: "spec", peers: [] });
+    render(<Multiplayer />);
+    fireEvent.click(screen.getByRole("button", { name: /stop watching/i }));
+    expect(mockMpSession.leave).toHaveBeenCalled();
+  });
+
+  it("players see the watching count in the lobby", () => {
+    useMpStore.setState({
+      mpStatus: "in_room", room: "r1", selfId: "aaa", spectatorCount: 3,
+      peers: [{ peer_id: "zzz", player: { id: "px", name: "Opponent" } }],
+    });
+    render(<Multiplayer />);
+    expect(screen.getByText(/3 watching/)).toBeInTheDocument();
+  });
+});
+
 describe("Multiplayer avatars", () => {
   it("renders an avatar for a peer with no stream", () => {
     useMpStore.setState({

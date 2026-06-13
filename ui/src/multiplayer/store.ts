@@ -100,6 +100,10 @@ interface MpState {
   chatUnread: number;
   /** Per-turn clock in seconds; 0 = off. Host preference (persisted), synced to the guest. */
   turnClockSecs: number;
+  /** True when we joined the room as a watch-only spectator. */
+  spectate: boolean;
+  /** How many spectators are watching the room (from broker presence). */
+  spectatorCount: number;
 
   // Actions
   setMpStatus: (s: MpStatus) => void;
@@ -124,6 +128,8 @@ interface MpState {
   setTurnClockPref: (seconds: number) => void;
   /** Guest applies the host's announced value (not persisted). */
   applyTurnClock: (seconds: number) => void;
+  setSpectate: (v: boolean) => void;
+  setSpectatorCount: (n: number) => void;
   resetMp: () => void;
 }
 
@@ -147,6 +153,8 @@ export const useMpStore = create<MpState>((set) => ({
   chatMessages: [],
   chatUnread: 0,
   turnClockSecs: readTurnClockPref(),
+  spectate: false,
+  spectatorCount: 0,
 
   setMpStatus: (s) => set({ mpStatus: s }),
   setRoom: (r) => set({ room: r }),
@@ -196,6 +204,8 @@ export const useMpStore = create<MpState>((set) => ({
     set({ turnClockSecs: seconds });
   },
   applyTurnClock: (seconds) => set({ turnClockSecs: seconds }),
+  setSpectate: (v) => set({ spectate: v }),
+  setSpectatorCount: (n) => set({ spectatorCount: n }),
   resetMp: () =>
     set({
       mpStatus: "idle",
@@ -213,5 +223,7 @@ export const useMpStore = create<MpState>((set) => ({
       chatUnread: 0,
       // Restore the local preference — a guest may have had the host's value applied.
       turnClockSecs: readTurnClockPref(),
+      spectate: false,
+      spectatorCount: 0,
     }),
 }));
