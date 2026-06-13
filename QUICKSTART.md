@@ -58,31 +58,42 @@ Either way it starts the bridge (UI at `http://127.0.0.1:8080`) and begins looki
 Two people, each on their own board + their own GRANBRIDGE, play one shared match with video/voice.
 
 1. Both open the **Multiplayer** tab.
-2. Set your **display name** + pick an avatar color in the **Profile** tab (optional).
+2. Set your **display name** + pick an avatar color in the **Profile** tab (optional). Choose your
+   camera/microphone in **Settings** (with a live "Test camera" preview).
 3. Both enter the **same Room ID + password** and the **Broker URL**, then **Join**. You'll see each
    other's camera tiles and an opponent stat card.
-4. The **host** (shown automatically) picks a mode and clicks **Start match**; the other player sees
-   "waiting for the host." Both boards then drive the one shared game — the host's engine is the
-   source of truth.
+4. The **host** (shown automatically) picks a mode — and optionally a **turn clock** (30/45/60s
+   countdown both players see) — and clicks **Start match**; the other player sees "waiting for the
+   host." Both boards then drive the one shared game — the host's engine is the source of truth.
+5. **Chat** any time with the in-room text chat (collapsible during the match, with an unread badge).
+6. **Spectators:** friends can tick **Watch only** on the join form to watch the match live (board +
+   score, no camera needed). Players see a "👁 N watching" count.
 
 > **You need a reachable broker** for the internet path (rooms + signaling) and, for camera/voice across
 > home networks, a **TURN server**. See [`server/`](server) for the Dockerized broker + coturn and the
 > TOWER deploy notes. On a LAN you can run the broker locally (`granbridge relay` / the `server/` broker).
 
-## 6. OBS overlays (optional)
+## 6. Tournament night (local)
+
+Got friends over? The **Tournament** tab runs a single-elimination bracket for **2–8 players** on one
+board: enter names, pick the game (501/301, Cricket, Around the Clock, Count-Up), and play through the
+bracket — winners advance automatically as each game finishes (or record results manually). The
+bracket survives an app restart.
+
+## 7. OBS overlays (optional)
 
 Browser-source overlays (scoreboard, checkout, throw, stats, lower-third) are served at
 `http://127.0.0.1:8080/overlays/`. Add one as a Browser Source in OBS. Add `?kiosk` to the main UI URL
 for a clean full-screen scoreboard.
 
-## 7. Where your data lives
+## 8. Where your data lives
 
 Everything writable is under **`%LOCALAPPDATA%\granbridge`**:
 - `history.db` — match history + career stats
 - `segment_map.overrides.json` — your calibration (if any)
 - `logs\` — decoded-event logs and diagnostics
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 - **Board won't connect:** wake it (throw/press), confirm Bluetooth is on, and that no other app holds
   the board. The badge shows the connection state.
