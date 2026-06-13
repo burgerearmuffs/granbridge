@@ -7,6 +7,7 @@ import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
 import { exportRecoveryKey } from "../multiplayer/recoveryKey";
 import { getUploadEnabled, setUploadEnabled } from "../stats/uploadPref";
 import { PageHeader } from "../components/Page";
+import { isKeyBackedUp, markKeyBackedUp } from "../components/Onboarding";
 
 export function Profile() {
   const [profile, setProfile] = useState(() => getOrCreatePlayer());
@@ -17,6 +18,7 @@ export function Profile() {
   const [keyError, setKeyError] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
   const [upload, setUpload] = useState(() => getUploadEnabled());
+  const [keyBackedUp, setKeyBackedUp] = useState(() => isKeyBackedUp());
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +39,8 @@ export function Profile() {
     try {
       if (!navigator.clipboard) throw new Error("no clipboard");
       await navigator.clipboard.writeText(key);
+      markKeyBackedUp();
+      setKeyBackedUp(true);
       setKeyCopied(true);
       setKeyError(null);
       setTimeout(() => setKeyCopied(false), 1500);
@@ -65,6 +69,16 @@ export function Profile() {
   return (
     <div className="max-w-md mx-auto mt-8 space-y-6">
       <PageHeader title="Profile" />
+
+      {!keyBackedUp && (
+        <div role="status" className="bg-amber-900/40 border border-amber-700 rounded-lg px-4 py-3 text-sm text-amber-200">
+          <strong>Back up your recovery key.</strong> It's the only way to keep your server career
+          stats if you reinstall or switch PCs.{" "}
+          <button onClick={exportKey} className="underline font-semibold" aria-label="Back up recovery key now">
+            Copy it now
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         <Avatar name={profile.name} color={profile.avatar.color} size={72} />
