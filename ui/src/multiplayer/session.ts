@@ -91,12 +91,22 @@ class MpSession {
       return;
     }
 
-    const { mic, cam, camDeviceId, micDeviceId } = useMpStore.getState();
+    const { mic, cam, camDeviceId, micDeviceId, boardCamDeviceId } = useMpStore.getState();
     const { stream, failure } = await acquireLocalMedia(
       buildConstraints(cam, mic, camDeviceId, micDeviceId),
     );
     useMpStore.getState().setLocalStream(stream);
     useMpStore.getState().setMediaNotice(mediaNoticeFor(failure));
+
+    // Optional second camera pointed at the board (video-only). Failure here is
+    // non-fatal — the match proceeds with the face cam alone.
+    let boardStream: MediaStream | null = null;
+    if (cam && boardCamDeviceId) {
+      boardStream = (await acquireLocalMedia(
+        buildConstraints(true, false, boardCamDeviceId, null),
+      )).stream;
+      useMpStore.getState().setLocalBoardStream(boardStream);
+    }
 
     this.selfCard = { profile: player, summary: await fetchMyCareerSummary(player.name) };
 
@@ -126,9 +136,11 @@ class MpSession {
       s.setSpectatorCount(spectators ?? 0);
       s.setMpStatus("in_room");
 
-      const pm = new PeerManager(bc, self, stream, iceServers);
+      const localStreams = [stream, boardStream].filter((s): s is MediaStream => s !== null);
+      const pm = new PeerManager(bc, self, localStreams.length > 0 ? localStreams : null, iceServers);
       this.pm = pm;
       pm.onRemoteStream = (peerId, rs) => useMpStore.getState().setRemoteStream(peerId, rs);
+      pm.onRemoteBoardStream = (peerId, rs) => useMpStore.getState().setRemoteBoardStream(peerId, rs);
       pm.onConnectionHealth = (_peerId, health) => useMpStore.getState().setConnectionHealth(health);
       this.ensureRemoteMatch();
       this._ensureSpectatorMirror(bc);
@@ -274,6 +286,7 @@ class MpSession {
     this.unsubMirror?.(); this.unsubMirror = null;
     this.selfCard = null;
     useMpStore.getState().localStream?.getTracks().forEach((t) => t.stop());
+    useMpStore.getState().localBoardStream?.getTracks().forEach((t) => t.stop());
     useMpStore.getState().resetMp();
   }
 }

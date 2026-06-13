@@ -28,7 +28,7 @@ export function VideoTile({ stream, label, muted = false, micActive = true, camA
   }, [stream]);
 
   return (
-    <div className="relative rounded-lg overflow-hidden bg-neutral-800 aspect-video">
+    <div className="relative rounded-xl overflow-hidden bg-neutral-800 aspect-video ring-1 ring-white/10 shadow-lg shadow-black/40">
       <video
         ref={videoRef}
         autoPlay
@@ -42,8 +42,8 @@ export function VideoTile({ stream, label, muted = false, micActive = true, camA
           <Avatar name={avatarName} color={avatarColor ?? "#3f3f46"} size={64} />
         </div>
       )}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-        <span className="bg-black/60 text-white text-xs px-2 py-0.5 rounded-full truncate max-w-[70%]">
+      <div className="absolute inset-x-0 bottom-0 px-2 pb-2 pt-6 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-between">
+        <span className="text-white/90 text-xs font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-sm truncate max-w-[70%]">
           {label}
         </span>
         <span className="flex gap-1">

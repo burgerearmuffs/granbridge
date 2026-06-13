@@ -202,6 +202,37 @@ describe("Multiplayer in-room match panel", () => {
     expect(screen.queryByRole("button", { name: /start match/i })).toBeNull();
   });
 
+  it("renders the opponent board cam zone when their second stream exists", () => {
+    enterRoomAs("aaa", "zzz");
+    useStore.setState({
+      gameState: {
+        mode: "x01", status: "in_progress",
+        players: [{ id: "p1", name: "Alice" }, { id: "p2", name: "Bob" }],
+        active_index: 0, visit: [], legs: {}, sets: {}, winner: null,
+        options: {}, mode_view: {}, stats: {},
+      },
+    });
+    const fakeBoard = { getTracks: () => [] } as unknown as MediaStream;
+    useMpStore.setState({ remoteBoardStreams: new Map([["zzz", fakeBoard]]) });
+    const { container } = render(<Multiplayer />);
+    expect(container.querySelector("[data-opp-board-zone]")).not.toBeNull();
+    expect(screen.getByLabelText(/video stream for opponent — board/i)).toBeInTheDocument();
+  });
+
+  it("omits the board cam zone when the peer has no second stream", () => {
+    enterRoomAs("aaa", "zzz");
+    useStore.setState({
+      gameState: {
+        mode: "x01", status: "in_progress",
+        players: [{ id: "p1", name: "Alice" }, { id: "p2", name: "Bob" }],
+        active_index: 0, visit: [], legs: {}, sets: {}, winner: null,
+        options: {}, mode_view: {}, stats: {},
+      },
+    });
+    const { container } = render(<Multiplayer />);
+    expect(container.querySelector("[data-opp-board-zone]")).toBeNull();
+  });
+
   it("shows reconnecting banner when connectionHealth is reconnecting", () => {
     enterRoomAs("aaa", "zzz");
     useMpStore.setState({ connectionHealth: "reconnecting" });

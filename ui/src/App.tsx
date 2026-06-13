@@ -22,6 +22,7 @@ import { Leaderboard } from "./views/Leaderboard";
 import { Settings } from "./views/Settings";
 import { Onboarding, isOnboarded } from "./components/Onboarding";
 import { Tournament } from "./views/Tournament";
+import { AnnouncementOverlay } from "./components/AnnouncementOverlay";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
@@ -77,11 +78,11 @@ export default function App() {
   }, [banners]);
 
   return (
-    <div className="min-h-full bg-neutral-950 text-white p-6">
+    <div className="min-h-full app-backdrop text-white p-6">
       {!kiosk && (
         <header className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-6">
-            <h1 className="text-3xl font-black tracking-tight">GRANBRIDGE</h1>
+            <h1 className="text-3xl font-black tracking-tight brand-title select-none">GRANBRIDGE</h1>
             <nav className="flex gap-1" aria-label="main navigation">
               {NAV_TABS.map((tab) => (
                 <button
@@ -89,9 +90,9 @@ export default function App() {
                   onClick={() => setActiveTab(tab.id)}
                   aria-pressed={activeTab === tab.id}
                   className={[
-                    "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                    "px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
                     activeTab === tab.id
-                      ? "bg-amber-400 text-neutral-900"
+                      ? "bg-amber-400 text-neutral-900 shadow-[0_0_16px_rgba(251,191,36,0.35)]"
                       : "text-neutral-400 hover:text-white hover:bg-neutral-800",
                   ].join(" ")}
                 >
@@ -135,6 +136,8 @@ export default function App() {
         )}
       </div>
       {showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
+      {/* Big-hit flashes sit below the CheckoutOverlay takeover */}
+      <AnnouncementOverlay />
       {/* Confetti fires on leg_won only; CheckoutOverlay owns game_won celebration */}
       <Celebration trigger={legWonCount} />
       <CheckoutOverlay trigger={overlayTrigger} />

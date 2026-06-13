@@ -4,6 +4,27 @@
 export type VideoKey = "game-won" | "leg-won";
 
 /**
+ * Big single-dart (and 180) announcement moments. Separate from VideoKey so the
+ * fullscreen CheckoutOverlay's label maps stay exhaustive; both key families
+ * share VIDEO_MANIFEST for their drop-a-file clip slots.
+ */
+export type AnnounceKey =
+  | "treble-twenty"
+  | "treble-nineteen"
+  | "treble-eighteen"
+  | "bullseye"
+  | "one-eighty";
+
+/** Map a single dart bed to its announcement, or null for an ordinary hit. */
+export function announceForHit(bed: string): AnnounceKey | null {
+  if (bed === "T20") return "treble-twenty";
+  if (bed === "T19") return "treble-nineteen";
+  if (bed === "T18") return "treble-eighteen";
+  if (bed === "DBULL") return "bullseye";
+  return null;
+}
+
+/**
  * Pure function: given a banner kind string, return the VideoKey or null.
  *
  * game_won  → "game-won"

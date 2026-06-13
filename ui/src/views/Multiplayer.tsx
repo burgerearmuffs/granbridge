@@ -40,7 +40,9 @@ export function Multiplayer() {
   const brokerUrl = useMpStore((s) => s.brokerUrl);
   const selfId = useMpStore((s) => s.selfId);
   const localStream = useMpStore((s) => s.localStream);
+  const localBoardStream = useMpStore((s) => s.localBoardStream);
   const remoteStreams = useMpStore((s) => s.remoteStreams);
+  const remoteBoardStreams = useMpStore((s) => s.remoteBoardStreams);
   const connectionHealth = useMpStore((s) => s.connectionHealth);
   const opponentCard = useMpStore((s) => s.opponentCard);
   const turnClockSecs = useMpStore((s) => s.turnClockSecs);
@@ -253,6 +255,16 @@ export function Multiplayer() {
     />
   ) : null;
 
+  const firstRemoteBoardStream = firstPeer ? remoteBoardStreams.get(firstPeer.peer_id) ?? null : null;
+  const firstRemoteBoardTile = firstRemoteBoardStream ? (
+    <VideoTile
+      key={`${firstPeer!.peer_id}-board`}
+      stream={firstRemoteBoardStream}
+      label={`${firstPeer!.player.name} — board`}
+      muted
+    />
+  ) : null;
+
   // Connection health banners (shown in both lobby and in-game)
   const healthBanners = (
     <>
@@ -319,6 +331,7 @@ export function Multiplayer() {
           board={<LiveGame state={gameState} />}
           selfVideo={localVideoTile}
           oppVideo={firstRemoteVideoTile ?? <div className="w-full h-full bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-xs">No opponent camera</div>}
+          oppBoardVideo={firstRemoteBoardTile}
           oppCard={opponentCard ? <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} /> : null}
           controls={
             <div className="space-y-2">
@@ -366,6 +379,16 @@ export function Multiplayer() {
             avatarColor={p.player.avatar?.color ?? defaultAvatarColor(p.player.id)}
           />
         ))}
+        {/* Board cams (yours + theirs), when configured */}
+        {localBoardStream && (
+          <VideoTile stream={localBoardStream} label="Your board" muted />
+        )}
+        {peers.map((p) => {
+          const bs = remoteBoardStreams.get(p.peer_id);
+          return bs ? (
+            <VideoTile key={`${p.peer_id}-board`} stream={bs} label={`${p.player.name} — board`} muted />
+          ) : null;
+        })}
       </div>
 
       {opponentCard && (

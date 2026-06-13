@@ -18,13 +18,15 @@ interface MpGameLayoutProps {
   selfVideo: ReactNode;
   /** Opponent camera feed (larger) */
   oppVideo: ReactNode;
+  /** Opponent's board camera (optional second view) */
+  oppBoardVideo?: ReactNode;
   /** Opponent profile card — may be null until card arrives */
   oppCard: ReactNode;
   /** MpControls + host/guest action controls */
   controls: ReactNode;
 }
 
-export function MpGameLayout({ board, selfVideo, oppVideo, oppCard, controls }: MpGameLayoutProps) {
+export function MpGameLayout({ board, selfVideo, oppVideo, oppBoardVideo, oppCard, controls }: MpGameLayoutProps) {
   return (
     <div
       data-mp-layout
@@ -39,7 +41,7 @@ export function MpGameLayout({ board, selfVideo, oppVideo, oppCard, controls }: 
       </div>
 
       {/* Right rail: ~34% width, column layout */}
-      <div className="w-[34%] flex flex-col min-h-0 overflow-hidden bg-neutral-900/60 p-3 gap-3">
+      <div className="w-[34%] flex flex-col min-h-0 overflow-hidden bg-neutral-900/60 backdrop-blur-sm border-l border-white/5 p-3 gap-3">
         {/* Opponent video — largest */}
         <div
           data-opp-video-zone
@@ -47,6 +49,16 @@ export function MpGameLayout({ board, selfVideo, oppVideo, oppCard, controls }: 
         >
           {oppVideo}
         </div>
+
+        {/* Opponent board cam (optional) */}
+        {oppBoardVideo && (
+          <div
+            data-opp-board-zone
+            className="flex-1 min-h-0 overflow-hidden rounded-lg"
+          >
+            {oppBoardVideo}
+          </div>
+        )}
 
         {/* Self video — smaller */}
         <div className="flex-1 min-h-0 overflow-hidden rounded-lg">

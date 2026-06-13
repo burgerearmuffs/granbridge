@@ -244,3 +244,33 @@ describe("mpSession spectator chat relay", () => {
     expect(msgs[0]).toMatchObject({ self: false, name: "Ann", text: "good darts" });
   });
 });
+
+describe("mpSession board camera", () => {
+  it("acquires the board cam when configured and stops it on leave", async () => {
+    const { acquireLocalMedia } = await import("./media");
+    vi.mocked(acquireLocalMedia).mockClear();
+    const stop = vi.fn();
+    const boardStream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+    vi.mocked(acquireLocalMedia)
+      .mockResolvedValueOnce({ stream: null, failure: null })            // face cam
+      .mockResolvedValueOnce({ stream: boardStream, failure: null });    // board cam
+    useMpStore.setState({ boardCamDeviceId: "board-1", cam: true });
+
+    await mpSession.join(JOIN);
+    expect(vi.mocked(acquireLocalMedia)).toHaveBeenCalledTimes(2);
+    expect(useMpStore.getState().localBoardStream).toBe(boardStream);
+
+    mpSession.leave();
+    expect(stop).toHaveBeenCalled();
+    expect(useMpStore.getState().localBoardStream).toBeNull();
+  });
+
+  it("skips the board cam entirely when none is configured", async () => {
+    const { acquireLocalMedia } = await import("./media");
+    vi.mocked(acquireLocalMedia).mockClear();
+    useMpStore.setState({ boardCamDeviceId: null });
+    await mpSession.join(JOIN);
+    expect(vi.mocked(acquireLocalMedia)).toHaveBeenCalledTimes(1);
+    expect(useMpStore.getState().localBoardStream).toBeNull();
+  });
+});

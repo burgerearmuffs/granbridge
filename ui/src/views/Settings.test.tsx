@@ -45,9 +45,9 @@ describe("isValidBrokerUrl", () => {
 describe("Settings devices", () => {
   it("lists devices and persists the chosen camera/mic", async () => {
     render(<Settings />);
-    await waitFor(() => expect(screen.getByText("Front Cam")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Front Cam").length).toBeGreaterThan(0));
 
-    fireEvent.change(screen.getByRole("combobox", { name: /camera device/i }), {
+    fireEvent.change(screen.getByRole("combobox", { name: /^camera device$/i }), {
       target: { value: "cam-1" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: /microphone device/i }), {
@@ -57,6 +57,18 @@ describe("Settings devices", () => {
     expect(useMpStore.getState().micDeviceId).toBe("mic-1");
     expect(localStorage.getItem("granbridge.mp.camDeviceId")).toBe("cam-1");
     expect(localStorage.getItem("granbridge.mp.micDeviceId")).toBe("mic-1");
+  });
+
+  it("persists the optional board camera and supports turning it back off", async () => {
+    render(<Settings />);
+    await waitFor(() => expect(screen.getAllByText("Front Cam").length).toBeGreaterThan(0));
+    const select = screen.getByRole("combobox", { name: /board camera device/i });
+    fireEvent.change(select, { target: { value: "cam-1" } });
+    expect(useMpStore.getState().boardCamDeviceId).toBe("cam-1");
+    expect(localStorage.getItem("granbridge.mp.boardCamDeviceId")).toBe("cam-1");
+    fireEvent.change(select, { target: { value: "" } });
+    expect(useMpStore.getState().boardCamDeviceId).toBeNull();
+    expect(localStorage.getItem("granbridge.mp.boardCamDeviceId")).toBeNull();
   });
 
   it("shows an error when the camera test fails", async () => {
