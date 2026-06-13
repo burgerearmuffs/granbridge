@@ -36,7 +36,7 @@ interface PeerEntry {
 
 export class PeerManager {
   private _broker: BrokerClient;
-  private _localStream: MediaStream | null;
+  private _localStreams: MediaStream[];
   private _iceServers: RTCIceServer[];
   private _selfPeerId: string;
   private _peers = new Map<string, PeerEntry>();
@@ -46,6 +46,8 @@ export class PeerManager {
 
   // Public callbacks
   onRemoteStream: (peerId: string, stream: MediaStream) => void = () => {};
+  /** Second (and later) remote streams — the peer's board cam. */
+  onRemoteBoardStream: (peerId: string, stream: MediaStream) => void = () => {};
   onDataMessage: (peerId: string, obj: unknown) => void = () => {};
   onPeerState: (peerId: string, state: PeerState) => void = () => {};
   onChannelOpen: (peerId: string) => void = () => {};
@@ -54,12 +56,13 @@ export class PeerManager {
   constructor(
     broker: BrokerClient,
     selfPeerId: string,
-    localStream: MediaStream | null,
+    localStream: MediaStream | MediaStream[] | null,
     iceServers: RTCIceServer[] = DEFAULT_ICE_SERVERS,
   ) {
     this._broker = broker;
     this._selfPeerId = selfPeerId;
-    this._localStream = localStream;
+    // Order matters: stream 0 is the face cam (with mic), stream 1 the board cam.
+    this._localStreams = localStream === null ? [] : Array.isArray(localStream) ? localStream.filter(Boolean) : [localStream];
     this._iceServers = iceServers;
 
     // Guard: no-op if RTCPeerConnection is absent (jsdom / SSR)
@@ -113,10 +116,12 @@ export class PeerManager {
     const entry: PeerEntry = { peerId, pc, dc: null, makingOffer: false, ignoreOffer: false };
     this._peers.set(peerId, entry);
 
-    // Add local tracks
-    if (this._localStream) {
-      for (const track of this._localStream.getTracks()) {
-        pc.addTrack(track, this._localStream);
+    // Add local tracks. Each track is associated with its own MediaStream so
+    // the receiver can group tracks back into face-cam vs board-cam streams
+    // (m-line order preserves our add order: face first, board second).
+    for (const stream of this._localStreams) {
+      for (const track of stream.getTracks()) {
+        pc.addTrack(track, stream);
       }
     }
 
@@ -130,13 +135,26 @@ export class PeerManager {
       };
     }
 
-    // Incoming tracks → remote stream
-    const remoteStream = new MediaStream();
+    // Incoming tracks → remote streams, grouped by the sender's stream id.
+    // First distinct stream = face cam (primary), second = board cam.
+    const primaryStream = new MediaStream();
+    const boardStream = new MediaStream();
+    let primaryId: string | null = null;
     pc.ontrack = (ev) => {
-      for (const track of ev.streams?.[0]?.getTracks() ?? [ev.track]) {
-        remoteStream.addTrack(track);
+      const senderStreamId = ev.streams?.[0]?.id ?? null;
+      const tracks = ev.streams?.[0]?.getTracks() ?? [ev.track];
+      if (senderStreamId === null || primaryId === null || senderStreamId === primaryId) {
+        if (senderStreamId !== null && primaryId === null) primaryId = senderStreamId;
+        for (const track of tracks) {
+          if (!primaryStream.getTracks().includes(track)) primaryStream.addTrack(track);
+        }
+        this.onRemoteStream(peerId, primaryStream);
+      } else {
+        for (const track of tracks) {
+          if (!boardStream.getTracks().includes(track)) boardStream.addTrack(track);
+        }
+        this.onRemoteBoardStream(peerId, boardStream);
       }
-      this.onRemoteStream(peerId, remoteStream);
     };
 
     // Receive data channel from polite peer

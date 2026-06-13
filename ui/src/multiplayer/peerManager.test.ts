@@ -36,7 +36,8 @@ class FakePC {
     this.iceTransportPolicy = (config as { iceTransportPolicy?: string }).iceTransportPolicy;
     FakePC.instances.push(this);
   }
-  addTrack() {}
+  added: unknown[][] = [];
+  addTrack(...args: unknown[]) { this.added.push(args); }
   createDataChannel(_label: string) {
     const dc = new FakeDataChannel();
     this._channels.push(dc);
@@ -193,5 +194,73 @@ describe("PeerManager reconnect", () => {
     for (let i = 0; i < 4; i++) { pc.connectionState = "failed"; pc.onconnectionstatechange?.(); vi.advanceTimersByTime(5000); }
     expect(health).toContain("lost");
     vi.useRealTimers();
+  });
+});
+
+describe("PeerManager multi-camera (board cam)", () => {
+  function connect(pm: PeerManager, broker: any) {
+    broker._emitPeers([{ peer_id: "bbb", player: { id: "p2", name: "Bob" } }]);
+    return FakePC.instances[0];
+  }
+
+  it("adds each local stream's tracks associated with that stream, face cam first", () => {
+    const broker = makeMockBroker() as any;
+    const t1 = { id: "face-v" }; const t2 = { id: "face-a" }; const t3 = { id: "board-v" };
+    const face = { id: "sFace", getTracks: () => [t1, t2] } as unknown as MediaStream;
+    const board = { id: "sBoard", getTracks: () => [t3] } as unknown as MediaStream;
+    const pm = new PeerManager(broker, "aaa", [face, board]);
+    const pc = connect(pm, broker);
+    expect(pc.added).toEqual([[t1, face], [t2, face], [t3, board]]);
+  });
+
+  it("single-stream constructor arg still works (back-compat)", () => {
+    const broker = makeMockBroker() as any;
+    const t1 = { id: "v" };
+    const face = { id: "sFace", getTracks: () => [t1] } as unknown as MediaStream;
+    const pm = new PeerManager(broker, "aaa", face);
+    const pc = connect(pm, broker);
+    expect(pc.added).toEqual([[t1, face]]);
+  });
+
+  it("routes the second distinct remote stream id to onRemoteBoardStream", () => {
+    const broker = makeMockBroker() as any;
+    const pm = new PeerManager(broker, "aaa", null);
+    const primary: string[] = []; const board: string[] = [];
+    pm.onRemoteStream = (pid) => primary.push(pid);
+    pm.onRemoteBoardStream = (pid) => board.push(pid);
+    const pc = connect(pm, broker);
+
+    const tA = { id: "tA" }; const tB = { id: "tB" };
+    pc.ontrack!({ track: tA, streams: [{ id: "sA", getTracks: () => [tA] }] });
+    pc.ontrack!({ track: tB, streams: [{ id: "sB", getTracks: () => [tB] }] });
+    expect(primary).toEqual(["bbb"]);
+    expect(board).toEqual(["bbb"]);
+  });
+
+  it("multiple tracks of the SAME stream id stay on the primary stream", () => {
+    const broker = makeMockBroker() as any;
+    const pm = new PeerManager(broker, "aaa", null);
+    const primary: string[] = []; const board: string[] = [];
+    pm.onRemoteStream = (pid) => primary.push(pid);
+    pm.onRemoteBoardStream = (pid) => board.push(pid);
+    const pc = connect(pm, broker);
+
+    const tA = { id: "tA" }; const tB = { id: "tB" };
+    pc.ontrack!({ track: tA, streams: [{ id: "sA", getTracks: () => [tA] }] });
+    pc.ontrack!({ track: tB, streams: [{ id: "sA", getTracks: () => [tB] }] });
+    expect(primary).toEqual(["bbb", "bbb"]);
+    expect(board).toEqual([]);
+  });
+
+  it("tracks without stream association fall back to the primary stream", () => {
+    const broker = makeMockBroker() as any;
+    const pm = new PeerManager(broker, "aaa", null);
+    const primary: string[] = []; const board: string[] = [];
+    pm.onRemoteStream = (pid) => primary.push(pid);
+    pm.onRemoteBoardStream = (pid) => board.push(pid);
+    const pc = connect(pm, broker);
+    pc.ontrack!({ track: { id: "bare" }, streams: [] });
+    expect(primary).toEqual(["bbb"]);
+    expect(board).toEqual([]);
   });
 });

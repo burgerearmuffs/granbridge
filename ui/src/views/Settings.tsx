@@ -37,6 +37,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function Settings() {
   const camDeviceId = useMpStore((s) => s.camDeviceId);
   const micDeviceId = useMpStore((s) => s.micDeviceId);
+  const boardCamDeviceId = useMpStore((s) => s.boardCamDeviceId);
   const brokerUrl = useMpStore((s) => s.brokerUrl);
 
   const [cams, setCams] = useState<MediaDeviceInfo[]>([]);
@@ -170,6 +171,26 @@ export function Settings() {
             </select>
           </label>
         </div>
+
+        <label className="block">
+          <span className="text-sm text-neutral-300">Board camera (optional second camera)</span>
+          <select
+            aria-label="Board camera device"
+            className={selectCls}
+            value={boardCamDeviceId ?? ""}
+            onChange={(e) => useMpStore.getState().setBoardCamDeviceId(e.target.value || null)}
+          >
+            <option value="">None — face cam only</option>
+            {cams.map((d, i) => (
+              <option key={d.deviceId || i} value={d.deviceId}>
+                {d.label || `Camera ${i + 1}`}
+              </option>
+            ))}
+          </select>
+          <span className="block mt-1 text-xs text-neutral-500">
+            Point it at your dartboard — opponents (and the in-game rail) get a second live view.
+          </span>
+        </label>
 
         <div className="flex items-center gap-3">
           {previewStream ? (

@@ -34,3 +34,16 @@ describe("videoForEvent", () => {
     expect(videoForEvent("Game_Won")).toBeNull();
   });
 });
+
+describe("announceForHit", () => {
+  it("announces high trebles and the double bull only", async () => {
+    const { announceForHit } = await import("./decide");
+    expect(announceForHit("T20")).toBe("treble-twenty");
+    expect(announceForHit("T19")).toBe("treble-nineteen");
+    expect(announceForHit("T18")).toBe("treble-eighteen");
+    expect(announceForHit("DBULL")).toBe("bullseye");
+    for (const bed of ["T17", "BULL", "S20", "D20", "MISS"]) {
+      expect(announceForHit(bed)).toBeNull();
+    }
+  });
+});

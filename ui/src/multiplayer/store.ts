@@ -41,6 +41,7 @@ const LS_MIC = "granbridge.mp.mic";
 const LS_CAM = "granbridge.mp.cam";
 const LS_CAM_DEVICE = "granbridge.mp.camDeviceId";
 const LS_MIC_DEVICE = "granbridge.mp.micDeviceId";
+const LS_BOARD_CAM_DEVICE = "granbridge.mp.boardCamDeviceId";
 const LS_TURN_CLOCK = "granbridge.mp.turnClockSecs";
 
 export const DEFAULT_BROKER_URL = "wss://darts.aventador.io/";
@@ -85,13 +86,19 @@ interface MpState {
   /** Preferred capture devices (set in Settings); null = browser default. Persisted. */
   camDeviceId: string | null;
   micDeviceId: string | null;
+  /** Optional second camera pointed at the board; null = feature off. Persisted. */
+  boardCamDeviceId: string | null;
   error: string | undefined;
   /** User-visible note when joining without camera/mic (permission denied etc.). */
   mediaNotice: string | undefined;
   brokerUrl: string;
   remoteMatchId: string | null;
   localStream: MediaStream | null;
+  /** Local board-cam stream (video-only) when a board camera is configured. */
+  localBoardStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
+  /** Per-peer board-cam streams (second video stream from each peer). */
+  remoteBoardStreams: Map<string, MediaStream>;
   connectionHealth: ConnectionHealth;
   opponentCard: { profile: import("./player").Profile; summary: import("./careerSummary").CareerSummary } | null;
   /** In-room text chat (capped at CHAT_HISTORY_CAP lines). */
@@ -114,12 +121,15 @@ interface MpState {
   setCam: (v: boolean) => void;
   setCamDeviceId: (id: string | null) => void;
   setMicDeviceId: (id: string | null) => void;
+  setBoardCamDeviceId: (id: string | null) => void;
   setError: (msg: string | undefined) => void;
   setMediaNotice: (msg: string | undefined) => void;
   setBrokerUrl: (url: string) => void;
   setRemoteMatchId: (id: string | null) => void;
   setLocalStream: (s: MediaStream | null) => void;
+  setLocalBoardStream: (s: MediaStream | null) => void;
   setRemoteStream: (peerId: string, s: MediaStream) => void;
+  setRemoteBoardStream: (peerId: string, s: MediaStream) => void;
   setConnectionHealth: (h: ConnectionHealth) => void;
   setOpponentCard: (c: MpState["opponentCard"]) => void;
   addChatMessage: (m: ChatMsg, opts?: { unread?: boolean }) => void;
@@ -142,12 +152,15 @@ export const useMpStore = create<MpState>((set) => ({
   cam: readBool(LS_CAM, true),
   camDeviceId: readString(LS_CAM_DEVICE),
   micDeviceId: readString(LS_MIC_DEVICE),
+  boardCamDeviceId: readString(LS_BOARD_CAM_DEVICE),
   error: undefined,
   mediaNotice: undefined,
   brokerUrl: readBrokerUrl(),
   remoteMatchId: null,
   localStream: null,
+  localBoardStream: null,
   remoteStreams: new Map(),
+  remoteBoardStreams: new Map(),
   connectionHealth: "connected",
   opponentCard: null,
   chatMessages: [],
@@ -182,6 +195,13 @@ export const useMpStore = create<MpState>((set) => ({
     } catch { /* ignore */ }
     set({ micDeviceId: id });
   },
+  setBoardCamDeviceId: (id) => {
+    try {
+      if (id) localStorage.setItem(LS_BOARD_CAM_DEVICE, id);
+      else localStorage.removeItem(LS_BOARD_CAM_DEVICE);
+    } catch { /* ignore */ }
+    set({ boardCamDeviceId: id });
+  },
   setError: (msg) => set({ error: msg }),
   setMediaNotice: (msg) => set({ mediaNotice: msg }),
   setBrokerUrl: (url) => {
@@ -190,7 +210,10 @@ export const useMpStore = create<MpState>((set) => ({
   },
   setRemoteMatchId: (id) => set({ remoteMatchId: id }),
   setLocalStream: (s) => set({ localStream: s }),
+  setLocalBoardStream: (s) => set({ localBoardStream: s }),
   setRemoteStream: (peerId, s) => set((st) => ({ remoteStreams: new Map(st.remoteStreams).set(peerId, s) })),
+  setRemoteBoardStream: (peerId, s) =>
+    set((st) => ({ remoteBoardStreams: new Map(st.remoteBoardStreams).set(peerId, s) })),
   setConnectionHealth: (h) => set({ connectionHealth: h }),
   setOpponentCard: (c) => set({ opponentCard: c }),
   addChatMessage: (m, opts) =>
@@ -216,7 +239,9 @@ export const useMpStore = create<MpState>((set) => ({
       mediaNotice: undefined,
       remoteMatchId: null,
       localStream: null,
+      localBoardStream: null,
       remoteStreams: new Map(),
+      remoteBoardStreams: new Map(),
       connectionHealth: "connected",
       opponentCard: null,
       chatMessages: [],
