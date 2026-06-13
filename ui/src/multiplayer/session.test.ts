@@ -30,7 +30,11 @@ vi.mock("./media", () => ({
   acquireLocalMedia: vi.fn(async () => ({ stream: null, failure: null })),
   buildConstraints: vi.fn(() => ({ video: true, audio: true })),
 }));
-vi.mock("./turn", () => ({ fetchIceServers: vi.fn(async () => []) }));
+vi.mock("./turn", () => ({
+  fetchIceServers: vi.fn(async () => [
+    { urls: ["turns:test:443?transport=tcp"], username: "u", credential: "c" },
+  ]),
+}));
 vi.mock("./careerSummary", () => ({ fetchMyCareerSummary: vi.fn(async () => ({ threeDartAvg: 0, wins: 0, gamesPlayed: 0 })) }));
 
 import { mpSession } from "./session";
@@ -92,6 +96,28 @@ describe("mpSession", () => {
     mpSession.leave();
     expect(rmStop).toHaveBeenCalled();
     expect(useMpStore.getState().mpStatus).toBe("idle");
+  });
+});
+
+describe("mpSession TURN unavailable", () => {
+  it("aborts the join with a clear error when /turn yields no ICE servers", async () => {
+    const { fetchIceServers } = await import("./turn");
+    vi.mocked(fetchIceServers).mockResolvedValueOnce([]);
+    await mpSession.join(JOIN);
+    const s = useMpStore.getState();
+    expect(s.mpStatus).toBe("error");
+    expect(s.error).toMatch(/call-relay credentials/i);
+    expect(joinFn).not.toHaveBeenCalled(); // never reached the broker join
+    expect(s.localStream).toBeNull();
+  });
+
+  it("spectator join does not consult /turn at all", async () => {
+    const { fetchIceServers } = await import("./turn");
+    vi.mocked(fetchIceServers).mockClear();
+    await mpSession.join({ ...JOIN, spectate: true });
+    expect(fetchIceServers).not.toHaveBeenCalled();
+    expect(useMpStore.getState().mpStatus).not.toBe("error");
+    expect(joinFn).toHaveBeenCalledTimes(1);
   });
 });
 
