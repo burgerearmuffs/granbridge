@@ -536,3 +536,18 @@ UI 444 passed. Versions bumped to 0.1.5.
   the watch view); README rewritten to current reality (intro + Multiplayer section).
 
 **Suites:** bridge 205 · server 80 (+4 docker-gated) · UI 464. Versions bumped to 0.1.6.
+
+---
+
+## 2026-06-13 — v0.1.7: dual cameras, announcement videos, aesthetics (PR #24)
+
+- **Multi-camera per player:** Settings board-cam picker; session acquires a second video-only
+  stream; PeerManager sends per-stream-tagged tracks and the receiver regroups by sender stream
+  id (face first, board second); opponent board view in the in-game rail + lobby tiles.
+- **Announcements:** AnnounceKey clips (treble-twenty/nineteen/eighteen, bullseye, one-eighty)
+  share VIDEO_MANIFEST's drop-a-file slots with procedural gold-flash fallback; store-side
+  detection incl. a visit-score mirror for 180s; AnnouncementOverlay below CheckoutOverlay.
+- **Aesthetics:** app backdrop vignette, brand-title gradient, nav glow, VideoTile ring +
+  label scrim, gradient banners, glass MP rail.
+
+**Suite:** UI 485 passed. Version bumped to 0.1.7.
