@@ -21,15 +21,17 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { Leaderboard } from "./views/Leaderboard";
 import { Settings } from "./views/Settings";
 import { Onboarding, isOnboarded } from "./components/Onboarding";
+import { Tournament } from "./views/Tournament";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
-type NavTab = "live" | "history" | "multiplayer" | "profile" | "leaderboard" | "settings";
+type NavTab = "live" | "history" | "multiplayer" | "tournament" | "profile" | "leaderboard" | "settings";
 
 const NAV_TABS: Array<{ id: NavTab; label: string }> = [
   { id: "live", label: "Live" },
   { id: "history", label: "History" },
   { id: "multiplayer", label: "Multiplayer" },
+  { id: "tournament", label: "Tournament" },
   { id: "profile", label: "Profile" },
   { id: "leaderboard", label: "Leaderboard" },
   { id: "settings", label: "Settings" },
@@ -111,6 +113,8 @@ export default function App() {
       <div key={activeTab} className="tab-content">
         {activeTab === "settings" ? (
           <Settings />
+        ) : activeTab === "tournament" ? (
+          <Tournament />
         ) : activeTab === "leaderboard" ? (
           <Leaderboard />
         ) : activeTab === "profile" ? (
