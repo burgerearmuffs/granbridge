@@ -18,6 +18,7 @@ class BrokerConfig:
     host: str
     port: int
     room_size_cap: int
+    spectator_cap: int
     max_rooms: int
     max_size: int
     allowed_origins: Optional[tuple[str, ...]]
@@ -53,6 +54,7 @@ def from_env(env=None) -> BrokerConfig:
         host=env.get("BROKER_HOST", "0.0.0.0"),
         port=int(env.get("BROKER_PORT", str(DEFAULT_PORT))),
         room_size_cap=int(env.get("ROOM_SIZE_CAP", "4")),
+        spectator_cap=int(env.get("SPECTATOR_CAP", "8")),
         max_rooms=int(env.get("MAX_ROOMS", "200")),
         max_size=int(env.get("MAX_MSG_BYTES", "65536")),
         allowed_origins=allowed,

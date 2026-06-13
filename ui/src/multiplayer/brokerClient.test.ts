@@ -106,7 +106,17 @@ describe("BrokerClient — receiving", () => {
     MockWS.last.receive({ type: "joined", self, peers });
 
     expect(cb).toHaveBeenCalledOnce();
-    expect(cb).toHaveBeenCalledWith(self, peers);
+    expect(cb).toHaveBeenCalledWith(self, peers, undefined);
+  });
+
+  it("incoming 'joined' forwards the spectators count", () => {
+    const cb = vi.fn();
+    const bc = new BrokerClient("ws://test");
+    bc.onJoined(cb);
+    bc.connect();
+    MockWS.last.open();
+    MockWS.last.receive({ type: "joined", self: "s1", peers: [], spectators: 2 });
+    expect(cb).toHaveBeenCalledWith("s1", [], 2);
   });
 
   it("incoming 'peers' fires onPeers with array", () => {
@@ -119,7 +129,16 @@ describe("BrokerClient — receiving", () => {
     const peers = [{ peer_id: "s3", player: { id: "p3", name: "Carol" } }];
     MockWS.last.receive({ type: "peers", peers });
 
-    expect(cb).toHaveBeenCalledWith(peers);
+    expect(cb).toHaveBeenCalledWith(peers, undefined);
+  });
+
+  it("join with the spectator option puts the flag on the wire", () => {
+    const bc = new BrokerClient("ws://test");
+    bc.connect();
+    MockWS.last.open();
+    bc.join("r", "pw", { id: "p", name: "S" }, { spectator: true });
+    const sent = JSON.parse(MockWS.last.sent[MockWS.last.sent.length - 1]);
+    expect(sent).toMatchObject({ type: "join", room: "r", spectator: true });
   });
 
   it("fans out 'peers' to all onPeers subscribers", () => {

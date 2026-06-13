@@ -17,7 +17,25 @@ import { useStore } from "../store";
 import type { Profile } from "./player";
 import type { CareerSummary } from "./careerSummary";
 
-export interface JoinOpts { room: string; password: string; displayName: string; brokerUrl: string; }
+export interface JoinOpts {
+  room: string;
+  password: string;
+  displayName: string;
+  brokerUrl: string;
+  /** Watch-only: no media, no WebRTC — render the state the host relays via the broker. */
+  spectate?: boolean;
+}
+
+/** Broker-relayed state for spectators (host → room when spectators are present). */
+export interface SpectateStateMsg { t: "spectate_state"; state: import("../types").GameState }
+
+function isSpectateState(o: unknown): o is SpectateStateMsg {
+  return (
+    typeof o === "object" && o !== null &&
+    (o as { t?: unknown }).t === "spectate_state" &&
+    typeof (o as { state?: unknown }).state === "object" && (o as { state?: unknown }).state !== null
+  );
+}
 
 /** Human message for a media acquisition failure (null = no notice). */
 export function mediaNoticeFor(failure: MediaFailure): string | undefined {
@@ -40,6 +58,7 @@ class MpSession {
   private pm: PeerManager | null = null;
   private rm: RemoteMatch | null = null;
   private selfCard: { profile: Profile; summary: CareerSummary } | null = null;
+  private unsubMirror: (() => void) | null = null;
 
   async join(opts: JoinOpts): Promise<void> {
     const store = useMpStore.getState();
@@ -47,11 +66,18 @@ class MpSession {
     store.setError(undefined);
     store.setMpStatus("connecting");
     store.setRoom(opts.room);
+    store.setSpectate(!!opts.spectate);
 
-    const { mic, cam, camDeviceId, micDeviceId } = useMpStore.getState();
     const player = setPlayerName(opts.displayName.trim() || getOrCreatePlayer().name);
     if (opts.brokerUrl.trim()) store.setBrokerUrl(opts.brokerUrl.trim());
+    const url = opts.brokerUrl.trim() || useMpStore.getState().brokerUrl;
 
+    if (opts.spectate) {
+      this._joinAsSpectator(url, opts, player);
+      return;
+    }
+
+    const { mic, cam, camDeviceId, micDeviceId } = useMpStore.getState();
     const { stream, failure } = await acquireLocalMedia(
       buildConstraints(cam, mic, camDeviceId, micDeviceId),
     );
@@ -60,16 +86,16 @@ class MpSession {
 
     this.selfCard = { profile: player, summary: await fetchMyCareerSummary(player.name) };
 
-    const url = opts.brokerUrl.trim() || useMpStore.getState().brokerUrl;
     const iceServers = await fetchIceServers(url);
 
     const bc = new BrokerClient(url);
     this.broker = bc;
 
-    bc.onJoined((self: string, initialPeers: PeerInfo[]) => {
+    bc.onJoined((self: string, initialPeers: PeerInfo[], spectators?: number) => {
       const s = useMpStore.getState();
       s.setSelfId(self);
       s.setPeers(initialPeers);
+      s.setSpectatorCount(spectators ?? 0);
       s.setMpStatus("in_room");
 
       const pm = new PeerManager(bc, self, stream, iceServers);
@@ -77,14 +103,71 @@ class MpSession {
       pm.onRemoteStream = (peerId, rs) => useMpStore.getState().setRemoteStream(peerId, rs);
       pm.onConnectionHealth = (_peerId, health) => useMpStore.getState().setConnectionHealth(health);
       this.ensureRemoteMatch();
+      this._ensureSpectatorMirror(bc);
     });
 
-    bc.onPeers((latest: PeerInfo[]) => { useMpStore.getState().setPeers(latest); this.ensureRemoteMatch(); });
+    bc.onPeers((latest: PeerInfo[], spectators?: number) => {
+      const s = useMpStore.getState();
+      const prevSpectators = s.spectatorCount;
+      s.setPeers(latest);
+      s.setSpectatorCount(spectators ?? 0);
+      this.ensureRemoteMatch();
+      // A new spectator needs the current state immediately, not on the next dart.
+      if ((spectators ?? 0) > prevSpectators) this._pushStateToSpectators(bc);
+    });
     bc.onError((code, message) => { const s = useMpStore.getState(); s.setError(`${code}: ${message}`); s.setMpStatus("error"); });
     bc.onClose(() => { const s = useMpStore.getState(); if (s.mpStatus === "in_room") { s.setMpStatus("error"); s.setError("Disconnected from broker"); } });
 
     bc.connect();
     bc.join(opts.room, opts.password, { id: player.id, name: player.name, avatar: player.avatar });
+  }
+
+  /** Watch-only path: broker presence + relayed game state; no media, no PeerManager. */
+  private _joinAsSpectator(url: string, opts: JoinOpts, player: Profile): void {
+    const bc = new BrokerClient(url);
+    this.broker = bc;
+
+    bc.onJoined((self: string, initialPeers: PeerInfo[], spectators?: number) => {
+      const s = useMpStore.getState();
+      s.setSelfId(self);
+      s.setPeers(initialPeers);
+      s.setSpectatorCount(spectators ?? 0);
+      s.setMpStatus("in_room");
+    });
+    bc.onPeers((latest: PeerInfo[], spectators?: number) => {
+      const s = useMpStore.getState();
+      s.setPeers(latest);
+      s.setSpectatorCount(spectators ?? 0);
+    });
+    bc.onMsg((_from, payload) => {
+      if (isSpectateState(payload)) {
+        useStore.getState().applyEvent({ type: "game_state", state: payload.state });
+      }
+    });
+    bc.onError((code, message) => { const s = useMpStore.getState(); s.setError(`${code}: ${message}`); s.setMpStatus("error"); });
+    bc.onClose(() => { const s = useMpStore.getState(); if (s.mpStatus === "in_room") { s.setMpStatus("error"); s.setError("Disconnected from broker"); } });
+
+    bc.connect();
+    bc.join(opts.room, opts.password, { id: player.id, name: player.name, avatar: player.avatar }, { spectator: true });
+  }
+
+  /** Host-side: mirror authoritative game_state to the room while spectators are watching. */
+  private _ensureSpectatorMirror(bc: BrokerClient): void {
+    if (this.unsubMirror) return;
+    this.unsubMirror = bridgeLink.onEvent((e) => {
+      if (e.type !== "game_state") return;
+      const { selfId, peers, spectatorCount } = useMpStore.getState();
+      if (spectatorCount > 0 && selfId && hostRole(selfId, peers) === "host") {
+        bc.sendMsg({ t: "spectate_state", state: e.state });
+      }
+    });
+  }
+
+  private _pushStateToSpectators(bc: BrokerClient): void {
+    const { selfId, peers } = useMpStore.getState();
+    if (!selfId || hostRole(selfId, peers) !== "host") return;
+    const state = useStore.getState().gameState;
+    if (state) bc.sendMsg({ t: "spectate_state", state });
   }
 
   private ensureRemoteMatch(): void {
@@ -143,6 +226,7 @@ class MpSession {
     this.broker?.leave(); this.broker?.close(); this.broker = null;
     this.pm?.closeAll(); this.pm = null;
     this.rm?.stop(); this.rm = null;
+    this.unsubMirror?.(); this.unsubMirror = null;
     this.selfCard = null;
     useMpStore.getState().localStream?.getTracks().forEach((t) => t.stop());
     useMpStore.getState().resetMp();

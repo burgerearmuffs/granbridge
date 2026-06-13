@@ -2,9 +2,13 @@
 
 Protocol (JSON over WebSocket). Server assigns each connection a peer_id (uuid4 hex).
 
-Client → {"type":"join","room":"R","password":"P","player":{"id":"...","name":"..."}}
-Server → joiner: {"type":"joined","self":"<peer_id>","peers":[{"peer_id","player"}...]}
-Server → room (on membership change): {"type":"peers","peers":[...]}
+Client → {"type":"join","room":"R","password":"P","player":{...},"spectator":false}
+Server → joiner: {"type":"joined","self":"<peer_id>","peers":[{"peer_id","player"}...],"spectators":N}
+Server → room (on membership change): {"type":"peers","peers":[...],"spectators":N}
+
+Spectators: join with "spectator": true to watch. They are NOT listed in `peers`
+(so player host-election is unaffected), count against a separate cap, receive
+`peers`/`msg` broadcasts, and may not send `signal` or `msg` themselves.
 Client → {"type":"signal","to":"<peer_id>","data":{...}}
 Server → target: {"type":"signal","from":"<peer_id>","data":{...}}
 Client → {"type":"msg","payload":{...}}
@@ -33,6 +37,7 @@ from granbridge_broker.stats import StatsStore, ValidationError
 from granbridge_broker.turn import make_turn_credentials
 
 DEFAULT_ROOM_SIZE_CAP = 4
+DEFAULT_SPECTATOR_CAP = 8
 
 
 @dataclass
@@ -40,6 +45,7 @@ class _Member:
     peer_id: str
     ws: ServerConnection
     player: dict
+    spectator: bool = False
 
 
 @dataclass
@@ -47,13 +53,20 @@ class _Room:
     password_hash: str
     members: list[_Member] = field(default_factory=list)
 
+    def players(self) -> list["_Member"]:
+        return [m for m in self.members if not m.spectator]
+
+    def spectator_count(self) -> int:
+        return sum(1 for m in self.members if m.spectator)
+
 
 def _sha256(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
 def _members_payload(room: _Room) -> list[dict]:
-    return [{"peer_id": m.peer_id, "player": m.player} for m in room.members]
+    """Player list only — spectators are intentionally invisible to host election."""
+    return [{"peer_id": m.peer_id, "player": m.player} for m in room.players()]
 
 
 async def _send(ws: ServerConnection, msg: dict) -> None:
@@ -77,6 +90,7 @@ class BrokerServer:
         port: int = 8788,
         room_size_cap: int = DEFAULT_ROOM_SIZE_CAP,
         *,
+        spectator_cap: int = DEFAULT_SPECTATOR_CAP,
         max_rooms: int = 200,
         max_size: int = 65536,
         allowed_origins: Optional[tuple[str, ...]] = None,
@@ -96,6 +110,7 @@ class BrokerServer:
         self._host = host
         self._port = port
         self._room_size_cap = room_size_cap
+        self._spectator_cap = spectator_cap
         self._max_rooms = max_rooms
         self._max_size = max_size
         self._allowed_origins = allowed_origins
@@ -239,6 +254,7 @@ class BrokerServer:
                     room_name = msg.get("room")
                     password = msg.get("password", "")
                     player = msg.get("player")
+                    spectator = bool(msg.get("spectator", False))
 
                     if not isinstance(room_name, str) or not room_name:
                         await _error(ws, "bad_request", "missing room name")
@@ -259,8 +275,12 @@ class BrokerServer:
                         if room.password_hash != pw_hash:
                             await _error(ws, "bad_password", "incorrect password")
                             continue
-                        # Check capacity
-                        if len(room.members) >= self._room_size_cap:
+                        # Check capacity (players and spectators have separate caps)
+                        if spectator:
+                            if room.spectator_count() >= self._spectator_cap:
+                                await _error(ws, "room_full", "spectator slots are full")
+                                continue
+                        elif len(room.players()) >= self._room_size_cap:
                             await _error(ws, "room_full", "room is full")
                             continue
                     else:
@@ -270,11 +290,11 @@ class BrokerServer:
                         self._log.info("room created name=%r (rooms=%d)", room_name, len(self._rooms))
 
                     # Build member
-                    member = _Member(peer_id=peer_id, ws=ws, player=player)
+                    member = _Member(peer_id=peer_id, ws=ws, player=player, spectator=spectator)
                     self._peers[peer_id] = member
                     self._peer_room[peer_id] = room_name
 
-                    # Snapshot existing peers for the joiner's "joined" response
+                    # Snapshot existing players for the joiner's "joined" response
                     existing_peers = _members_payload(room)
 
                     # Add to room
@@ -285,6 +305,7 @@ class BrokerServer:
                         "type": "joined",
                         "self": peer_id,
                         "peers": existing_peers,
+                        "spectators": room.spectator_count(),
                     })
 
                     # Broadcast updated "peers" to everyone else
@@ -294,6 +315,9 @@ class BrokerServer:
                 elif mtype == "signal":
                     if member is None:
                         await _error(ws, "bad_request", "must join before signaling")
+                        continue
+                    if member.spectator:
+                        await _error(ws, "bad_request", "spectators cannot signal")
                         continue
                     if not self._msg_limiter.allow(peer_id, self._clock()):
                         self._log.warning("dropped signal flood peer=%s", peer_id)
@@ -317,6 +341,9 @@ class BrokerServer:
                 elif mtype == "msg":
                     if member is None:
                         await _error(ws, "bad_request", "must join before messaging")
+                        continue
+                    if member.spectator:
+                        await _error(ws, "bad_request", "spectators cannot send messages")
                         continue
                     if not self._msg_limiter.allow(peer_id, self._clock()):
                         self._log.warning("dropped msg flood peer=%s", peer_id)
@@ -413,6 +440,7 @@ class BrokerServer:
         self, room: _Room, *, exclude_peer_id: Optional[str]
     ) -> None:
         payload = _members_payload(room)
+        spectators = room.spectator_count()
         for m in list(room.members):
             if m.peer_id != exclude_peer_id:
-                await _send(m.ws, {"type": "peers", "peers": payload})
+                await _send(m.ws, {"type": "peers", "peers": payload, "spectators": spectators})
