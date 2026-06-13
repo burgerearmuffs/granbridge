@@ -518,3 +518,21 @@ Autonomous production-readiness pass across six merged PRs:
 
 **Suites at end of pass:** bridge 204 passed · server 80 passed (+4 docker-gated env errors) ·
 UI 444 passed. Versions bumped to 0.1.5.
+
+---
+
+## 2026-06-12 — v0.1.5 SHIPPED + fast-follow features (PRs #20–#22, v0.1.6)
+
+- **v0.1.5 released** (signed, full, all 6 assets; update chain verified end-to-end). Server
+  release **server-v0.3.0** (spectator role) cut alongside.
+- **PR #20** — relay-only joins now abort with a clear error when `/turn` yields no ICE servers
+  (was a silent hang; known follow-up from the 443-only change). Spectator joins never consult
+  `/turn`.
+- **PR #21** — MP lobby match options (301/501/701 + best-of-legs for X01/Cricket); shareable
+  result card (clipboard text + canvas PNG, jsdom-safe); offline commentary enabled by default
+  (`plugins_enabled = ["commentary"]`) with a new `commentary` UI event + `CommentaryTicker`
+  caption in LiveGame.
+- **PR #22** — spectator chat relay (`{t:"spectate_chat"}` host mirror, read-only ChatPanel in
+  the watch view); README rewritten to current reality (intro + Multiplayer section).
+
+**Suites:** bridge 205 · server 80 (+4 docker-gated) · UI 464. Versions bumped to 0.1.6.
