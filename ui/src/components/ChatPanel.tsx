@@ -11,7 +11,7 @@ import { useMpStore } from "../multiplayer/store";
 import { mpSession } from "../multiplayer/session";
 import { CHAT_MAX_LEN } from "../multiplayer/remoteMatch";
 
-export function ChatPanel({ startOpen = false }: { startOpen?: boolean }) {
+export function ChatPanel({ startOpen = false, readOnly = false }: { startOpen?: boolean; readOnly?: boolean }) {
   const messages = useMpStore((s) => s.chatMessages);
   const unread = useMpStore((s) => s.chatUnread);
   const [open, setOpen] = useState(startOpen);
@@ -73,7 +73,9 @@ export function ChatPanel({ startOpen = false }: { startOpen?: boolean }) {
         className="max-h-40 min-h-20 overflow-y-auto px-3 py-2 space-y-1 text-sm"
       >
         {messages.length === 0 && (
-          <p className="text-neutral-600 text-xs">Say hi — messages stay between you two.</p>
+          <p className="text-neutral-600 text-xs">
+            {readOnly ? "Player chat will appear here." : "Say hi — messages stay between you two."}
+          </p>
         )}
         {messages.map((m, i) => (
           <p key={`${m.ts}-${i}`} className="break-words">
@@ -84,6 +86,7 @@ export function ChatPanel({ startOpen = false }: { startOpen?: boolean }) {
           </p>
         ))}
       </div>
+      {!readOnly && (
       <div className="flex gap-2 p-2 border-t border-neutral-800">
         <input
           type="text"
@@ -104,6 +107,7 @@ export function ChatPanel({ startOpen = false }: { startOpen?: boolean }) {
           Send
         </button>
       </div>
+      )}
     </div>
   );
 }

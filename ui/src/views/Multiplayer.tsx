@@ -219,6 +219,11 @@ export function Multiplayer() {
         ) : (
           <p className="text-neutral-500 animate-pulse">Waiting for the match to start…</p>
         )}
+
+        {/* Players' chat, mirrored read-only by the host */}
+        <div className="max-w-md">
+          <ChatPanel startOpen readOnly />
+        </div>
       </div>
     );
   }

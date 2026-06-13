@@ -20,10 +20,19 @@ vi.mock("./brokerClient", () => ({
   },
 }));
 const rmStart = vi.fn(); const rmStop = vi.fn(); const rmStartGame = vi.fn();
+const rmSendChat = vi.fn(); const rmSetTurnClock = vi.fn();
+const rmOptsBox: { current: any } = { current: null };
 vi.mock("./peerManager", () => ({ PeerManager: class { onRemoteStream:any=()=>{}; onConnectionHealth:any=()=>{}; closeAll(){} } }));
 vi.mock("./remoteMatch", async (orig) => {
   const actual = await orig<any>();
-  return { ...actual, RemoteMatch: class { start = rmStart; stop = rmStop; startGame = rmStartGame; } };
+  return {
+    ...actual,
+    RemoteMatch: class {
+      constructor(opts: any) { rmOptsBox.current = opts; }
+      start = rmStart; stop = rmStop; startGame = rmStartGame;
+      sendChat = rmSendChat; setTurnClock = rmSetTurnClock;
+    },
+  };
 });
 vi.mock("./media", () => ({
   getLocalStream: vi.fn(async () => null),
@@ -48,6 +57,7 @@ beforeEach(() => {
   useStore.setState({ gameState: null });
   onJoinedCbs.length = 0; onPeersCbs.length = 0; onMsgCbs.length = 0;
   joinFn.mockClear(); sendMsgFn.mockClear(); rmStart.mockClear(); rmStop.mockClear();
+  rmSendChat.mockClear(); rmOptsBox.current = null;
 });
 
 const JOIN = { room: "r", password: "p", displayName: "Me", brokerUrl: "ws://x" };
@@ -183,5 +193,54 @@ describe("mpSession spectator", () => {
     sendMsgFn.mockClear();
     bridgeLink.emit({ type: "game_state", state: STATE } as never);
     expect(sendMsgFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("mpSession spectator chat relay", () => {
+  const PEER = { peer_id: "zzz", player: { id: "p2", name: "G" } };
+
+  it("host mirrors a received guest chat line to spectators", async () => {
+    await mpSession.join(JOIN);
+    onJoinedCbs[0]("aaa", [PEER], 1); // host with one spectator
+    rmOptsBox.current.onChat("nice ton", "Bo", 55);
+    expect(sendMsgFn).toHaveBeenCalledWith({ t: "spectate_chat", name: "Bo", text: "nice ton", ts: 55 });
+    // ...and still lands in the local transcript
+    expect(useMpStore.getState().chatMessages.some((m) => m.text === "nice ton")).toBe(true);
+  });
+
+  it("host mirrors its own sent line to spectators", async () => {
+    await mpSession.join(JOIN);
+    onJoinedCbs[0]("aaa", [PEER], 1);
+    mpSession.sendChat("hello there");
+    expect(rmSendChat).toHaveBeenCalled();
+    expect(sendMsgFn).toHaveBeenCalledWith(
+      expect.objectContaining({ t: "spectate_chat", text: "hello there" }),
+    );
+  });
+
+  it("no mirroring without spectators, and never from a guest", async () => {
+    await mpSession.join(JOIN);
+    onJoinedCbs[0]("aaa", [PEER], 0); // host, nobody watching
+    rmOptsBox.current.onChat("quiet", "Bo", 1);
+    expect(sendMsgFn).not.toHaveBeenCalled();
+
+    mpSession.leave();
+    sendMsgFn.mockClear();
+    await mpSession.join(JOIN);
+    onJoinedCbs[onJoinedCbs.length - 1]("zzz", [{ peer_id: "aaa", player: { id: "p1", name: "H" } }], 3); // guest
+    rmOptsBox.current.onChat("still quiet", "H", 2);
+    expect(sendMsgFn).not.toHaveBeenCalled();
+  });
+
+  it("spectator renders mirrored chat and rejects malformed lines", async () => {
+    await mpSession.join({ ...JOIN, spectate: true });
+    onJoinedCbs[0]("spec", [PEER], 1);
+    emitMsg("h1", { t: "spectate_chat", name: "Ann", text: "good darts", ts: 9 });
+    emitMsg("h1", { t: "spectate_chat", name: "Ann", text: "", ts: 9 });          // empty
+    emitMsg("h1", { t: "spectate_chat", name: "Ann", text: "x".repeat(501), ts: 9 }); // oversized
+    emitMsg("h1", { t: "spectate_chat", name: "Ann", text: "no ts" });            // missing ts
+    const msgs = useMpStore.getState().chatMessages;
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({ self: false, name: "Ann", text: "good darts" });
   });
 });
