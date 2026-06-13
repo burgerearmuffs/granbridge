@@ -20,6 +20,7 @@ import { useUpdater } from "./useUpdater";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { Leaderboard } from "./views/Leaderboard";
 import { Settings } from "./views/Settings";
+import { Onboarding, isOnboarded } from "./components/Onboarding";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
@@ -43,6 +44,7 @@ export default function App() {
   const playing = gameState && gameState.status === "in_progress";
   const kiosk = new URLSearchParams(location.search).has("kiosk");
   const [activeTab, setActiveTab] = useState<NavTab>("live");
+  const [showOnboarding, setShowOnboarding] = useState(() => !kiosk && !isOnboarded());
   useStatsSubmission();
   useEffect(() => { void flushStatsQueue(); }, []);
 
@@ -128,6 +130,7 @@ export default function App() {
           <Setup send={send} />
         )}
       </div>
+      {showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
       {/* Confetti fires on leg_won only; CheckoutOverlay owns game_won celebration */}
       <Celebration trigger={legWonCount} />
       <CheckoutOverlay trigger={overlayTrigger} />
