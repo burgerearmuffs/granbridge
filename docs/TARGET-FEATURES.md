@@ -28,7 +28,12 @@ Status legend: ✅ built · ◐ foundation/partial · ○ designed-not-built · 
   reconnect handling + anti-desync.
 - ⚙ **Hosted backend:** a signaling + relay service (room registry, auth, presence) reachable over the
   internet. This is the keystone — without hosting, "internet multiplayer" can't exist.
-- ○ Spectating (join a room as a viewer), turn clock, rematch.
+- ✅ **Spectating (built 2026-06-12, v0.1.5):** "Watch only" join — broker `spectator: true` role
+  (invisible to host election, separate `SPECTATOR_CAP`, read-only at the server), host relays
+  `game_state` to the room while spectators are present; watch-only client view + "N watching" chips.
+- ✅ **Turn clock (built 2026-06-12, v0.1.5):** host-set 30/45/60s advisory countdown chip, synced to
+  the guest over the data channel (`{t:"clock"}`), resets per active player, never auto-advances.
+- ✅ Rematch (guest requests; host re-issues the same start).
 
 ## C. Video / Voice chat in matches — ○ / ⚙ net-new (NOT the existing player-cams)
 - ○ **Two-way A/V between players** via WebRTC (camera + mic), shown in-app during the match
@@ -56,13 +61,18 @@ Status legend: ✅ built · ◐ foundation/partial · ○ designed-not-built · 
   data-channel `CareerSummary` when the broker is unreachable (Plan 2b).
 
 ## E. Streaming & social — partially ✅
-- ✅ OBS overlays. ○ In-match spectator links, share match results, Discord rich presence (plugin exists for events).
+- ✅ OBS overlays. ✅ In-match spectating (see B). ✅ **In-match text chat (built 2026-06-12,
+  v0.1.5):** data-channel `{t:"chat"}`, collapsible panel + unread badge. ○ Share match results,
+  Discord rich presence (plugin exists for events).
 - ✅ **Leaderboard (built, verified-only):** `GET /stats/leaderboard` serves verified-only rankings
   (min 3 co-signed matches, sortable by 3-dart avg or wins); `Leaderboard.tsx` view with avg/wins
   toggle + nav tab in `App.tsx` (Plan 2b).
 
 ## F. Future / stretch — ○ (foundations only)
-- ◐ AI commentary (offline template built; LLM seam flagged). ○ Tournaments/leagues/brackets.
+- ◐ AI commentary (offline template built; LLM seam flagged).
+- ◐ **Tournaments (local single-elim built 2026-06-12, v0.1.5):** Tournament tab, 2–8 players on one
+  board, byes auto-resolve, winners auto-advance from finished games, bracket persisted. Online
+  tournaments / leagues still ○.
 - ○ Mobile companion. ○ CV camera autoscoring + anti-cheat (architecture doc only).
 
 ---

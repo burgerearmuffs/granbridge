@@ -478,3 +478,43 @@ Spec `docs/superpowers/specs/2026-05-24-server-side-stats-client-design.md` (§7
   card, Leaderboard). The full server-side stats pipeline — ingestion (backend) → submission (2a) →
   display (2b) — is end-to-end built.
 
+
+---
+
+## 2026-06-12 — Production push: hardening, Settings, chat + turn clock, spectators, onboarding, tournaments (v0.1.5, PRs #12–#18)
+
+Autonomous production-readiness pass across six merged PRs:
+
+- **Hardening (PR #12)** — bridge WS reconnect backoff (0.5s→8s cap, reset on open);
+  `acquireLocalMedia()` reports *why* camera/mic failed (unsupported/denied/failed) and the
+  Multiplayer view shows a dismissible notice instead of silently joining without A/V; checkout
+  3-dart search memoized (`lru_cache`, tuple-backed); public `GameEngine.flush()` (cli no longer
+  pokes `_flush`); jsdom canvas stub removes the standing vitest unhandled error. Review also marked
+  two FOLLOWUPS items stale: `overrides_path` already lives in `%LOCALAPPDATA%`, and the placeholder
+  icons were already replaced by the dartboard set.
+- **Settings view (PR #14)** — sixth nav tab: camera/mic device pickers (persisted; used via
+  `buildConstraints` with `deviceId.ideal` fallback semantics; "Test camera" live preview doubles as
+  the permission grant), broker URL editor with ws/wss validation + reset-to-default, clear local
+  match history (new `POST /api/history/clear`; `StaticServer` grew `post_routes`,
+  `HistoryStore.clear_all()`), manual update check. App nav refactored to a `NAV_TABS` map.
+- **Chat + turn clock (PR #15)** — data-channel protocol grew validated `{t:"chat"}` (500-char cap,
+  React-escaped render, 200-line transcript, unread badge; open in lobby, collapsed in-game) and
+  `{t:"clock"}` (host announces Off/30/45/60s, persisted pref, re-sent on channel re-open; advisory
+  countdown chip that resets per active player and never auto-advances).
+- **Spectator mode (PR #16)** — broker `join` accepts `spectator: true`: spectators are invisible to
+  `peers` (host election untouched), capped separately (`SPECTATOR_CAP`, default 8), read-only
+  (signal/msg rejected); `joined`/`peers` carry a `spectators` count. Client "Watch only" join skips
+  media/ICE/PeerManager/RemoteMatch and renders `{t:"spectate_state"}` broker msgs that the host
+  mirrors only while spectators are present (+ immediate push when one joins). Watch-only view +
+  "N watching" chips.
+- **Onboarding (PR #17)** — first-run 3-step modal (name+avatar → tab tour → recovery-key copy),
+  `granbridge.onboarded` flag, kiosk-suppressed; recovery-key backed-up tracking with an amber
+  Profile banner until the key is copied (onboarding or Profile export both satisfy it).
+- **Tournaments (PR #18)** — local single-elimination bracket (2–8 players, one board): pure
+  `tournament/bracket.ts` (byes to first seeds, immutable winner propagation), persisted store
+  (`granbridge.tournament`), Tournament tab with bracket grid, "Play this match" → `start_game` over
+  the bridge, auto-advance on the board's finished state (stale-state guarded), manual fallback,
+  champion banner.
+
+**Suites at end of pass:** bridge 204 passed · server 80 passed (+4 docker-gated env errors) ·
+UI 444 passed. Versions bumped to 0.1.5.

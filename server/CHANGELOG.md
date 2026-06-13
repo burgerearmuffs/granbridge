@@ -5,6 +5,26 @@ Server releases use the `server-vX.Y.Z` tag convention and ship a single asset z
 
 ---
 
+## server-v0.3.0
+
+**Feature: spectator role.** `join` accepts `"spectator": true` — spectators watch a room without
+becoming players:
+
+- **Invisible to players:** spectators never appear in `peers` payloads, so client host election
+  (lexicographic smallest peer id) is unaffected.
+- **Separate capacity:** spectators count against `SPECTATOR_CAP` (env, default 8), not
+  `ROOM_SIZE_CAP`, so an audience can't squeeze players out (and vice versa).
+- **Read-only:** the server rejects `signal` and `msg` from spectator connections (`bad_request`);
+  they still *receive* `peers` and `msg` broadcasts (the client uses this for the host's
+  `{t:"spectate_state"}` relay).
+- **Presence:** `joined` and `peers` payloads now include a `"spectators": N` count.
+
+Backwards-compatible: clients that omit the flag join as players; old clients ignore the extra
+`spectators` field. Pairs with desktop v0.1.5 (Watch-only join UI). No transport/infra changes from
+server-v0.2.0.
+
+---
+
 ## server-v0.2.0
 
 **Breaking (transport):** the broker stack now runs over **TCP 80 + 443 only**. coturn is reached via
