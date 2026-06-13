@@ -87,6 +87,20 @@ class MpSession {
     this.selfCard = { profile: player, summary: await fetchMyCareerSummary(player.name) };
 
     const iceServers = await fetchIceServers(url);
+    // Relay-only WebRTC cannot produce a single candidate without the broker's
+    // TURNS credentials — joining would just hang. Fail loudly instead.
+    if (iceServers.length === 0) {
+      useMpStore.getState().localStream?.getTracks().forEach((t) => t.stop());
+      useMpStore.getState().setLocalStream(null);
+      const s = useMpStore.getState();
+      s.setError(
+        `Couldn't get call-relay credentials from the broker (${url} /turn). ` +
+        "The match connection can't be made without them — check the broker URL " +
+        "in Settings and that the server is up, then try again.",
+      );
+      s.setMpStatus("error");
+      return;
+    }
 
     const bc = new BrokerClient(url);
     this.broker = bc;
