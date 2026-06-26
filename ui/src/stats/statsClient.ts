@@ -101,3 +101,50 @@ export function submitMatch(
     ws.onclose = () => finish(() => reject(new Error("closed")));
   });
 }
+
+/** Update server-side profile fields over a transient WebSocket; resolves on profile_ack. */
+export function updateProfile(
+  identity: Identity, fields: { name?: string; color?: string; bio?: string },
+  wsUrl: string = readBrokerUrl(), timeoutMs = 8000,
+): Promise<{ id: string; bio: string | null }> {
+  return new Promise((resolve, reject) => {
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error("ws_construct"));
+      return;
+    }
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* ignore */ }
+      fn();
+    };
+    const timer = setTimeout(() => finish(() => reject(new Error("timeout"))), timeoutMs);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: "profile_update",
+        id: identity.id,
+        writeToken: identity.writeToken,
+        player: {
+          id: identity.id,
+          name: fields.name ?? identity.name,
+          avatar: { color: fields.color ?? identity.avatarColor },
+          bio: fields.bio ?? "",
+        },
+      }));
+    };
+    ws.onmessage = (ev: MessageEvent) => {
+      let msg: { type?: string; id?: string; bio?: string | null; code?: string };
+      try { msg = JSON.parse(typeof ev.data === "string" ? ev.data : ""); }
+      catch { return; }
+      if (msg.type === "profile_ack") finish(() => resolve({ id: msg.id ?? identity.id, bio: msg.bio ?? null }));
+      else if (msg.type === "error") finish(() => reject(new Error(msg.code || "error")));
+    };
+    ws.onerror = () => finish(() => reject(new Error("ws_error")));
+    ws.onclose = () => finish(() => reject(new Error("closed")));
+  });
+}
