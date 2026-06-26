@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getOrCreatePlayer, setPlayerName, setPlayerColor } from "./player";
+import { getOrCreatePlayer, setPlayerName, setPlayerColor, setPlayerBio } from "./player";
 import { AVATAR_PALETTE } from "./avatar";
 
 const KEY = "granbridge.player";
@@ -61,5 +61,24 @@ describe("player writeToken", () => {
     expect(p.writeToken.length).toBeGreaterThan(0);
     const again = getOrCreatePlayer();
     expect(again.writeToken).toBe(p.writeToken); // stable across reads (persisted)
+  });
+});
+
+describe("bio", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("setPlayerBio persists and round-trips", () => {
+    const p = setPlayerBio("checkout king");
+    expect(p.bio).toBe("checkout king");
+    expect(getOrCreatePlayer().bio).toBe("checkout king");
+  });
+
+  it("a legacy record without bio loads with bio undefined", () => {
+    localStorage.setItem("granbridge.player", JSON.stringify({
+      id: "abc", name: "Old", avatar: { color: "#123456" }, writeToken: "t",
+    }));
+    const p = getOrCreatePlayer();
+    expect(p.bio).toBeUndefined();
+    expect(p.name).toBe("Old");
   });
 });

@@ -14,6 +14,7 @@ export interface Profile {
   name: string;
   avatar: AvatarSpec;
   writeToken: string;
+  bio?: string;
 }
 
 const STORAGE_KEY = "granbridge.player";
@@ -24,7 +25,7 @@ export function getOrCreatePlayer(): Profile {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as {
-        id?: string; name?: string; avatar?: { color?: unknown }; writeToken?: unknown;
+        id?: string; name?: string; avatar?: { color?: unknown }; writeToken?: unknown; bio?: unknown;
       };
       if (parsed.id && parsed.name) {
         const hasColor = parsed.avatar && typeof parsed.avatar.color === "string";
@@ -34,6 +35,7 @@ export function getOrCreatePlayer(): Profile {
           name: parsed.name,
           avatar: { color: hasColor ? (parsed.avatar!.color as string) : defaultAvatarColor(parsed.id) },
           writeToken: hasToken ? (parsed.writeToken as string) : crypto.randomUUID(),
+          ...(typeof parsed.bio === "string" ? { bio: parsed.bio } : {}),
         };
         if (!hasColor || !hasToken) _persist(profile);
         return profile;
@@ -62,6 +64,13 @@ export function setPlayerName(name: string): Profile {
 export function setPlayerColor(color: string): Profile {
   const current = getOrCreatePlayer();
   const updated: Profile = { ...current, avatar: { ...current.avatar, color } };
+  _persist(updated);
+  return updated;
+}
+
+/** Update the stored bio; returns the updated profile. */
+export function setPlayerBio(bio: string): Profile {
+  const updated: Profile = { ...getOrCreatePlayer(), bio };
   _persist(updated);
   return updated;
 }
