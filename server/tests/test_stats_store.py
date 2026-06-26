@@ -104,3 +104,39 @@ def test_counts_reports_players_and_distinct_matches(tmp_path):
     c = s.counts()
     assert c["players"] == 2
     assert c["matches"] == 2  # distinct match_id
+
+
+def test_update_profile_creates_player_without_a_match(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    out = s.update_profile("P9", "tok-9", display_name="Zoe", avatar_color="#0f0", bio="  love the bull  ")
+    assert out["bio"] == "love the bull"  # stripped
+    summary = s.player_summary("P9")
+    assert summary["games_played"] == 0
+    assert summary["display_name"] == "Zoe"
+    assert summary["bio"] == "love the bull"
+
+
+def test_update_profile_wrong_token_rejected(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("P1", "tok-1", bio="first")
+    with pytest.raises(PermissionError):
+        s.update_profile("P1", "WRONG", bio="hijack")
+
+
+def test_update_profile_rejects_overlong_bio(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    with pytest.raises(ValidationError):
+        s.update_profile("P1", "tok-1", bio="x" * 161)
+
+
+def test_empty_bio_stores_null(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("P1", "tok-1", display_name="Al", bio="   ")
+    assert s.player_summary("P1")["bio"] is None
+
+
+def test_bio_persists_across_match_submit(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("P1", "tok-1", bio="checkout king")
+    s.submit_match("P1", "tok-1", _match())  # submit must not wipe bio
+    assert s.player_summary("P1")["bio"] == "checkout king"

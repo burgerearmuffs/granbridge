@@ -17,6 +17,7 @@ MAX_DARTS = 5000
 MAX_DART_SCORE = 60       # T20; bounds 3-dart avg to <= 180
 MAX_THROWS = 2000
 MIN_LEADERBOARD_GAMES = 3
+MAX_BIO = 160
 
 
 class ValidationError(ValueError):
@@ -127,6 +128,9 @@ class StatsStore:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_matches_reporter ON matches(reporter_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_matches_verified ON matches(verified)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_throws_reporter ON match_throws(reporter_id)")
+            cols = {r["name"] for r in conn.execute("PRAGMA table_info(players)").fetchall()}
+            if "bio" not in cols:
+                conn.execute("ALTER TABLE players ADD COLUMN bio TEXT")
             conn.commit()
 
     def submit_match(self, player_id: str, write_token: str, match: object,
@@ -182,6 +186,40 @@ class StatsStore:
             conn.commit()
         return {"match_id": match["match_id"], "verified": verified}
 
+    def update_profile(self, player_id: str, write_token: str,
+                       display_name: str = "", avatar_color: str = "", bio: str = "") -> dict:
+        """Create-or-update a player's profile fields. TOFU-authorized like submit_match.
+
+        Registers the identity if new (so a profile can exist before any match).
+        Raises PermissionError on token mismatch, ValidationError on a too-long bio.
+        """
+        display_name = (display_name or "")[:64]
+        avatar_color = (avatar_color or "")[:32]
+        bio = "".join(ch for ch in (bio or "") if ch >= " " or ch == "\n").strip()
+        if len(bio) > MAX_BIO:
+            raise ValidationError("bio too long")
+        bio_val = bio or None
+        token_hash = _sha256(write_token)
+        now = _utc_now()
+        with _connect(self.db_path) as conn:
+            row = conn.execute("SELECT token_hash FROM players WHERE id = ?", (player_id,)).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO players (id, token_hash, display_name, avatar_color, bio, first_seen, last_seen)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (player_id, token_hash, display_name, avatar_color, bio_val, now, now),
+                )
+            else:
+                if not hmac.compare_digest(row["token_hash"], token_hash):
+                    raise PermissionError("token_mismatch")
+                conn.execute(
+                    "UPDATE players SET display_name = ?, avatar_color = ?, bio = ?, last_seen = ? WHERE id = ?",
+                    (display_name, avatar_color, bio_val, now, player_id),
+                )
+            conn.commit()
+        return {"id": player_id, "display_name": display_name,
+                "avatar_color": avatar_color, "bio": bio_val}
+
     def _recompute_verification(self, conn, match_id: str) -> bool:
         rows = conn.execute(
             "SELECT reporter_id, winner_id FROM matches WHERE match_id = ?", (match_id,)
@@ -235,7 +273,7 @@ class StatsStore:
     def player_summary(self, player_id: str) -> dict:
         with _connect(self.db_path) as conn:
             prow = conn.execute(
-                "SELECT display_name, avatar_color FROM players WHERE id = ?", (player_id,)
+                "SELECT display_name, avatar_color, bio FROM players WHERE id = ?", (player_id,)
             ).fetchone()
             agg = conn.execute("""
                 SELECT COUNT(*) AS games_played,
@@ -255,6 +293,7 @@ class StatsStore:
             "id": player_id,
             "display_name": prow["display_name"] if prow else None,
             "avatar_color": prow["avatar_color"] if prow else None,
+            "bio": prow["bio"] if prow else None,
             "games_played": agg["games_played"] or 0,
             "wins": agg["wins"] or 0,
             "verified_games": agg["verified_games"] or 0,
