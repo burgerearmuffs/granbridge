@@ -266,3 +266,64 @@ async def test_h2h_missing_second_id_is_400_or_404(tmp_path):
             assert e.code in (400, 404)
     finally:
         await s.stop()
+
+
+def _profile_msg(player_id="P1", token="t1", name="Ann", bio="hi there"):
+    return {
+        "type": "profile_update", "id": player_id, "writeToken": token,
+        "player": {"id": player_id, "name": name, "avatar": {"color": "#f00"}, "bio": bio},
+    }
+
+
+@pytest.mark.asyncio
+async def test_profile_update_over_ws_then_read_back(tmp_path):
+    s, _, port = await _start(tmp_path)
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            await ws.send(json.dumps(_profile_msg(bio="bullseye fan")))
+            ack = json.loads(await ws.recv())
+        assert ack["type"] == "profile_ack" and ack["id"] == "P1" and ack["bio"] == "bullseye fan"
+        _, body = await _get(port, "/stats/player/P1")
+        assert body["bio"] == "bullseye fan" and body["games_played"] == 0
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_profile_update_wrong_token_rejected(tmp_path):
+    s, _, port = await _start(tmp_path)
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            await ws.send(json.dumps(_profile_msg()))
+            await ws.recv()  # registers token
+            await ws.send(json.dumps(_profile_msg(token="WRONG", bio="x")))
+            err = json.loads(await ws.recv())
+        assert err["type"] == "error" and err["code"] == "token_mismatch"
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_profile_update_overlong_bio_is_implausible(tmp_path):
+    s, _, port = await _start(tmp_path)
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            await ws.send(json.dumps(_profile_msg(bio="x" * 161)))
+            err = json.loads(await ws.recv())
+        assert err["type"] == "error" and err["code"] == "implausible"
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_profile_update_when_disabled_unsupported(tmp_path):
+    s = BrokerServer("127.0.0.1", 0, turn_secret="sek", turn_domain="x.test")  # no stats_store
+    await s.start()
+    port = s._server.sockets[0].getsockname()[1]
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            await ws.send(json.dumps(_profile_msg()))
+            err = json.loads(await ws.recv())
+        assert err["type"] == "error" and err["code"] == "unsupported"
+    finally:
+        await s.stop()
