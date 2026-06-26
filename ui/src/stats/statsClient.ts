@@ -1,5 +1,5 @@
 import { readBrokerUrl } from "../multiplayer/store";
-import type { PlayerSummary, LeaderRow, MatchRecord, Identity } from "./types";
+import type { PlayerSummary, LeaderRow, MatchRecord, Identity, MatchHistoryRow, HeadToHead } from "./types";
 import type { CareerSummary } from "../multiplayer/careerSummary";
 
 /** Map the broker's PlayerSummary to the UI's CareerSummary (defensive on missing fields). */
@@ -41,6 +41,22 @@ export async function fetchLeaderboard(
   const res = await fetch(`${base}/stats/leaderboard?metric=${metric}&limit=${limit}`);
   if (!res.ok) throw new Error(`stats/leaderboard ${res.status}`);
   return (await res.json()) as { metric: string; players: LeaderRow[] };
+}
+
+export async function fetchPlayerMatches(
+  id: string, limit = 20, offset = 0, base: string = brokerHttpBase(),
+): Promise<{ player_id: string; matches: MatchHistoryRow[] }> {
+  const res = await fetch(`${base}/stats/player/${encodeURIComponent(id)}/matches?limit=${limit}&offset=${offset}`);
+  if (!res.ok) throw new Error(`stats/player/matches ${res.status}`);
+  return (await res.json()) as { player_id: string; matches: MatchHistoryRow[] };
+}
+
+export async function fetchHeadToHead(
+  a: string, b: string, base: string = brokerHttpBase(),
+): Promise<HeadToHead> {
+  const res = await fetch(`${base}/stats/h2h/${encodeURIComponent(a)}/${encodeURIComponent(b)}`);
+  if (!res.ok) throw new Error(`stats/h2h ${res.status}`);
+  return (await res.json()) as HeadToHead;
 }
 
 /** Submit a match over a transient WebSocket; resolves on stats_ack, rejects Error(code) otherwise. */
