@@ -214,3 +214,55 @@ async def test_stats_submit_rate_limited(tmp_path):
         assert err["type"] == "error" and err["code"] == "rate_limited"
     finally:
         await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_player_matches_route_not_swallowed_by_bare_route(tmp_path):
+    s, store, port = await _start(tmp_path)
+    try:
+        await asyncio.to_thread(store.submit_match, "P1", "t1", {
+            "match_id": "m1", "mode": "x01", "opponent_id": "P2", "winner_id": "P1",
+            "is_remote": True, "darts": 9, "total_scored": 180,
+            "started_at": "2026-05-24T10:00:00.000Z", "ended_at": None, "throws": None,
+        })
+        status, body = await _get(port, "/stats/player/P1/matches")
+        assert status == 200
+        assert "matches" in body and "games_played" not in body   # NOT a player_summary
+        assert body["player_id"] == "P1"
+        assert body["matches"][0]["match_id"] == "m1"
+        assert body["matches"][0]["won"] is True
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_h2h_route_returns_tally(tmp_path):
+    s, store, port = await _start(tmp_path)
+    try:
+        await asyncio.to_thread(store.submit_match, "A", "ta", {
+            "match_id": "g1", "mode": "x01", "opponent_id": "B", "winner_id": "A",
+            "is_remote": True, "darts": 9, "total_scored": 180,
+            "started_at": "2026-05-24T10:00:00.000Z", "ended_at": None, "throws": None})
+        await asyncio.to_thread(store.submit_match, "B", "tb", {
+            "match_id": "g1", "mode": "x01", "opponent_id": "A", "winner_id": "A",
+            "is_remote": True, "darts": 9, "total_scored": 100,
+            "started_at": "2026-05-24T10:00:00.000Z", "ended_at": None, "throws": None})
+        status, body = await _get(port, "/stats/h2h/A/B")
+        assert status == 200
+        assert body["games"] == 1 and body["a_wins"] == 1 and body["b_wins"] == 0
+    finally:
+        await s.stop()
+
+
+@pytest.mark.asyncio
+async def test_h2h_missing_second_id_is_400_or_404(tmp_path):
+    s, _, port = await _start(tmp_path)
+    try:
+        import urllib.error
+        try:
+            await _get(port, "/stats/h2h/A")
+            assert False, "expected an HTTP error"
+        except urllib.error.HTTPError as e:
+            assert e.code in (400, 404)
+    finally:
+        await s.stop()

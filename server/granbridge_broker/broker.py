@@ -203,12 +203,34 @@ class BrokerServer:
 
     async def _handle_stats_get(self, path_only: str, full_path: str):
         try:
+            if path_only.startswith("/stats/player/") and path_only.endswith("/matches"):
+                pid = path_only[len("/stats/player/"):-len("/matches")]
+                if not pid or len(pid) > 128:
+                    return json_response(400, {"error": "bad player id"}, reason="Bad Request")
+                qs = parse_qs(urlparse(full_path).query)
+                try:
+                    limit = int((qs.get("limit") or ["20"])[0])
+                except ValueError:
+                    limit = 20
+                try:
+                    offset = int((qs.get("offset") or ["0"])[0])
+                except ValueError:
+                    offset = 0
+                matches = await asyncio.to_thread(self._stats.recent_matches, pid, limit, offset)
+                return json_response(200, {"player_id": pid, "matches": matches})
             if path_only.startswith("/stats/player/"):
                 pid = path_only[len("/stats/player/"):]
                 if not pid or len(pid) > 128:
                     return json_response(400, {"error": "bad player id"}, reason="Bad Request")
                 summary = await asyncio.to_thread(self._stats.player_summary, pid)
                 return json_response(200, summary)
+            if path_only.startswith("/stats/h2h/"):
+                parts = path_only[len("/stats/h2h/"):].split("/")
+                if len(parts) != 2 or not parts[0] or not parts[1] \
+                        or len(parts[0]) > 128 or len(parts[1]) > 128:
+                    return json_response(400, {"error": "bad h2h ids"}, reason="Bad Request")
+                h2h = await asyncio.to_thread(self._stats.head_to_head, parts[0], parts[1])
+                return json_response(200, h2h)
             if path_only == "/stats/leaderboard":
                 qs = parse_qs(urlparse(full_path).query)
                 metric = (qs.get("metric") or ["avg"])[0]
