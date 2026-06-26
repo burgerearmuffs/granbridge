@@ -58,10 +58,13 @@ Either way it starts the bridge (UI at `http://127.0.0.1:8080`) and begins looki
 Two people, each on their own board + their own GRANBRIDGE, play one shared match with video/voice.
 
 1. Both open the **Multiplayer** tab.
-2. Set your **display name** + pick an avatar color in the **Profile** tab (optional). Choose your
+2. Set your **display name**, pick an avatar color, and add an optional **bio** in the **Profile** tab.
+   Your profile, **career stats** and **recent-game history** sync to the server (keyed to your player
+   ID), so they follow you across devices — back up your **recovery key** to keep them. Choose your
    camera/microphone in **Settings** (with a live "Test camera" preview).
 3. Both enter the **same Room ID + password** and the **Broker URL**, then **Join**. You'll see each
-   other's camera tiles and an opponent stat card.
+   other's camera tiles and an opponent stat card — including your **head-to-head record** (e.g.
+   *vs you: 4–2*) against that player.
 4. The **host** (shown automatically) picks a mode — and optionally a **turn clock** (30/45/60s
    countdown both players see) — and clicks **Start match**; the other player sees "waiting for the
    host." Both boards then drive the one shared game — the host's engine is the source of truth.

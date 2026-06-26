@@ -5,6 +5,33 @@ Server releases use the `server-vX.Y.Z` tag convention and ship a single asset z
 
 ---
 
+## server-v0.4.0
+
+**Feature: richer profiles.** Three additive capabilities on top of the identity-keyed stats backend,
+all reads over HTTP GET / the one write over the existing transient-WS message, authorized by the same
+trust-on-first-use (TOFU) write-token:
+
+- **Match-history timeline** — `GET /stats/player/<id>/matches?limit=&offset=` returns a player's
+  recent matches newest-first (`{match_id, mode, opponent_id, opponent_name, is_remote, won, verified,
+  three_dart_avg, started_at, ended_at}`; `limit` clamped to `[1,100]`). Matched **before** the bare
+  `/stats/player/<id>` route.
+- **Head-to-head** — `GET /stats/h2h/<a>/<b>` returns `{a, b, games, a_wins, b_wins, last_played,
+  pending}`; headline counts are verified-only, `pending` counts reported-but-unverified matches,
+  self-vs-self and unknown ids return zeros.
+- **First-class profile** — a new `profile_update` WS message (`{id, writeToken, player:{name,
+  avatar:{color}, bio}}` → `profile_ack`) lets a player set/update **`bio`** (≤160 chars; over-length
+  rejected) plus name/avatar **without playing a match**, registering the identity on first write.
+  `bio` is added to the `players` table via an idempotent `ALTER TABLE` migration that runs on boot,
+  and is now included in the `player_summary` response.
+
+Backwards-compatible: the new column is nullable, the new routes/message are ignored by old peers, and
+new response fields are optional — old clients keep working and new clients degrade gracefully against
+an un-upgraded broker. No transport/infra changes from server-v0.3.0; the migration runs automatically
+on `docker compose up -d --build`. Pairs with desktop v0.1.8 (Profile bio + recent games, opponent-card
+head-to-head).
+
+---
+
 ## server-v0.3.0
 
 **Feature: spectator role.** `join` accepts `"spectator": true` — spectators watch a room without
