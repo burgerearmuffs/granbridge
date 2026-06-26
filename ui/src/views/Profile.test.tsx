@@ -1,13 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { Profile } from "./Profile";
+import { updateProfile } from "../stats/statsClient";
 
-beforeEach(() => localStorage.clear());
+// Keep every statsClient export real (they go through the global-fetch stub below),
+// except updateProfile, which opens a WebSocket — replace it with a spy.
+vi.mock("../stats/statsClient", async (orig) => ({
+  ...(await orig<typeof import("../stats/statsClient")>()),
+  updateProfile: vi.fn().mockResolvedValue({ id: "x", bio: null }),
+}));
+
+beforeEach(() => { localStorage.clear(); (updateProfile as ReturnType<typeof vi.fn>).mockClear(); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-// URL-aware fetch: /stats/player/* (server) vs /api/history/stats (local fallback).
-function mockFetch(opts: { player?: unknown; serverOk?: boolean; localRows?: unknown } = {}) {
+// URL-aware fetch: /matches (history) vs /stats/player/* (summary) vs /api/history/stats (local fallback).
+function mockFetch(opts: { player?: unknown; serverOk?: boolean; localRows?: unknown; matches?: unknown } = {}) {
   vi.stubGlobal("fetch", vi.fn((url: string) => {
+    if (url.includes("/matches")) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(opts.matches ?? { player_id: "x", matches: [] }) });
+    }
     if (url.includes("/stats/player/")) {
       if (opts.serverOk === false) return Promise.resolve({ ok: false, status: 500 });
       return Promise.resolve({ ok: true, json: () => Promise.resolve(opts.player ?? {}) });
@@ -102,5 +113,14 @@ describe("Profile view", () => {
       fireEvent.click(screen.getByRole("button", { name: /^restore$/i }));
     });
     expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("edits bio and fires a debounced updateProfile", async () => {
+    mockFetch({ player: { three_dart_avg: 0, wins: 0, games_played: 0 } });
+    render(<Profile />);
+    const bio = await screen.findByLabelText("Bio");
+    fireEvent.change(bio, { target: { value: "love the bull" } });
+    expect((bio as HTMLTextAreaElement).value).toBe("love the bull");
+    await waitFor(() => expect(updateProfile).toHaveBeenCalled(), { timeout: 1500 });
   });
 });

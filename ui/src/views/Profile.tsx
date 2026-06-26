@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { getOrCreatePlayer, setPlayerName, setPlayerColor, applyRecoveryKey } from "../multiplayer/player";
+import { getOrCreatePlayer, setPlayerName, setPlayerColor, setPlayerBio, applyRecoveryKey } from "../multiplayer/player";
 import { AVATAR_PALETTE, defaultAvatarColor } from "../multiplayer/avatar";
 import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
-import { fetchPlayerSummary, toCareerSummary } from "../stats/statsClient";
+import { fetchPlayerSummary, toCareerSummary, updateProfile } from "../stats/statsClient";
 import { exportRecoveryKey } from "../multiplayer/recoveryKey";
 import { getUploadEnabled, setUploadEnabled } from "../stats/uploadPref";
 import { PageHeader } from "../components/Page";
@@ -33,6 +33,19 @@ export function Profile() {
     })();
     return () => { cancelled = true; };
   }, [profile.id, profile.name]);
+
+  // Propagate profile edits to the server (debounced), so name/avatar/bio sync
+  // even without playing a match. Best-effort: ignore failures (offline, etc.).
+  useEffect(() => {
+    if (!getUploadEnabled()) return;
+    const t = setTimeout(() => {
+      void updateProfile(
+        { id: profile.id, writeToken: profile.writeToken, name: profile.name, avatarColor: profile.avatar.color },
+        { name: profile.name, color: profile.avatar.color, bio: profile.bio ?? "" },
+      ).catch(() => { /* best-effort */ });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [profile.id, profile.writeToken, profile.name, profile.avatar.color, profile.bio]);
 
   const exportKey = async () => {
     const key = exportRecoveryKey(profile);
@@ -94,6 +107,20 @@ export function Profile() {
           aria-label="Display name"
           className="mt-1 w-full bg-neutral-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
         />
+      </label>
+
+      <label className="block">
+        <span className="text-sm text-neutral-300">Bio</span>
+        <textarea
+          value={profile.bio ?? ""}
+          onChange={(e) => setProfile(setPlayerBio(e.target.value))}
+          aria-label="Bio"
+          maxLength={160}
+          rows={2}
+          placeholder="Say something about your game (optional)"
+          className="mt-1 w-full bg-neutral-800 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+        />
+        <span className="text-[11px] text-neutral-500">{(profile.bio ?? "").length}/160</span>
       </label>
 
       <div>
