@@ -173,3 +173,26 @@ def test_recent_matches_limit_and_offset(tmp_path):
 def test_recent_matches_empty_for_unknown(tmp_path):
     s = StatsStore(tmp_path / "stats.db")
     assert s.recent_matches("nobody") == []
+
+
+def test_head_to_head_counts_verified_wins_and_pending(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    # Two co-signed (verified) A-vs-B matches: A wins g1, B wins g2.
+    s.submit_match("A", "ta", _match(match_id="g1", winner="A", opponent="B"))
+    s.submit_match("B", "tb", _match(match_id="g1", winner="A", opponent="A"))  # verifies g1 (A won)
+    s.submit_match("A", "ta", _match(match_id="g2", winner="B", opponent="B"))
+    s.submit_match("B", "tb", _match(match_id="g2", winner="B", opponent="A"))  # verifies g2 (B won)
+    s.submit_match("A", "ta", _match(match_id="g3", winner="A", opponent="B"))  # pending (B never co-signs)
+    h = s.head_to_head("A", "B")
+    assert h["games"] == 2 and h["a_wins"] == 1 and h["b_wins"] == 1
+    assert h["pending"] == 1
+    assert h["last_played"] is not None
+
+
+def test_head_to_head_self_and_unknown_are_zero(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.submit_match("A", "ta", _match(match_id="g1", winner="A", opponent="B"))
+    assert s.head_to_head("A", "A") == {"a": "A", "b": "A", "games": 0, "a_wins": 0,
+                                        "b_wins": 0, "last_played": None, "pending": 0}
+    z = s.head_to_head("X", "Y")
+    assert z["games"] == 0 and z["pending"] == 0 and z["last_played"] is None

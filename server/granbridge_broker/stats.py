@@ -293,6 +293,32 @@ class StatsStore:
             })
         return out
 
+    def head_to_head(self, a: str, b: str) -> dict:
+        result = {"a": a, "b": b, "games": 0, "a_wins": 0, "b_wins": 0,
+                  "last_played": None, "pending": 0}
+        if a == b:
+            return result
+        with _connect(self.db_path) as conn:
+            rows = conn.execute(
+                "SELECT winner_id, verified, started_at FROM matches"
+                " WHERE reporter_id = ? AND opponent_id = ?", (a, b),
+            ).fetchall()
+        last = None
+        for r in rows:
+            started = r["started_at"] or ""
+            if last is None or started > last:
+                last = started
+            if r["verified"]:
+                result["games"] += 1
+                if r["winner_id"] == a:
+                    result["a_wins"] += 1
+                elif r["winner_id"] == b:
+                    result["b_wins"] += 1
+            else:
+                result["pending"] += 1
+        result["last_played"] = last
+        return result
+
     def counts(self) -> dict:
         with _connect(self.db_path) as conn:
             players = conn.execute("SELECT COUNT(*) AS c FROM players").fetchone()["c"]
