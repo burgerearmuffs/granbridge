@@ -123,4 +123,25 @@ describe("Profile view", () => {
     expect((bio as HTMLTextAreaElement).value).toBe("love the bull");
     await waitFor(() => expect(updateProfile).toHaveBeenCalled(), { timeout: 1500 });
   });
+
+  it("renders recent games from the server", async () => {
+    localStorage.setItem("granbridge.player", JSON.stringify({ id: "id1", name: "Ada", avatar: { color: "#f59e0b" }, writeToken: "t" }));
+    mockFetch({
+      player: { three_dart_avg: 0, wins: 0, games_played: 0 },
+      matches: { player_id: "id1", matches: [
+        { match_id: "m1", mode: "x01", opponent_id: "O", opponent_name: "Opie",
+          is_remote: true, won: true, verified: true, three_dart_avg: 60.2,
+          started_at: "2026-05-24T10:00:00.000Z", ended_at: null },
+      ] },
+    });
+    render(<Profile />);
+    expect(await screen.findByText(/Opie/)).toBeInTheDocument();
+    expect(screen.getByText(/60.2/)).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the server has no games", async () => {
+    mockFetch({ player: { three_dart_avg: 0, wins: 0, games_played: 0 } });
+    render(<Profile />);
+    expect(await screen.findByText(/no games on the server yet/i)).toBeInTheDocument();
+  });
 });

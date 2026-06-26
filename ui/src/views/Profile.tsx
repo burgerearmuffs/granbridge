@@ -3,7 +3,8 @@ import { getOrCreatePlayer, setPlayerName, setPlayerColor, setPlayerBio, applyRe
 import { AVATAR_PALETTE, defaultAvatarColor } from "../multiplayer/avatar";
 import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
-import { fetchPlayerSummary, toCareerSummary, updateProfile } from "../stats/statsClient";
+import { fetchPlayerSummary, toCareerSummary, updateProfile, fetchPlayerMatches } from "../stats/statsClient";
+import type { MatchHistoryRow } from "../stats/types";
 import { exportRecoveryKey } from "../multiplayer/recoveryKey";
 import { getUploadEnabled, setUploadEnabled } from "../stats/uploadPref";
 import { PageHeader } from "../components/Page";
@@ -19,6 +20,7 @@ export function Profile() {
   const [keyCopied, setKeyCopied] = useState(false);
   const [upload, setUpload] = useState(() => getUploadEnabled());
   const [keyBackedUp, setKeyBackedUp] = useState(() => isKeyBackedUp());
+  const [history, setHistory] = useState<MatchHistoryRow[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +35,19 @@ export function Profile() {
     })();
     return () => { cancelled = true; };
   }, [profile.id, profile.name]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { matches } = await fetchPlayerMatches(profile.id, 10);
+        if (!cancelled) setHistory(matches);
+      } catch {
+        if (!cancelled) setHistory([]);   // server unreachable -> empty (summary fallback covers the rest)
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile.id]);
 
   // Propagate profile edits to the server (debounced), so name/avatar/bio sync
   // even without playing a match. Best-effort: ignore failures (offline, etc.).
@@ -211,6 +226,30 @@ export function Profile() {
               ? "Synced from the stats server, keyed by your player ID."
               : "Server unreachable — showing local stats (keyed by display name)."}
           </p>
+        )}
+      </div>
+
+      <div className="border-t border-neutral-800 pt-4">
+        <h3 className="text-sm text-neutral-300 mb-2">Recent games</h3>
+        {history === null ? (
+          <p className="text-neutral-600 text-xs">Loading…</p>
+        ) : history.length === 0 ? (
+          <p className="text-neutral-600 text-xs">No games on the server yet.</p>
+        ) : (
+          <ul className="space-y-1">
+            {history.map((m) => (
+              <li key={m.match_id} className="flex items-center justify-between gap-3 text-sm bg-neutral-800 rounded px-3 py-1.5">
+                <span className="text-neutral-300 truncate flex-1">
+                  vs {m.opponent_name ?? (m.opponent_id ? m.opponent_id.slice(0, 6) : "—")}
+                </span>
+                <span className="text-neutral-500 text-xs uppercase">{m.mode}</span>
+                <span className={m.won ? "text-emerald-400 font-semibold" : "text-neutral-500"}>
+                  {m.won ? "W" : "L"}
+                </span>
+                <span className="text-amber-300 tabular-nums">{m.three_dart_avg.toFixed(1)}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>
