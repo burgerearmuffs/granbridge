@@ -140,3 +140,36 @@ def test_bio_persists_across_match_submit(tmp_path):
     s.update_profile("P1", "tok-1", bio="checkout king")
     s.submit_match("P1", "tok-1", _match())  # submit must not wipe bio
     assert s.player_summary("P1")["bio"] == "checkout king"
+
+
+def _match_at(match_id, started, opponent="P2", winner="P1", darts=9, total=180):
+    m = _match(match_id=match_id, opponent=opponent, winner=winner, darts=darts, total=total)
+    m["started_at"] = started
+    return m
+
+
+def test_recent_matches_newest_first_with_opponent_name(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("OPP", "topp", display_name="Opie")          # give the opponent a name
+    s.submit_match("P1", "t1", _match_at("a", "2026-05-24T10:00:00.000Z", opponent="OPP", winner="P1"))
+    s.submit_match("P1", "t1", _match_at("b", "2026-05-25T10:00:00.000Z", opponent="OPP", winner="OPP"))
+    rows = s.recent_matches("P1")
+    assert [r["match_id"] for r in rows] == ["b", "a"]            # newest first
+    assert rows[0]["won"] is False and rows[1]["won"] is True
+    assert rows[0]["opponent_name"] == "Opie"
+    assert rows[1]["three_dart_avg"] == 60.0                       # 180/9*3
+
+
+def test_recent_matches_limit_and_offset(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    for i in range(5):
+        s.submit_match("P1", "t1", _match_at(f"m{i}", f"2026-05-2{i}T10:00:00.000Z"))
+    page1 = s.recent_matches("P1", limit=2, offset=0)
+    page2 = s.recent_matches("P1", limit=2, offset=2)
+    assert [r["match_id"] for r in page1] == ["m4", "m3"]
+    assert [r["match_id"] for r in page2] == ["m2", "m1"]
+
+
+def test_recent_matches_empty_for_unknown(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    assert s.recent_matches("nobody") == []

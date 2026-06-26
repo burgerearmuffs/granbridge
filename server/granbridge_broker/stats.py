@@ -264,6 +264,35 @@ class StatsStore:
                  reverse=True)
         return out[:limit]
 
+    def recent_matches(self, player_id: str, limit: int = 20, offset: int = 0) -> list[dict]:
+        limit = max(1, min(int(limit), 100))
+        offset = max(0, int(offset))
+        with _connect(self.db_path) as conn:
+            rows = conn.execute("""
+                SELECT m.match_id, m.mode, m.opponent_id, m.is_remote, m.winner_id,
+                       m.darts, m.total_scored, m.verified, m.started_at, m.ended_at,
+                       p.display_name AS opponent_name
+                FROM matches m
+                LEFT JOIN players p ON p.id = m.opponent_id
+                WHERE m.reporter_id = ?
+                ORDER BY m.started_at DESC
+                LIMIT ? OFFSET ?
+            """, (player_id, limit, offset)).fetchall()
+        out = []
+        for r in rows:
+            darts = r["darts"] or 0
+            total = r["total_scored"] or 0
+            out.append({
+                "match_id": r["match_id"], "mode": r["mode"],
+                "opponent_id": r["opponent_id"], "opponent_name": r["opponent_name"],
+                "is_remote": bool(r["is_remote"]),
+                "won": r["winner_id"] == player_id,
+                "verified": bool(r["verified"]),
+                "three_dart_avg": round(total / darts * 3, 2) if darts else 0.0,
+                "started_at": r["started_at"], "ended_at": r["ended_at"],
+            })
+        return out
+
     def counts(self) -> dict:
         with _connect(self.db_path) as conn:
             players = conn.execute("SELECT COUNT(*) AS c FROM players").fetchone()["c"]
