@@ -1,5 +1,5 @@
 import { readBrokerUrl } from "../multiplayer/store";
-import type { PlayerSummary, LeaderRow, MatchRecord, Identity } from "./types";
+import type { PlayerSummary, LeaderRow, MatchRecord, Identity, MatchHistoryRow, HeadToHead } from "./types";
 import type { CareerSummary } from "../multiplayer/careerSummary";
 
 /** Map the broker's PlayerSummary to the UI's CareerSummary (defensive on missing fields). */
@@ -43,6 +43,22 @@ export async function fetchLeaderboard(
   return (await res.json()) as { metric: string; players: LeaderRow[] };
 }
 
+export async function fetchPlayerMatches(
+  id: string, limit = 20, offset = 0, base: string = brokerHttpBase(),
+): Promise<{ player_id: string; matches: MatchHistoryRow[] }> {
+  const res = await fetch(`${base}/stats/player/${encodeURIComponent(id)}/matches?limit=${limit}&offset=${offset}`);
+  if (!res.ok) throw new Error(`stats/player/matches ${res.status}`);
+  return (await res.json()) as { player_id: string; matches: MatchHistoryRow[] };
+}
+
+export async function fetchHeadToHead(
+  a: string, b: string, base: string = brokerHttpBase(),
+): Promise<HeadToHead> {
+  const res = await fetch(`${base}/stats/h2h/${encodeURIComponent(a)}/${encodeURIComponent(b)}`);
+  if (!res.ok) throw new Error(`stats/h2h ${res.status}`);
+  return (await res.json()) as HeadToHead;
+}
+
 /** Submit a match over a transient WebSocket; resolves on stats_ack, rejects Error(code) otherwise. */
 export function submitMatch(
   record: MatchRecord, identity: Identity,
@@ -79,6 +95,53 @@ export function submitMatch(
       try { msg = JSON.parse(typeof ev.data === "string" ? ev.data : ""); }
       catch { return; } // ignore non-JSON / partial frame; wait for the next message or the timeout
       if (msg.type === "stats_ack") finish(() => resolve({ match_id: msg.match_id ?? record.match_id, verified: !!msg.verified }));
+      else if (msg.type === "error") finish(() => reject(new Error(msg.code || "error")));
+    };
+    ws.onerror = () => finish(() => reject(new Error("ws_error")));
+    ws.onclose = () => finish(() => reject(new Error("closed")));
+  });
+}
+
+/** Update server-side profile fields over a transient WebSocket; resolves on profile_ack. */
+export function updateProfile(
+  identity: Identity, fields: { name?: string; color?: string; bio?: string },
+  wsUrl: string = readBrokerUrl(), timeoutMs = 8000,
+): Promise<{ id: string; bio: string | null }> {
+  return new Promise((resolve, reject) => {
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error("ws_construct"));
+      return;
+    }
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* ignore */ }
+      fn();
+    };
+    const timer = setTimeout(() => finish(() => reject(new Error("timeout"))), timeoutMs);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: "profile_update",
+        id: identity.id,
+        writeToken: identity.writeToken,
+        player: {
+          id: identity.id,
+          name: fields.name ?? identity.name,
+          avatar: { color: fields.color ?? identity.avatarColor },
+          bio: fields.bio ?? "",
+        },
+      }));
+    };
+    ws.onmessage = (ev: MessageEvent) => {
+      let msg: { type?: string; id?: string; bio?: string | null; code?: string };
+      try { msg = JSON.parse(typeof ev.data === "string" ? ev.data : ""); }
+      catch { return; }
+      if (msg.type === "profile_ack") finish(() => resolve({ id: msg.id ?? identity.id, bio: msg.bio ?? null }));
       else if (msg.type === "error") finish(() => reject(new Error(msg.code || "error")));
     };
     ws.onerror = () => finish(() => reject(new Error("ws_error")));

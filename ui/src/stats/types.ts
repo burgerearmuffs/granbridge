@@ -22,6 +22,7 @@ export interface PlayerSummary {
   id: string;
   display_name: string | null;
   avatar_color: string | null;
+  bio?: string | null;
   games_played: number;
   wins: number;
   verified_games: number;
@@ -38,6 +39,29 @@ export interface LeaderRow {
   games: number;
   wins: number;
   three_dart_avg: number;
+}
+
+export interface MatchHistoryRow {
+  match_id: string;
+  mode: string;
+  opponent_id: string | null;
+  opponent_name: string | null;
+  is_remote: boolean;
+  won: boolean;
+  verified: boolean;
+  three_dart_avg: number;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface HeadToHead {
+  a: string;
+  b: string;
+  games: number;
+  a_wins: number;
+  b_wins: number;
+  last_played: string | null;
+  pending: number;
 }
 
 export interface QueueEntry {

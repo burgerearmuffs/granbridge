@@ -22,6 +22,8 @@ import { MpGameLayout } from "../components/MpGameLayout";
 import { useStore } from "../store";
 import { LiveGame } from "./LiveGame";
 import { OpponentCard } from "../components/OpponentCard";
+import { fetchHeadToHead } from "../stats/statsClient";
+import type { HeadToHead } from "../stats/types";
 import { defaultAvatarColor } from "../multiplayer/avatar";
 import { mpSession } from "../multiplayer/session";
 import { hostRole } from "../multiplayer/remoteMatch";
@@ -45,6 +47,7 @@ export function Multiplayer() {
   const remoteBoardStreams = useMpStore((s) => s.remoteBoardStreams);
   const connectionHealth = useMpStore((s) => s.connectionHealth);
   const opponentCard = useMpStore((s) => s.opponentCard);
+  const [h2h, setH2h] = useState<HeadToHead | undefined>(undefined);
   const turnClockSecs = useMpStore((s) => s.turnClockSecs);
   const spectate = useMpStore((s) => s.spectate);
   const spectatorCount = useMpStore((s) => s.spectatorCount);
@@ -66,6 +69,17 @@ export function Multiplayer() {
     for (const track of localStream.getAudioTracks()) track.enabled = mic;
     for (const track of localStream.getVideoTracks()) track.enabled = cam;
   }, [mic, cam, localStream]);
+
+  // Fetch head-to-head against the current opponent (best-effort; undefined hides the line).
+  useEffect(() => {
+    const oppId = opponentCard?.profile.id;
+    if (!oppId) { setH2h(undefined); return; }
+    let cancelled = false;
+    fetchHeadToHead(identity.id, oppId)
+      .then((r) => { if (!cancelled) setH2h(r); })
+      .catch(() => { if (!cancelled) setH2h(undefined); });
+    return () => { cancelled = true; };
+  }, [opponentCard?.profile.id, identity.id]);
 
   const handleJoin = useCallback(() => {
     if (!roomInput.trim() || !passwordInput.trim()) return;
@@ -332,7 +346,7 @@ export function Multiplayer() {
           selfVideo={localVideoTile}
           oppVideo={firstRemoteVideoTile ?? <div className="w-full h-full bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-xs">No opponent camera</div>}
           oppBoardVideo={firstRemoteBoardTile}
-          oppCard={opponentCard ? <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} /> : null}
+          oppCard={opponentCard ? <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} headToHead={h2h} /> : null}
           controls={
             <div className="space-y-2">
               <ChatPanel />
@@ -392,7 +406,7 @@ export function Multiplayer() {
       </div>
 
       {opponentCard && (
-        <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} />
+        <OpponentCard profile={opponentCard.profile} summary={opponentCard.summary} headToHead={h2h} />
       )}
 
       {/* Peer list */}

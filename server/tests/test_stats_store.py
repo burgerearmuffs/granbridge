@@ -104,3 +104,95 @@ def test_counts_reports_players_and_distinct_matches(tmp_path):
     c = s.counts()
     assert c["players"] == 2
     assert c["matches"] == 2  # distinct match_id
+
+
+def test_update_profile_creates_player_without_a_match(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    out = s.update_profile("P9", "tok-9", display_name="Zoe", avatar_color="#0f0", bio="  love the bull  ")
+    assert out["bio"] == "love the bull"  # stripped
+    summary = s.player_summary("P9")
+    assert summary["games_played"] == 0
+    assert summary["display_name"] == "Zoe"
+    assert summary["bio"] == "love the bull"
+
+
+def test_update_profile_wrong_token_rejected(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("P1", "tok-1", bio="first")
+    with pytest.raises(PermissionError):
+        s.update_profile("P1", "WRONG", bio="hijack")
+
+
+def test_update_profile_rejects_overlong_bio(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    with pytest.raises(ValidationError):
+        s.update_profile("P1", "tok-1", bio="x" * 161)
+
+
+def test_empty_bio_stores_null(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("P1", "tok-1", display_name="Al", bio="   ")
+    assert s.player_summary("P1")["bio"] is None
+
+
+def test_bio_persists_across_match_submit(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("P1", "tok-1", bio="checkout king")
+    s.submit_match("P1", "tok-1", _match())  # submit must not wipe bio
+    assert s.player_summary("P1")["bio"] == "checkout king"
+
+
+def _match_at(match_id, started, opponent="P2", winner="P1", darts=9, total=180):
+    m = _match(match_id=match_id, opponent=opponent, winner=winner, darts=darts, total=total)
+    m["started_at"] = started
+    return m
+
+
+def test_recent_matches_newest_first_with_opponent_name(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.update_profile("OPP", "topp", display_name="Opie")          # give the opponent a name
+    s.submit_match("P1", "t1", _match_at("a", "2026-05-24T10:00:00.000Z", opponent="OPP", winner="P1"))
+    s.submit_match("P1", "t1", _match_at("b", "2026-05-25T10:00:00.000Z", opponent="OPP", winner="OPP"))
+    rows = s.recent_matches("P1")
+    assert [r["match_id"] for r in rows] == ["b", "a"]            # newest first
+    assert rows[0]["won"] is False and rows[1]["won"] is True
+    assert rows[0]["opponent_name"] == "Opie"
+    assert rows[1]["three_dart_avg"] == 60.0                       # 180/9*3
+
+
+def test_recent_matches_limit_and_offset(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    for i in range(5):
+        s.submit_match("P1", "t1", _match_at(f"m{i}", f"2026-05-2{i}T10:00:00.000Z"))
+    page1 = s.recent_matches("P1", limit=2, offset=0)
+    page2 = s.recent_matches("P1", limit=2, offset=2)
+    assert [r["match_id"] for r in page1] == ["m4", "m3"]
+    assert [r["match_id"] for r in page2] == ["m2", "m1"]
+
+
+def test_recent_matches_empty_for_unknown(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    assert s.recent_matches("nobody") == []
+
+
+def test_head_to_head_counts_verified_wins_and_pending(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    # Two co-signed (verified) A-vs-B matches: A wins g1, B wins g2.
+    s.submit_match("A", "ta", _match(match_id="g1", winner="A", opponent="B"))
+    s.submit_match("B", "tb", _match(match_id="g1", winner="A", opponent="A"))  # verifies g1 (A won)
+    s.submit_match("A", "ta", _match(match_id="g2", winner="B", opponent="B"))
+    s.submit_match("B", "tb", _match(match_id="g2", winner="B", opponent="A"))  # verifies g2 (B won)
+    s.submit_match("A", "ta", _match(match_id="g3", winner="A", opponent="B"))  # pending (B never co-signs)
+    h = s.head_to_head("A", "B")
+    assert h["games"] == 2 and h["a_wins"] == 1 and h["b_wins"] == 1
+    assert h["pending"] == 1
+    assert h["last_played"] is not None
+
+
+def test_head_to_head_self_and_unknown_are_zero(tmp_path):
+    s = StatsStore(tmp_path / "stats.db")
+    s.submit_match("A", "ta", _match(match_id="g1", winner="A", opponent="B"))
+    assert s.head_to_head("A", "A") == {"a": "A", "b": "A", "games": 0, "a_wins": 0,
+                                        "b_wins": 0, "last_played": None, "pending": 0}
+    z = s.head_to_head("X", "Y")
+    assert z["games"] == 0 and z["pending"] == 0 and z["last_played"] is None

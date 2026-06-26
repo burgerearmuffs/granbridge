@@ -203,12 +203,34 @@ class BrokerServer:
 
     async def _handle_stats_get(self, path_only: str, full_path: str):
         try:
+            if path_only.startswith("/stats/player/") and path_only.endswith("/matches"):
+                pid = path_only[len("/stats/player/"):-len("/matches")]
+                if not pid or len(pid) > 128:
+                    return json_response(400, {"error": "bad player id"}, reason="Bad Request")
+                qs = parse_qs(urlparse(full_path).query)
+                try:
+                    limit = int((qs.get("limit") or ["20"])[0])
+                except ValueError:
+                    limit = 20
+                try:
+                    offset = int((qs.get("offset") or ["0"])[0])
+                except ValueError:
+                    offset = 0
+                matches = await asyncio.to_thread(self._stats.recent_matches, pid, limit, offset)
+                return json_response(200, {"player_id": pid, "matches": matches})
             if path_only.startswith("/stats/player/"):
                 pid = path_only[len("/stats/player/"):]
                 if not pid or len(pid) > 128:
                     return json_response(400, {"error": "bad player id"}, reason="Bad Request")
                 summary = await asyncio.to_thread(self._stats.player_summary, pid)
                 return json_response(200, summary)
+            if path_only.startswith("/stats/h2h/"):
+                parts = path_only[len("/stats/h2h/"):].split("/")
+                if len(parts) != 2 or not parts[0] or not parts[1] \
+                        or len(parts[0]) > 128 or len(parts[1]) > 128:
+                    return json_response(400, {"error": "bad h2h ids"}, reason="Bad Request")
+                h2h = await asyncio.to_thread(self._stats.head_to_head, parts[0], parts[1])
+                return json_response(200, h2h)
             if path_only == "/stats/leaderboard":
                 qs = parse_qs(urlparse(full_path).query)
                 metric = (qs.get("metric") or ["avg"])[0]
@@ -396,6 +418,39 @@ class BrokerServer:
                         continue
                     await _send(ws, {"type": "stats_ack",
                                      "match_id": result["match_id"], "verified": result["verified"]})
+
+                # ---- profile_update -----------------------------------
+                elif mtype == "profile_update":
+                    if self._stats is None:
+                        await _error(ws, "unsupported", "stats not enabled")
+                        continue
+                    if not self._stats_limiter.allow(peer_id, self._clock()):
+                        await _error(ws, "rate_limited", "too many submissions")
+                        continue
+                    pid = msg.get("id")
+                    token = msg.get("writeToken")
+                    if not isinstance(pid, str) or not pid or not isinstance(token, str) or not token:
+                        await _error(ws, "bad_request", "profile_update missing id/writeToken")
+                        continue
+                    player = msg.get("player") if isinstance(msg.get("player"), dict) else {}
+                    name = player.get("name", "") if isinstance(player.get("name"), str) else ""
+                    avatar = player.get("avatar") if isinstance(player.get("avatar"), dict) else {}
+                    color = avatar.get("color", "") if isinstance(avatar.get("color"), str) else ""
+                    bio = player.get("bio", "") if isinstance(player.get("bio"), str) else ""
+                    try:
+                        result = await asyncio.to_thread(
+                            self._stats.update_profile, pid, token, name, color, bio)
+                    except ValidationError:
+                        await _error(ws, "implausible", "profile failed validation")
+                        continue
+                    except PermissionError:
+                        await _error(ws, "token_mismatch", "write token does not match")
+                        continue
+                    except Exception:
+                        self._log.exception("profile_update failed unexpectedly")
+                        await _error(ws, "server_error", "internal error processing profile")
+                        continue
+                    await _send(ws, {"type": "profile_ack", "id": pid, "bio": result.get("bio")})
 
                 # ---- leave -----------------------------------------------
                 elif mtype == "leave":

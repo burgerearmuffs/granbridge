@@ -52,3 +52,30 @@ describe("toCareerSummary", () => {
     expect(toCareerSummary({} as never)).toEqual({ threeDartAvg: 0, wins: 0, gamesPlayed: 0 });
   });
 });
+
+import { fetchPlayerMatches, fetchHeadToHead } from "./statsClient";
+
+describe("history + h2h reads", () => {
+  it("fetchPlayerMatches hits the /matches subpath with limit+offset", async () => {
+    const body = { player_id: "P1", matches: [{ match_id: "m1", won: true }] };
+    const f = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) });
+    vi.stubGlobal("fetch", f);
+    const out = await fetchPlayerMatches("P1", 10, 5, "https://h");
+    expect(f).toHaveBeenCalledWith("https://h/stats/player/P1/matches?limit=10&offset=5");
+    expect(out.matches[0].match_id).toBe("m1");
+  });
+
+  it("fetchHeadToHead hits /stats/h2h/{a}/{b}", async () => {
+    const body = { a: "P1", b: "P2", games: 3, a_wins: 2, b_wins: 1, last_played: null, pending: 0 };
+    const f = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) });
+    vi.stubGlobal("fetch", f);
+    const out = await fetchHeadToHead("P1", "P2", "https://h");
+    expect(f).toHaveBeenCalledWith("https://h/stats/h2h/P1/P2");
+    expect(out.a_wins).toBe(2);
+  });
+
+  it("fetchPlayerMatches throws on non-OK", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    await expect(fetchPlayerMatches("P1", 20, 0, "https://h")).rejects.toThrow();
+  });
+});
