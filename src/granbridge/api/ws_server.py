@@ -68,6 +68,8 @@ class WebSocketServer:
                     t.cancel()
 
     async def _pump_out(self, ws: ServerConnection, sub) -> None:
+        # Cancellation while awaiting sub.get() can drop at most one event, and
+        # only for THIS client, which is already disconnecting — benign by design.
         try:
             while True:
                 event = await sub.get()
