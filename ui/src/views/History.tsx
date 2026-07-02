@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Dartboard } from "../components/Dartboard";
 import { apiBase } from "../apiBase";
 import { Section, EmptyState } from "../components/Page";
+import { throwsToCsv, exportFilename, downloadText } from "../stats/exporters";
+import type { HistoryDump } from "../stats/exporters";
 
 interface StatRow {
   player: string;
@@ -45,12 +47,33 @@ function formatDate(iso: string | null): string {
   }
 }
 
+async function fetchDump(): Promise<HistoryDump> {
+  const res = await fetch(`${apiBase()}/api/history/export/all`);
+  if (!res.ok) throw new Error(`Export request failed (${res.status}).`);
+  return (await res.json()) as HistoryDump;
+}
+
 export function History() {
   const [stats, setStats] = useState<StatRow[]>([]);
   const [games, setGames] = useState<GameRow[]>([]);
   const [heatmap, setHeatmap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function handleExport(kind: "json" | "csv") {
+    setExportError(null);
+    try {
+      const dump = await fetchDump();
+      if (kind === "json") {
+        downloadText(JSON.stringify(dump, null, 2), exportFilename("json"), "application/json");
+      } else {
+        downloadText(throwsToCsv(dump), exportFilename("csv"), "text/csv");
+      }
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed.");
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +203,39 @@ export function History() {
               );
             })}
           </ul>
+        )}
+      </Section>
+
+      {/* Export */}
+      <Section heading="Export Your Data">
+        <p className="text-neutral-500 text-sm mb-3">
+          Download your complete match history — every game and every dart. JSON is the
+          canonical dump; CSV is one row per throw for spreadsheets.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void handleExport("json")}
+            className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm font-semibold
+                       border border-neutral-700 focus:outline-none focus-visible:ring-2
+                       focus-visible:ring-amber-400"
+          >
+            Export JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExport("csv")}
+            className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm font-semibold
+                       border border-neutral-700 focus:outline-none focus-visible:ring-2
+                       focus-visible:ring-amber-400"
+          >
+            Export CSV
+          </button>
+        </div>
+        {exportError && (
+          <p role="alert" className="text-red-400 text-sm mt-3">
+            {exportError}
+          </p>
         )}
       </Section>
 

@@ -19,6 +19,15 @@ Tauri) for local play, internet multiplayer with live video, and streaming.
   leaderboard, a Settings tab (A/V devices, broker, local data), first-run
   onboarding, offline commentary captions, shareable result cards, and
   auto-updates.
+- **Sound & spectacle:** real self-generated sound effects (dart thuds,
+  crowd-roar fanfares) with a volume control, full-screen celebration clips
+  (GAME SHOT!, LEG!, 180, treble/bullseye), and per-player **entrance
+  themes** (walk-on video + fanfare). Every clip is a drop-a-file replaceable
+  asset under `ui/public/{sounds,videos}/` — regenerate them all from
+  `tools/make_sounds.py`, `tools/make_videos.py`, `tools/make_entrances.py`.
+- **Own your data:** one-click **Export JSON / CSV** of your complete match
+  history (every game, every dart) from the History tab, plus a documented
+  local SQLite DB under `%LOCALAPPDATA%\granbridge`.
 - **Internet multiplayer:** room + password matches with two-way camera/mic
   over WebRTC (relay-only TURNS over 443), host-authoritative game sync, text
   chat, an optional turn clock, guest controls + rematch — and **spectators**

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getOrCreatePlayer, setPlayerName, setPlayerColor, setPlayerBio, applyRecoveryKey } from "../multiplayer/player";
+import { getOrCreatePlayer, setPlayerName, setPlayerColor, setPlayerBio, setPlayerEntranceTheme, applyRecoveryKey } from "../multiplayer/player";
+import { ENTRANCE_THEMES, isEntranceTheme } from "../entrance/themes";
 import { AVATAR_PALETTE, defaultAvatarColor } from "../multiplayer/avatar";
 import { Avatar } from "../components/Avatar";
 import { fetchMyCareerSummary, type CareerSummary } from "../multiplayer/careerSummary";
@@ -159,6 +160,43 @@ export function Profile() {
           >
             Reset
           </button>
+        </div>
+      </div>
+
+      <div>
+        <span className="text-sm text-neutral-300">Entrance theme</span>
+        <p className="text-neutral-600 text-xs mb-2">
+          Your walk-on when a game starts — video + fanfare. Click to skip during play.
+        </p>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Entrance theme">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!profile.entranceTheme}
+            onClick={() => setProfile(setPlayerEntranceTheme(undefined))}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors
+              ${!profile.entranceTheme
+                ? "border-white text-white bg-neutral-700"
+                : "border-neutral-700 text-neutral-400 hover:text-white"}`}
+          >
+            None
+          </button>
+          {Object.entries(ENTRANCE_THEMES).map(([key, spec]) => (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={profile.entranceTheme === key}
+              onClick={() => setProfile(setPlayerEntranceTheme(isEntranceTheme(key) ? key : undefined))}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors
+                ${profile.entranceTheme === key
+                  ? "border-white text-neutral-950"
+                  : "border-neutral-700 text-neutral-400 hover:text-white"}`}
+              style={profile.entranceTheme === key ? { backgroundColor: spec.accent } : undefined}
+            >
+              {spec.label}
+            </button>
+          ))}
         </div>
       </div>
 

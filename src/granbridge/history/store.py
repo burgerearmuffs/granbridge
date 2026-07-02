@@ -154,6 +154,36 @@ class HistoryStore:
             ],
         }
 
+    def export_all(self) -> dict:
+        """Full own-your-data dump: every game (finished or not) with its throws."""
+        with _connect(self.db_path) as conn:
+            games = conn.execute("SELECT * FROM games ORDER BY id").fetchall()
+            throws = conn.execute(
+                "SELECT game_id, player, bed, score, ts FROM throws ORDER BY id"
+            ).fetchall()
+        by_game: dict[int, list[dict]] = {}
+        for t in throws:
+            by_game.setdefault(t["game_id"], []).append(
+                {"player": t["player"], "bed": t["bed"], "score": t["score"], "ts": t["ts"]}
+            )
+        return {
+            "schema": "granbridge.history.v1",
+            "exported_at": _utc_now(),
+            "games": [
+                {
+                    "id": g["id"],
+                    "mode": g["mode"],
+                    "players": json.loads(g["players_json"]),
+                    "options": json.loads(g["options_json"]),
+                    "winner": g["winner"],
+                    "started_at": g["started_at"],
+                    "ended_at": g["ended_at"],
+                    "throws": by_game.get(g["id"], []),
+                }
+                for g in games
+            ],
+        }
+
     def hit_counts(self, game_id: Optional[int] = None) -> dict[str, int]:
         """Return bed -> count across all throws, optionally scoped to a single game."""
         with _connect(self.db_path) as conn:

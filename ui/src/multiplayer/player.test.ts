@@ -82,3 +82,31 @@ describe("bio", () => {
     expect(p.name).toBe("Old");
   });
 });
+
+describe("entrance theme", () => {
+  it("is absent on a fresh profile", () => {
+    expect(getOrCreatePlayer().entranceTheme).toBeUndefined();
+  });
+
+  it("setPlayerEntranceTheme persists a valid theme", async () => {
+    const { setPlayerEntranceTheme } = await import("./player");
+    const p = setPlayerEntranceTheme("gold");
+    expect(p.entranceTheme).toBe("gold");
+    expect(getOrCreatePlayer().entranceTheme).toBe("gold");
+  });
+
+  it("setPlayerEntranceTheme(undefined) clears the theme", async () => {
+    const { setPlayerEntranceTheme } = await import("./player");
+    setPlayerEntranceTheme("teal");
+    const p = setPlayerEntranceTheme(undefined);
+    expect(p.entranceTheme).toBeUndefined();
+    expect(getOrCreatePlayer().entranceTheme).toBeUndefined();
+  });
+
+  it("drops an invalid persisted theme on read", () => {
+    localStorage.setItem(KEY, JSON.stringify({
+      id: "x1", name: "Ann", avatar: { color: "#fff" }, writeToken: "t", entranceTheme: "disco",
+    }));
+    expect(getOrCreatePlayer().entranceTheme).toBeUndefined();
+  });
+});

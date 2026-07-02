@@ -5,6 +5,7 @@
  */
 import { defaultAvatarColor } from "./avatar";
 import { importRecoveryKey } from "./recoveryKey";
+import { isEntranceTheme, type EntranceTheme } from "../entrance/themes";
 
 export interface AvatarSpec {
   color: string;
@@ -15,6 +16,8 @@ export interface Profile {
   avatar: AvatarSpec;
   writeToken: string;
   bio?: string;
+  /** Walk-on style for game start; absent = no entrance. */
+  entranceTheme?: EntranceTheme;
 }
 
 const STORAGE_KEY = "granbridge.player";
@@ -26,6 +29,7 @@ export function getOrCreatePlayer(): Profile {
     if (raw) {
       const parsed = JSON.parse(raw) as {
         id?: string; name?: string; avatar?: { color?: unknown }; writeToken?: unknown; bio?: unknown;
+        entranceTheme?: unknown;
       };
       if (parsed.id && parsed.name) {
         const hasColor = parsed.avatar && typeof parsed.avatar.color === "string";
@@ -36,6 +40,7 @@ export function getOrCreatePlayer(): Profile {
           avatar: { color: hasColor ? (parsed.avatar!.color as string) : defaultAvatarColor(parsed.id) },
           writeToken: hasToken ? (parsed.writeToken as string) : crypto.randomUUID(),
           ...(typeof parsed.bio === "string" ? { bio: parsed.bio } : {}),
+          ...(isEntranceTheme(parsed.entranceTheme) ? { entranceTheme: parsed.entranceTheme } : {}),
         };
         if (!hasColor || !hasToken) _persist(profile);
         return profile;
@@ -71,6 +76,14 @@ export function setPlayerColor(color: string): Profile {
 /** Update the stored bio; returns the updated profile. */
 export function setPlayerBio(bio: string): Profile {
   const updated: Profile = { ...getOrCreatePlayer(), bio };
+  _persist(updated);
+  return updated;
+}
+
+/** Update (or clear, with undefined) the stored entrance theme. */
+export function setPlayerEntranceTheme(theme: EntranceTheme | undefined): Profile {
+  const { entranceTheme: _drop, ...rest } = getOrCreatePlayer();
+  const updated: Profile = { ...rest, ...(theme ? { entranceTheme: theme } : {}) };
   _persist(updated);
   return updated;
 }

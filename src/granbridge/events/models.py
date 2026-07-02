@@ -49,12 +49,20 @@ class ConnectionState(BaseEvent):
 
 
 class ButtonEvent(BaseEvent):
+    """RESERVED — never emitted today. The board's OUT frame decodes as a
+    dart_hit MISS; no distinct button frame has been observed on real hardware.
+    Kept in the contract so consumers can subscribe forward-compatibly."""
+
     type: Literal["button"] = "button"
     raw: str
     name: str
 
 
 class Heartbeat(BaseEvent):
+    """RESERVED — never emitted today. The BLE watchdog raises internally on
+    stall rather than publishing Heartbeat(source="watchdog"), and no board
+    heartbeat frame has been identified. Kept for forward compatibility."""
+
     type: Literal["heartbeat"] = "heartbeat"
     source: Literal["board", "watchdog"]
 
