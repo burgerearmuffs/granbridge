@@ -53,6 +53,25 @@ Either way it starts the bridge (UI at `http://127.0.0.1:8080`) and begins looki
 4. Throw — scores, checkout hints, sounds, and celebrations update live. Use the on-screen controls for
    **next player**, **record miss**, **undo**, and **correct misread**.
 
+### Sound & celebration videos
+
+Every big moment ships with real, self-generated audio and video: dart-hit thuds, crowd-roar
+fanfares for legs/games/180s, and full-screen celebration clips (**GAME SHOT!**, **LEG!**, **180**,
+treble/bullseye flashes). The 🔊 header control mutes or sets the **volume**; the 🎬 control turns
+celebration videos off (or on to a reduced-motion text version). If the app loses its connection
+mid-game, a banner tells you what's reconnecting — your game state is never lost.
+
+**Make it yours:** every clip is a plain file you can replace — drop your own MP3s into the app's
+`sounds/` folder or MP4s into `videos/` using the same filenames (see the README files in those
+folders for the exact names and specs). Missing or broken files fall back to built-in effects
+automatically.
+
+### Entrance themes (walk-ons)
+
+Pick an **entrance theme** on the **Profile** tab — *Gold Standard*, *Cool Runnings*, or *Inferno*.
+When you start a game, your name gets a broadcast-style walk-on with video + fanfare. Click (or press
+Escape) to skip it.
+
 ## 5. Play online with a friend (multiplayer)
 
 Two people, each on their own board + their own GRANBRIDGE, play one shared match with video/voice.
@@ -89,12 +108,16 @@ Browser-source overlays (scoreboard, checkout, throw, stats, lower-third) are se
 `http://127.0.0.1:8080/overlays/`. Add one as a Browser Source in OBS. Add `?kiosk` to the main UI URL
 for a clean full-screen scoreboard.
 
-## 8. Where your data lives
+## 8. Where your data lives — and how to take it with you
 
 Everything writable is under **`%LOCALAPPDATA%\granbridge`**:
 - `history.db` — match history + career stats
 - `segment_map.overrides.json` — your calibration (if any)
 - `logs\` — decoded-event logs and diagnostics
+
+**Export any time:** the **History** tab has **Export JSON** (your complete history — every game and
+every dart, in a stable documented schema) and **Export CSV** (one row per throw, ready for a
+spreadsheet). Your data is never locked in.
 
 ## 9. Troubleshooting
 
