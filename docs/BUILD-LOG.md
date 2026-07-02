@@ -570,3 +570,25 @@ UI 444 passed. Versions bumped to 0.1.5.
   playing under filtering, MP4s canplaythrough.
 
 **Suite:** UI 508 passed (66 files), build green.
+
+---
+
+## 2026-07-02 — Final-polish pass (PR #29)
+
+- **Favicon/web icons** from the dartboard source (make_icon.py extended) — no more 404/blank tab.
+- **Entrance themes:** Gold Standard / Cool Runnings / Inferno walk-ons (text-free background
+  clips + fanfares via tools/make_entrances.py); Profile picker; EntranceOverlay fires on the
+  Start Game gesture, click/Escape to skip, video-settings + reduced-motion aware.
+- **Own-your-data export:** HistoryStore.export_all() at /api/history/export/all; History tab
+  Export JSON (canonical granbridge.history.v1) / Export CSV (row per throw).
+- **Disconnect UX:** prominent mid-game banner distinguishing board reconnects from bridge
+  outages (header badge is tiny and absent in kiosk mode).
+- **FOLLOWUPS audit:** everything actionable was already fixed (bounded queues, origin guard,
+  AppData paths, checkout lru_cache, public flush(), log sinks); heartbeat/button documented
+  RESERVED; FOLLOWUPS.md now truthful. A11y: Escape-skip + badge status label.
+- **Docs:** QUICKSTART/README cover sounds/videos, volume, drop-a-file customization,
+  entrance themes, export.
+- **Verified:** 207 Python + 532 UI tests, builds green; live smoke — favicon 200s, entrance
+  overlay end-to-end in a real browser ("Now throwing: Willa", inferno clip playing).
+
+**Suite:** UI 532 passed (69 files), bridge 207 passed. → v0.1.9 release next.
