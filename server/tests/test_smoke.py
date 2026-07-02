@@ -79,3 +79,17 @@ def test_recv_stun_message_reads_header_plus_body():
     sock = _FakeSock(msg + b"TRAILING")
     out = recv_stun_message(sock)
     assert out == msg
+
+
+def test_wss_ssl_context_advertises_http11_alpn():
+    # The 443 demux routes TLS by ALPN: no ALPN → coturn, http/1.1 → broker.
+    # Browsers always send ALPN; the smoke client must too or WSS false-fails.
+    ctx = smoke._wss_ssl_context("wss://play.example.com")
+    assert ctx is not None
+    # ssl.SSLContext doesn't expose the configured protos; monkey-level check:
+    # set_alpn_protocols was called iff our sentinel records it.
+    assert getattr(ctx, "_granbridge_alpn", None) == ["http/1.1"]
+
+
+def test_wss_ssl_context_none_for_plain_ws():
+    assert smoke._wss_ssl_context("ws://127.0.0.1:8798") is None

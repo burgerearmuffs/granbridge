@@ -55,7 +55,10 @@ This confirms in one command that:
   HMAC-minted credentials, verifying the full 443-only TURN flow end-to-end **without a browser**.
 - **`wss://` room join** — WebSocket is reachable and a `join` handshake completes.
   Install `websockets` (`pip install websockets`) to enable the WS check; without it the check
-  is skipped and the tool still reports the HTTP results.
+  is skipped and the tool still reports the HTTP results. The smoke client advertises
+  **ALPN `http/1.1`** on wss:// connects (like every browser) so the 443 ALPN demux routes it
+  to the broker — older smoke.py versions sent no ALPN, got demuxed to coturn, and false-failed
+  the WSS/stats checks on a perfectly healthy deployment.
 - **UDP 3478 checks** — SKIPPED by default (443-only mode). Pass `--legacy-udp` to test a legacy
   UDP-3478 deployment.
 
