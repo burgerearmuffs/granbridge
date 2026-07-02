@@ -1,6 +1,8 @@
 import type { Event } from "../types";
 import { SoundDecider } from "./decide";
 import { SynthPack } from "./SynthPack";
+import { FilePack } from "./FilePack";
+import { SOUND_MANIFEST } from "./manifest";
 import type { SoundName } from "./decide";
 
 const STORAGE_KEY = "granbridge.sound";
@@ -98,5 +100,8 @@ export class SoundManager {
   }
 }
 
-/** Application-wide singleton — import this everywhere. */
-export const soundManager = new SoundManager();
+/** Application-wide singleton — import this everywhere.
+ *  Real audio files from ui/public/sounds/ with per-sound SynthPack fallback. */
+export const soundManager = new SoundManager(
+  new FilePack(SOUND_MANIFEST, new SynthPack()),
+);

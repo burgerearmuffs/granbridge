@@ -1,47 +1,35 @@
-# Checkout Video Clips
+# Checkout & Announcement Video Clips
 
-Drop `.mp4` files here to enable real celebration videos.
-
-Vite serves everything in `ui/public/` at the site root with no filename hashing,
-so files placed here are immediately available at the paths listed below.
-
-## Expected filenames
-
-| File | Triggered by |
-|------|-------------|
-| `game-won.mp4` | `game_won` event — shown by `CheckoutOverlay` as "GAME SHOT!" |
-| `leg-won.mp4`  | `leg_won` event  — shown by `CheckoutOverlay` as "LEG!"       |
-
-These paths come from `ui/src/video/manifest.ts`:
+Real celebration clips shipped with the app, rendered procedurally by
+`tools/make_videos.py` (PIL frames piped to ffmpeg — rotating rays, physics
+confetti, broadcast headline with glow; 960×540 @ 30 fps, H.264 yuv420p).
+To restyle a clip, edit its `ClipSpec` there and rerun:
 
 ```
-/videos/game-won.mp4
-/videos/leg-won.mp4
+.venv/Scripts/python tools/make_videos.py
 ```
 
-## Fallback behaviour
+## Filenames
 
-If a file is absent (HTTP 404) or unplayable, `CheckoutOverlay` catches the
-`onError` event and automatically falls back to the built-in procedural
-CSS/text celebration — no code change required.
+These paths come from `ui/src/video/manifest.ts` (`VIDEO_MANIFEST`):
 
-## Recommended specs
+| File | Triggered by | Duration |
+|------|--------------|----------|
+| `game-won.mp4` | `game_won` — CheckoutOverlay "GAME SHOT!" | 6 s |
+| `leg-won.mp4`  | `leg_won` — CheckoutOverlay "LEG!" | 4 s |
+| `one-eighty.mp4` | a 180 visit (outranks the third dart's treble clip) | 2.6 s |
+| `treble-twenty.mp4` | a T20 hit | 2.2 s |
+| `treble-nineteen.mp4` | a T19 hit | 2.2 s |
+| `treble-eighteen.mp4` | a T18 hit | 2.2 s |
+| `bullseye.mp4` | a double bull (DBULL) | 2.2 s |
 
-- Short clips (4–10 s), portrait or landscape, ≤ 20 MB
-- H.264 + AAC in an MP4 container for broad browser support
-- The `<video>` element is `muted` so autoplay works in all browsers
+## Replacing a clip / fallback behaviour
 
-## Announcement clips (v0.1.7+)
+Drop any `.mp4` at the same path — Vite serves `ui/public/` at the site root
+with no hashing. If a file is absent (404) or unplayable, the overlays catch
+`onError` and fall back to the built-in procedural CSS celebration — no code
+change required.
 
-The same drop-a-file mechanism powers the big-hit `AnnouncementOverlay`:
-
-| File | Triggered by |
-|------|-------------|
-| `treble-twenty.mp4`   | a T20 hit — "TREBLE TWENTY!" |
-| `treble-nineteen.mp4` | a T19 hit |
-| `treble-eighteen.mp4` | a T18 hit |
-| `bullseye.mp4`        | a double bull (DBULL) |
-| `one-eighty.mp4`      | a 180 visit (outranks the third dart's treble clip) |
-
-Missing files fall back to the procedural gold text flash. Keep these clips
-SHORT (1–3 s) — they fire mid-game, capped at 5 s.
+Specs if you swap in your own: H.264 + AAC MP4, ≤ 20 MB; keep announcement
+clips ≤ 5 s (the AnnouncementOverlay hard-caps them at 5 s), and the
+`<video>` element is `muted` so autoplay works everywhere.

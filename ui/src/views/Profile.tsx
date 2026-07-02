@@ -54,9 +54,11 @@ export function Profile() {
   useEffect(() => {
     if (!getUploadEnabled()) return;
     const t = setTimeout(() => {
-      void updateProfile(
-        { id: profile.id, writeToken: profile.writeToken, name: profile.name, avatarColor: profile.avatar.color },
-        { name: profile.name, color: profile.avatar.color, bio: profile.bio ?? "" },
+      void Promise.resolve(
+        updateProfile(
+          { id: profile.id, writeToken: profile.writeToken, name: profile.name, avatarColor: profile.avatar.color },
+          { name: profile.name, color: profile.avatar.color, bio: profile.bio ?? "" },
+        ),
       ).catch(() => { /* best-effort */ });
     }, 600);
     return () => clearTimeout(t);

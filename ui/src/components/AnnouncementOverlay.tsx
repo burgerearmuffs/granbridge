@@ -82,7 +82,7 @@ export function AnnouncementOverlay() {
           muted
           playsInline
           data-testid="announcement-video"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover video-fade-in"
           onEnded={() => setVisible(false)}
           onError={() => {
             // No clip for this moment — procedural flash instead.
