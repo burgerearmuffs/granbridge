@@ -52,3 +52,10 @@ d.ellipse([c - R * 0.05, c - R * 0.05, c + R * 0.05, c + R * 0.05], fill=RED)
 OUT = "tools/granbridge-icon.png"
 img.save(OUT)
 print(f"wrote {OUT} {img.size}")
+
+# Web favicon set (served from ui/public/ — referenced by ui/index.html).
+img.save("ui/public/favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+img.resize((32, 32), Image.LANCZOS).save("ui/public/favicon-32.png")
+img.resize((180, 180), Image.LANCZOS).save("ui/public/apple-touch-icon.png")
+img.resize((192, 192), Image.LANCZOS).save("ui/public/icon-192.png")
+print("wrote ui/public/{favicon.ico,favicon-32.png,apple-touch-icon.png,icon-192.png}")
