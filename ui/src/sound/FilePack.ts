@@ -4,18 +4,23 @@ import type { SoundPack } from "./SoundManager";
 /**
  * Real-audio sound pack backed by files from SOUND_MANIFEST.
  *
- * Loading strategy (per sound, lazy):
- *  - First play() kicks off fetch + decodeAudioData and plays the fallback
- *    pack in the meantime, so a cue is never silent.
- *  - Once decoded, subsequent plays use the cached AudioBuffer.
- *  - A failed fetch/decode marks that sound as failed forever — it delegates
- *    to the fallback pack from then on, with no re-fetch.
- *  - If Web Audio is unavailable entirely, every play delegates.
+ * Loading strategy (per sound, lazy, three tiers):
+ *  1. fetch + decodeAudioData → cached AudioBuffer (lowest latency, overlaps
+ *     freely). First play() kicks this off and plays the fallback pack in the
+ *     meantime, so a cue is never silent.
+ *  2. If the fetch/decode path fails, probe an HTMLAudioElement instead.
+ *     Media-element requests take a different network path than fetch() and
+ *     survive content filters that intercept XHR audio responses.
+ *  3. If both fail, that sound delegates to the fallback pack (SynthPack)
+ *     forever — no re-fetching.
+ *
+ * If Web Audio is unavailable entirely, every play delegates immediately.
  */
 export class FilePack implements SoundPack {
   private ctx: AudioContext | null = null;
   private buffers = new Map<SoundName, AudioBuffer>();
-  private loading = new Map<SoundName, Promise<void>>();
+  private elements = new Map<SoundName, HTMLAudioElement>();
+  private loading = new Set<SoundName>();
   private failed = new Set<SoundName>();
 
   constructor(
@@ -53,9 +58,16 @@ export class FilePack implements SoundPack {
       return;
     }
 
+    const element = this.elements.get(name);
+    if (element) {
+      this.playElement(element, name, volume);
+      return;
+    }
+
     // Not loaded yet: start (or join) the load, cover this play with synth.
     if (!this.loading.has(name)) {
-      this.loading.set(name, this.load(ctx, name));
+      this.loading.add(name);
+      void this.load(ctx, name);
     }
     this.fallback.play(name, volume);
   }
@@ -65,12 +77,56 @@ export class FilePack implements SoundPack {
       const res = await fetch(this.manifest[name]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.arrayBuffer();
+      if (data.byteLength === 0) throw new Error("empty body");
       const buffer = await ctx.decodeAudioData(data);
       this.buffers.set(name, buffer);
+      this.loading.delete(name);
+    } catch {
+      this.probeElement(name);
+    }
+  }
+
+  /** Tier 2: see whether an <audio> element can load the clip instead. */
+  private probeElement(name: SoundName): void {
+    if (typeof Audio === "undefined") {
+      this.failed.add(name);
+      this.loading.delete(name);
+      return;
+    }
+    try {
+      const el = new Audio(this.manifest[name]);
+      el.preload = "auto";
+      el.addEventListener(
+        "canplaythrough",
+        () => {
+          this.elements.set(name, el);
+          this.loading.delete(name);
+        },
+        { once: true },
+      );
+      el.addEventListener(
+        "error",
+        () => {
+          this.failed.add(name);
+          this.loading.delete(name);
+        },
+        { once: true },
+      );
+      el.load();
     } catch {
       this.failed.add(name);
-    } finally {
       this.loading.delete(name);
+    }
+  }
+
+  private playElement(template: HTMLAudioElement, name: SoundName, volume: number): void {
+    try {
+      // Clone so rapid repeats overlap instead of restarting one element.
+      const el = template.cloneNode(true) as HTMLAudioElement;
+      el.volume = Math.max(0, Math.min(1, volume));
+      void el.play()?.catch?.(() => this.fallback.play(name, volume));
+    } catch {
+      this.fallback.play(name, volume);
     }
   }
 

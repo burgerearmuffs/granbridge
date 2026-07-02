@@ -53,6 +53,43 @@ class FakeAudioContext {
   }
 }
 
+/** Fake HTMLAudioElement whose load outcome the test controls. */
+class FakeAudio {
+  static instances: FakeAudio[] = [];
+  static loadOutcome: "canplay" | "error" | "pending" = "pending";
+  src: string;
+  preload = "";
+  volume = 1;
+  played = 0;
+  private listeners = new Map<string, () => void>();
+
+  constructor(src: string) {
+    this.src = src;
+    FakeAudio.instances.push(this);
+  }
+
+  addEventListener(type: string, cb: () => void) {
+    this.listeners.set(type, cb);
+  }
+
+  load() {
+    if (FakeAudio.loadOutcome !== "pending") {
+      this.listeners.get(FakeAudio.loadOutcome === "canplay" ? "canplaythrough" : "error")?.();
+    }
+  }
+
+  cloneNode(): FakeAudio {
+    const clone = new FakeAudio(this.src);
+    clone.volume = this.volume;
+    return clone;
+  }
+
+  play() {
+    this.played += 1;
+    return Promise.resolve();
+  }
+}
+
 const MANIFEST: Record<SoundName, string> = {
   "hit": "/sounds/hit.mp3",
   "hit-treble": "/sounds/hit-treble.mp3",
@@ -79,6 +116,9 @@ beforeEach(() => {
     arrayBuffer: async () => new ArrayBuffer(8),
   }));
   vi.stubGlobal("fetch", fetchMock);
+  FakeAudio.instances = [];
+  FakeAudio.loadOutcome = "pending";
+  vi.stubGlobal("Audio", FakeAudio);
 });
 
 afterEach(() => {
@@ -126,8 +166,42 @@ describe("FilePack", () => {
     expect(fakeCtx.gains[0].value).toBeCloseTo(0.8);
   });
 
-  it("falls back permanently for a sound whose fetch 404s, without re-fetching", async () => {
+  it("probes an <audio> element when fetch 404s and plays through it", async () => {
     fetchMock.mockResolvedValue({ ok: false, arrayBuffer: async () => new ArrayBuffer(0) });
+    FakeAudio.loadOutcome = "canplay";
+    const fallback = makeFakeFallback();
+    const pack = new FilePack(MANIFEST, fallback);
+
+    pack.play("miss", 0.5); // load kicks off; synth covers
+    await flush();
+
+    pack.play("miss", 0.7); // element ready → media-element playback
+    expect(fallback.calls).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fakeCtx.sources).toHaveLength(0);
+    // template + one clone; the clone actually played at the right volume
+    const clone = FakeAudio.instances[FakeAudio.instances.length - 1];
+    expect(clone.played).toBe(1);
+    expect(clone.volume).toBeCloseTo(0.7);
+  });
+
+  it("probes the element path when the fetched body is empty (filtered response)", async () => {
+    fetchMock.mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) });
+    FakeAudio.loadOutcome = "canplay";
+    const fallback = makeFakeFallback();
+    const pack = new FilePack(MANIFEST, fallback);
+
+    pack.play("hit", 0.5);
+    await flush();
+    pack.play("hit", 0.6);
+
+    expect(fakeCtx.decodeAudioData).not.toHaveBeenCalled();
+    expect(FakeAudio.instances[FakeAudio.instances.length - 1].played).toBe(1);
+  });
+
+  it("falls back permanently when both fetch and element fail, without re-fetching", async () => {
+    fetchMock.mockResolvedValue({ ok: false, arrayBuffer: async () => new ArrayBuffer(0) });
+    FakeAudio.loadOutcome = "error";
     const fallback = makeFakeFallback();
     const pack = new FilePack(MANIFEST, fallback);
 
@@ -141,8 +215,9 @@ describe("FilePack", () => {
     expect(fakeCtx.sources).toHaveLength(0);
   });
 
-  it("falls back permanently when decode fails", async () => {
+  it("falls back to synth (and probes element) when decode fails", async () => {
     fakeCtx.decodeAudioData.mockRejectedValue(new Error("bad data"));
+    FakeAudio.loadOutcome = "error";
     const fallback = makeFakeFallback();
     const pack = new FilePack(MANIFEST, fallback);
 
