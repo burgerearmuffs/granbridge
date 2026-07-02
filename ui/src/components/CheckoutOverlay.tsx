@@ -166,6 +166,7 @@ function OverlayInner({
           muted
           playsInline
           data-testid="checkout-video"
+          className="video-fade-in"
           style={{
             position: "absolute",
             inset: 0,
