@@ -551,3 +551,22 @@ UI 444 passed. Versions bumped to 0.1.5.
   label scrim, gradient banners, glass MP rail.
 
 **Suite:** UI 485 passed. Version bumped to 0.1.7.
+
+---
+
+## 2026-07-01 — AV assets: real sounds, celebration videos, polish (PR #28)
+
+- **Sound:** nine self-generated MP3s (tools/make_sounds.py — numpy layered synthesis:
+  sisal thuds, shaped-noise crowd roars, brass fanfares, convolution reverb) shipped in
+  ui/public/sounds/; new FilePack (TDD) with three-tier loading — fetch+decodeAudioData →
+  HTMLAudioElement probe → per-sound SynthPack fallback; app singleton plays real audio.
+- **Video:** seven procedurally rendered MP4s (tools/make_videos.py — PIL→ffmpeg, 960×540@30):
+  GAME SHOT!, LEG!, 180 triple-flash, T20/T19/T18, BULLSEYE ring-zoom; fill every
+  VIDEO_MANIFEST slot within the overlay duration caps.
+- **Polish:** backdrop grain + layered vignette, glassier board container, 250 ms video
+  fade-in (reduced-motion safe). Drive-by: Profile bio-sync catch guard.
+- **Verified end-to-end:** live-browser run exposed a fetch-filtering environment (audio/mpeg
+  → empty 204); the element tier was added and verified to recover — real audio confirmed
+  playing under filtering, MP4s canplaythrough.
+
+**Suite:** UI 508 passed (66 files), build green.
