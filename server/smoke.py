@@ -295,13 +295,29 @@ def check_turn(http_base: str) -> tuple[bool, str]:
         return False, f"/turn: {exc}"
 
 
+def _wss_ssl_context(ws_url: str):
+    """SSL context for wss:// smoke connects, or None for plain ws://.
+
+    The 443-only deployment demuxes TLS by ALPN: ClientHellos advertising
+    http/1.1 (every browser) go to the broker; anything else falls through to
+    coturn. Python's default context sends NO ALPN, so without this the WSS
+    and stats checks land on coturn and false-fail on a healthy deployment.
+    """
+    if not ws_url.startswith("wss"):
+        return None
+    ctx = _ssl.create_default_context()
+    ctx.set_alpn_protocols(["http/1.1"])
+    ctx._granbridge_alpn = ["http/1.1"]  # introspection hook for tests
+    return ctx
+
+
 async def check_ws(ws_url: str) -> tuple[bool | None, str]:
     try:
         import websockets
     except ImportError:
         return None, "wss connect: SKIPPED (install 'websockets' to enable this check)"
     try:
-        async with websockets.connect(ws_url, open_timeout=5) as ws:
+        async with websockets.connect(ws_url, open_timeout=5, ssl=_wss_ssl_context(ws_url)) as ws:
             await ws.send(json.dumps({
                 "type": "join", "room": "__smoke__", "password": "smoke",
                 "player": {"id": "smoke", "name": "smoke"},
@@ -329,7 +345,7 @@ async def check_stats(ws_url: str, http_base: str) -> tuple[bool | None, str]:
         "throws": None,
     }
     try:
-        async with websockets.connect(ws_url, open_timeout=5) as ws:
+        async with websockets.connect(ws_url, open_timeout=5, ssl=_wss_ssl_context(ws_url)) as ws:
             await ws.send(json.dumps({"type": "stats_submit", "id": pid, "writeToken": "smoke",
                                       "player": {"id": pid, "name": pid}, "match": match}))
             ack = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
