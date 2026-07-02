@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import type { Event, GameState } from "./types";
 import { announceForHit, type AnnounceKey } from "./video/decide";
+import type { EntranceTheme } from "./entrance/themes";
 
 interface Banner { kind: string; text: string; at: number; }
 export interface LastHit { bed: string; score: number; at: number; }
 export interface CommentaryLine { text: string; at: number; }
 export interface Announcement { key: AnnounceKey; at: number; }
+export interface EntranceCue { theme: EntranceTheme; playerName: string; at: number; }
 interface State {
   connection: string;
   gameState: GameState | null;
@@ -14,9 +16,12 @@ interface State {
   commentary: CommentaryLine | null;
   /** Latest big-hit moment (Treble Twenty, Bullseye, One Eighty…). */
   announcement: Announcement | null;
+  /** Walk-on cue fired when the local player starts a game. */
+  entrance: EntranceCue | null;
   /** Scores of the current visit's darts (local mirror, for 180 detection). */
   visitScores: number[];
   setConnection: (s: string) => void;
+  triggerEntrance: (theme: EntranceTheme, playerName: string) => void;
   applyEvent: (e: Event) => void;
   reset: () => void;
 }
@@ -29,11 +34,13 @@ export const useStore = create<State>((set) => ({
   lastHit: null,
   commentary: null,
   announcement: null,
+  entrance: null,
   visitScores: [],
   setConnection: (s) => set({ connection: s }),
+  triggerEntrance: (theme, playerName) => set({ entrance: { theme, playerName, at: Date.now() } }),
   reset: () => set({
     connection: "disconnected", gameState: null, banners: [], lastHit: null,
-    commentary: null, announcement: null, visitScores: [],
+    commentary: null, announcement: null, entrance: null, visitScores: [],
   }),
   applyEvent: (e) =>
     set((st) => {

@@ -23,6 +23,7 @@ import { Settings } from "./views/Settings";
 import { Onboarding, isOnboarded } from "./components/Onboarding";
 import { Tournament } from "./views/Tournament";
 import { AnnouncementOverlay } from "./components/AnnouncementOverlay";
+import { EntranceOverlay } from "./entrance/EntranceOverlay";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
@@ -136,6 +137,8 @@ export default function App() {
         )}
       </div>
       {showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
+      {/* Walk-on takeover sits above announcements, below GAME SHOT */}
+      <EntranceOverlay />
       {/* Big-hit flashes sit below the CheckoutOverlay takeover */}
       <AnnouncementOverlay />
       {/* Confetti fires on leg_won only; CheckoutOverlay owns game_won celebration */}

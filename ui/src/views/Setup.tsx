@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { Command } from "../types";
 import { PageHeader } from "../components/Page";
+import { getOrCreatePlayer } from "../multiplayer/player";
+import { useStore } from "../store";
 
 interface Props {
   send: (c: Command) => void;
@@ -30,6 +32,12 @@ export function Setup({ send }: Props) {
         : {};
 
     send({ command: "start_game", mode, players, options });
+
+    // Walk-on: the Start click is a user gesture, so the fanfare can play.
+    const profile = getOrCreatePlayer();
+    if (profile.entranceTheme) {
+      useStore.getState().triggerEntrance(profile.entranceTheme, profile.name);
+    }
   };
 
   const label = "block text-sm font-semibold text-neutral-300 mb-1";
