@@ -82,6 +82,7 @@ def serve(
                 "/api/history/stats": store.player_stats,
                 "/api/history/heatmap": store.hit_counts,
                 "/api/history/export/latest": store.export_latest_match,
+                "/api/history/export/all": store.export_all,
             },
             post_routes={
                 "/api/history/clear": store.clear_all,

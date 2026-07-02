@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { History } from "./History";
 
 const STATS_PAYLOAD = [
@@ -197,5 +197,63 @@ describe("History view", () => {
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/stats");
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/recent");
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8080/api/history/heatmap");
+  });
+});
+
+describe("History export", () => {
+  let originalFetch: typeof globalThis.fetch;
+  let originalCreate: typeof URL.createObjectURL;
+  let originalRevoke: typeof URL.revokeObjectURL;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    originalCreate = URL.createObjectURL;
+    originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:mock");
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+    vi.restoreAllMocks();
+  });
+
+  const DUMP = {
+    schema: "granbridge.history.v1",
+    exported_at: "2026-07-02T00:00:00.000Z",
+    games: [
+      {
+        id: 1, mode: "x01", players: ["Alice", "Bob"], options: {}, winner: "Alice",
+        started_at: "2026-05-20T18:00:00Z", ended_at: "2026-05-20T18:30:00Z",
+        throws: [{ player: "Alice", bed: "T20", score: 60, ts: "t" }],
+      },
+    ],
+  };
+
+  it("Export JSON fetches the full dump and triggers a download", async () => {
+    globalThis.fetch = makeFetch({ "/api/history/export/all": DUMP });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<History />);
+    await waitFor(() => expect(screen.getByText("Export JSON")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Export JSON"));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.endsWith("/api/history/export/all"))).toBe(true);
+  });
+
+  it("shows an error when the export endpoint fails", async () => {
+    globalThis.fetch = makeFetch({ "/api/history/export/all": undefined });
+    render(<History />);
+    await waitFor(() => expect(screen.getByText("Export CSV")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Export CSV"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
   });
 });
