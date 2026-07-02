@@ -1,11 +1,11 @@
 {
-  "version": "0.1.6",
-  "notes": "MP match options (301/501/701, best-of-legs), shareable result cards, live offline commentary, spectator chat.",
-  "pub_date": "2026-06-13T00:44:00.378Z",
+  "version": "0.1.9",
+  "notes": "Real sound effects, celebration videos, entrance themes, data export, disconnect banner",
+  "pub_date": "2026-07-02T14:49:18.136Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReC9wT3UyVmdnK0JxN2VJQVdPeXlJSUQ0eHNtc2JrZDdFWWh6L1A4eEhOaW1DZHA1NklzYWhZV1BlYmVWVW1qQlNqaHpEbGh5bVdYKzNXK0FqSzdCM3lraE1hcFJ6T2dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzExNDI5CWZpbGU6R1JBTkJSSURHRV8wLjEuNl94NjQtc2V0dXAuZXhlClg2RUV6TFkvbHRCcXFqcUZydy9jREV6N3lUV0U0ZmM2WGFLdFU4Mi9nWm81NnJQM1pxVUo5TWFYVEV4Z2gveElIVUYzWUZhZXp1dXpjY3YvK2JSd0NRPT0K",
-      "url": "https://github.com/burgerearmuffs/granbridge/releases/download/v0.1.6/GRANBRIDGE_0.1.6_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReC9wT3UyVmdnK0p6MTg2Z3lLMVp5elExSWpVM2Y0TUE2dm43YjIxSmxTWEtJMGJuVFpnTXNYWExqY2g4REVaOEZhSytBYjZjQnMya2VVcWhhNStCNW85dXdyS0FYRmc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzMDAzNzI2CWZpbGU6R1JBTkJSSURHRV8wLjEuOV94NjQtc2V0dXAuZXhlCmN4RkJwZHF0SXpTYmQwSHIvZWFxenF6VEZOT2JnandCQlRBdjlzbWg4b3hmRkFFbU1ZWkFaaEZhbkovOHpHZU9NVDgrZ05PQUNOVGg4ZnZvRGNRSUJ3PT0K",
+      "url": "https://github.com/burgerearmuffs/granbridge/releases/download/v0.1.9/GRANBRIDGE_0.1.9_x64-setup.exe"
     }
   }
 }
