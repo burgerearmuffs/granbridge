@@ -24,6 +24,7 @@ import { Onboarding, isOnboarded } from "./components/Onboarding";
 import { Tournament } from "./views/Tournament";
 import { AnnouncementOverlay } from "./components/AnnouncementOverlay";
 import { EntranceOverlay } from "./entrance/EntranceOverlay";
+import { DisconnectBanner } from "./components/DisconnectBanner";
 import { useStatsSubmission } from "./stats/useStatsSubmission";
 import { flush as flushStatsQueue } from "./stats/statsQueue";
 
@@ -127,6 +128,7 @@ export default function App() {
           <History />
         ) : playing ? (
           <>
+            <DisconnectBanner connection={connection} playing={true} />
             <LiveGame state={gameState!} />
             <div className="mt-10">
               <Controls send={send} />
