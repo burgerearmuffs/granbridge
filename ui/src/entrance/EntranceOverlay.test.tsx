@@ -112,3 +112,12 @@ describe("EntranceOverlay", () => {
     expect(FakeAudio.instances).toHaveLength(1);
   });
 });
+
+describe("EntranceOverlay keyboard", () => {
+  it("dismisses on Escape", () => {
+    render(<EntranceOverlay />);
+    trigger();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("entrance-overlay")).toBeNull();
+  });
+});

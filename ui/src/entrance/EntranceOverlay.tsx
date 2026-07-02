@@ -61,6 +61,19 @@ export function EntranceOverlay() {
     if (timerRef.current !== null) clearTimeout(timerRef.current);
   }, []);
 
+  // Keyboard skip: Escape dismisses while visible.
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (timerRef.current !== null) clearTimeout(timerRef.current);
+        setVisible(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible]);
+
   if (!visible || !entrance) return null;
   const spec = ENTRANCE_THEMES[entrance.theme];
 
